@@ -118,3 +118,14 @@ func allocateHare(votes map[string]int, totalSeats int, threshold float64) map[s
 	}
 	return seats
 }
+
+// SumSeats aggregates per-region seat maps into parliament-wide totals keyed by Party.ID.
+func SumSeats(regionSeats map[string]map[string]int) map[string]int {
+	totals := make(map[string]int)
+	for _, seats := range regionSeats {
+		for partyID, count := range seats {
+			totals[partyID] += count
+		}
+	}
+	return totals
+}

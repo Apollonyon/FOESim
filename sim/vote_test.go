@@ -57,3 +57,28 @@ func TestVoteShares(t *testing.T) {
 		}
 	})
 }
+
+func TestSimulateRegion(t *testing.T) {
+	parties := DefaultParties()
+	for _, r := range DefaultRegions() {
+		t.Run(r.ID, func(t *testing.T) {
+			votes, seats := SimulateRegion(r, parties, 0.85)
+
+			totalVotes := 0
+			for _, v := range votes {
+				totalVotes += v
+			}
+			if totalVotes <= 0 {
+				t.Errorf("expected positive votes for %s, got %d", r.ID, totalVotes)
+			}
+
+			totalSeats := 0
+			for _, s := range seats {
+				totalSeats += s
+			}
+			if totalSeats != r.Seats {
+				t.Errorf("allocated %d seats for %s, want %d", totalSeats, r.ID, r.Seats)
+			}
+		})
+	}
+}

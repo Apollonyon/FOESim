@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ParliamentSim — European Election Atlas</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Full-viewport interactive Europe map -->
+  <main id="map-stage" aria-label="Interactive European Election Map">
+    <svg id="europe-map" viewBox="120 140 780 820" preserveAspectRatio="xMidYMid meet">
+      <defs id="map-defs"></defs>
+      <g id="map-viewport">
+        <g id="layer-graticule"></g>
+        <g id="layer-context"></g>
+        <g id="layer-countries"></g>
+        <g id="layer-precincts"></g>
+        <g id="layer-borders"></g>
+        <g id="layer-labels"></g>
+      </g>
+    </svg>
+
+    <!-- Map hover tooltip -->
+    <div id="map-tooltip" class="tooltip hidden"></div>
+
+    <!-- Top-left floating command strip -->
+    <header class="hud hud-top-left">
+      <div class="brand-row">
+        <div class="brand">
+          <span class="brand-mark">EU</span>
+          <div>
+            <h1>ParliamentSim</h1>
+            <div id="scenario-subtitle" class="subtitle">Loading scenario…</div>
+          </div>
+        </div>
+        <div id="status-badge" class="status-badge status-idle">
+          <span class="status-dot"></span>
+          <span id="status-text">READY</span>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <button id="btn-run" class="btn btn-primary">Start Election</button>
+        <div class="segmented" role="group" aria-label="Broadcast speed">
+          <button class="seg-btn" data-delay="320">1×</button>
+          <button class="seg-btn active" data-delay="140">2×</button>
+          <button class="seg-btn" data-delay="45">5×</button>
+          <button class="seg-btn" data-delay="0">Instant</button>
+        </div>
+
+        <label class="mini-field" title="Random seed">
+          <span>Seed</span>
+          <input id="input-seed" type="number" value="42" />
+          <button id="btn-rand-seed" class="icon-btn" title="Randomize seed">↻</button>
+        </label>
+
+        <label class="mini-field" title="Voter choice temperature (lower = sharper polarization)">
+          <span>Temp</span>
+          <input id="input-temp" type="range" min="0.35" max="1.60" step="0.05" value="0.85" />
+          <output id="temp-val">0.85</output>
+        </label>
+      </div>
+
+      <div class="nav-row">
+        <div class="focus-pills" id="focus-pills">
+          <button class="focus-btn active" data-focus="eu">Europe</button>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <span id="progress-label" class="mono">0 / 0 precincts</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Top-right floating overlay switcher & legend -->
+    <aside class="hud hud-top-right">
+      <div class="overlay-bar" role="group" aria-label="Map overlay">
+        <button class="ov-btn active" data-overlay="winner">Winner</button>
+        <button class="ov-btn" data-overlay="party">Party %</button>
+        <button class="ov-btn" data-overlay="turnout">Turnout</button>
+        <button class="ov-btn" data-overlay="eu_axis">Pro-EU</button>
+        <button class="ov-btn" data-overlay="econ_axis">Left–Right</button>
+      </div>
+      <div id="party-picker-wrap" class="party-picker hidden">
+        <label for="party-select">Party</label>
+        <select id="party-select"></select>
+      </div>
+      <div id="map-legend" class="legend"></div>
+    </aside>
+
+    <!-- Zoom controls -->
+    <div class="hud zoom-controls">
+      <button id="btn-zoom-in" class="zoom-btn" title="Zoom in">+</button>
+      <button id="btn-zoom-out" class="zoom-btn" title="Zoom out">−</button>
+      <button id="btn-zoom-reset" class="zoom-btn" title="Reset view">⌖</button>
+    </div>
+
+    <!-- Bottom-left floating Parliament Hemicycle HUD -->
+    <section id="hemicycle-hud" class="hud hud-bottom-left">
+      <div class="hud-header">
+        <div>
+          <span class="hud-kicker">EUROPEAN PARLIAMENT PROJECTION</span>
+          <div class="hud-sub"><span id="hemicycle-total" class="mono">0</span> seats · majority <span id="hemicycle-maj" class="mono">0</span></div>
+        </div>
+        <button id="btn-toggle-hemi" class="icon-btn" title="Collapse/Expand">▾</button>
+      </div>
+      <div id="hemicycle-body" class="hemicycle-body">
+        <svg id="hemicycle-svg" viewBox="0 0 360 195" aria-label="Parliament seat hemicycle"></svg>
+        <div id="seat-ledger" class="seat-ledger"></div>
+      </div>
+    </section>
+
+    <!-- Bottom-right live reporting ticker -->
+    <aside id="ticker" class="hud hud-bottom-right" aria-live="polite"></aside>
+
+    <!-- Right slide-in inspector drawer (shown on country / precinct click) -->
+    <aside id="inspector" class="hud inspector hidden" aria-label="Selection inspector">
+      <div class="inspector-head">
+        <div>
+          <div id="inspector-kicker" class="hud-kicker">COUNTRY</div>
+          <h2 id="inspector-title">—</h2>
+        </div>
+        <button id="btn-close-inspector" class="icon-btn" title="Close">✕</button>
+      </div>
+      <div id="inspector-stats" class="inspector-stats"></div>
+      <div id="inspector-actions" class="inspector-actions"></div>
+      <div id="inspector-bars" class="inspector-bars"></div>
+    </aside>
+  </main>
+
+  <script src="mapdata.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

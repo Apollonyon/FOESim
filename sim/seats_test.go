@@ -96,3 +96,14 @@ func TestAllocateSeats(t *testing.T) {
 		})
 	}
 }
+
+func TestSumSeats(t *testing.T) {
+	got := SumSeats(map[string]map[string]int{
+		"de": {"epp": 30, "sd": 14},
+		"fr": {"epp": 8, "pfe": 30},
+	})
+	want := map[string]int{"epp": 38, "sd": 14, "pfe": 30}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
