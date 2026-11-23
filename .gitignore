@@ -1,0 +1,15 @@
+# Compiled binaries
+/parliamentsim
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary & coverage
+*.test
+*.out
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
