@@ -1,0 +1,202 @@
+{
+  "name": "EU Starter (DE, FR, IT)",
+  "parties": [
+    {
+      "id": "left",
+      "name": "The Left",
+      "short_name": "LEFT",
+      "color": "#B71C1C",
+      "position": [-0.85, -0.75, -0.20, -0.75, 0.65],
+      "appeal": -0.15
+    },
+    {
+      "id": "sd",
+      "name": "Socialists & Democrats",
+      "short_name": "S&D",
+      "color": "#E53935",
+      "position": [-0.45, -0.45, 0.55, 0.15, 0.45],
+      "appeal": 0.20
+    },
+    {
+      "id": "greens",
+      "name": "Greens/EFA",
+      "short_name": "GREENS",
+      "color": "#43A047",
+      "position": [-0.35, -0.80, 0.75, 0.05, 0.95],
+      "appeal": 0.05
+    },
+    {
+      "id": "volt",
+      "name": "Volt Europa",
+      "short_name": "VOLT",
+      "color": "#6A1B9A",
+      "position": [0.10, -0.75, 0.95, 0.45, 0.75],
+      "appeal": -0.55
+    },
+    {
+      "id": "renew",
+      "name": "Renew Europe",
+      "short_name": "RENEW",
+      "color": "#FBC02D",
+      "position": [0.45, -0.35, 0.80, 0.45, 0.25],
+      "appeal": 0.10
+    },
+    {
+      "id": "epp",
+      "name": "European People's Party",
+      "short_name": "EPP",
+      "color": "#1E88E5",
+      "position": [0.45, 0.30, 0.50, 0.60, -0.05],
+      "appeal": 0.35
+    },
+    {
+      "id": "ecr",
+      "name": "European Conservatives & Reformists",
+      "short_name": "ECR",
+      "color": "#1565C0",
+      "position": [0.55, 0.70, -0.40, 0.70, -0.45],
+      "appeal": 0.10
+    },
+    {
+      "id": "pfe",
+      "name": "Patriots for Europe",
+      "short_name": "PfE",
+      "color": "#0D47A1",
+      "position": [0.10, 0.90, -0.85, -0.35, -0.75],
+      "appeal": 0.15
+    }
+  ],
+  "regions": [
+    {
+      "id": "de",
+      "name": "Germany",
+      "seats": 96,
+      "precincts": 16,
+      "method": "sainte_lague",
+      "threshold": 0.0,
+      "party_bonus": {
+        "epp": 0.25,
+        "greens": 0.15,
+        "volt": 0.10,
+        "ecr": -0.25
+      },
+      "groups": [
+        {
+          "name": "Urban Youth",
+          "population": 11000000,
+          "turnout": 0.62,
+          "ideal": [-0.35, -0.75, 0.75, 0.10, 0.85],
+          "weights": [1.0, 1.4, 1.3, 0.7, 1.8]
+        },
+        {
+          "name": "Suburban Professionals",
+          "population": 18000000,
+          "turnout": 0.72,
+          "ideal": [0.35, -0.10, 0.60, 0.50, 0.20],
+          "weights": [1.6, 0.9, 1.2, 1.1, 1.0]
+        },
+        {
+          "name": "Industrial Workers",
+          "population": 16000000,
+          "turnout": 0.58,
+          "ideal": [-0.30, 0.35, -0.25, -0.10, -0.40],
+          "weights": [1.7, 1.2, 1.0, 0.8, 1.1]
+        },
+        {
+          "name": "Rural Retirees",
+          "population": 16000000,
+          "turnout": 0.70,
+          "ideal": [0.25, 0.55, 0.15, 0.35, -0.25],
+          "weights": [1.2, 1.6, 0.9, 1.1, 0.7]
+        }
+      ]
+    },
+    {
+      "id": "fr",
+      "name": "France",
+      "seats": 81,
+      "precincts": 14,
+      "method": "dhondt",
+      "threshold": 0.05,
+      "party_bonus": {
+        "pfe": 0.45,
+        "renew": 0.15,
+        "left": 0.15,
+        "epp": -0.35
+      },
+      "groups": [
+        {
+          "name": "Metro Progressives",
+          "population": 12000000,
+          "turnout": 0.56,
+          "ideal": [-0.55, -0.70, 0.45, 0.05, 0.75],
+          "weights": [1.4, 1.3, 1.0, 0.7, 1.5]
+        },
+        {
+          "name": "Urban Centrists",
+          "population": 11000000,
+          "turnout": 0.64,
+          "ideal": [0.40, -0.25, 0.75, 0.55, 0.15],
+          "weights": [1.5, 0.9, 1.5, 1.2, 0.9]
+        },
+        {
+          "name": "Peri-Urban Voters",
+          "population": 15000000,
+          "turnout": 0.54,
+          "ideal": [-0.05, 0.70, -0.65, -0.10, -0.60],
+          "weights": [1.4, 1.6, 1.5, 0.8, 1.1]
+        },
+        {
+          "name": "Conservative Seniors",
+          "population": 11000000,
+          "turnout": 0.66,
+          "ideal": [0.45, 0.55, 0.10, 0.50, -0.20],
+          "weights": [1.3, 1.5, 1.0, 1.1, 0.6]
+        }
+      ]
+    },
+    {
+      "id": "it",
+      "name": "Italy",
+      "seats": 76,
+      "precincts": 12,
+      "method": "hare",
+      "threshold": 0.04,
+      "party_bonus": {
+        "ecr": 0.50,
+        "sd": 0.20,
+        "greens": -0.20
+      },
+      "groups": [
+        {
+          "name": "Northern Businesses",
+          "population": 13000000,
+          "turnout": 0.58,
+          "ideal": [0.55, 0.45, -0.10, 0.45, -0.35],
+          "weights": [1.7, 1.1, 1.2, 0.9, 0.9]
+        },
+        {
+          "name": "Urban Center-Left",
+          "population": 12000000,
+          "turnout": 0.56,
+          "ideal": [-0.45, -0.50, 0.60, 0.10, 0.55],
+          "weights": [1.3, 1.3, 1.2, 0.8, 1.3]
+        },
+        {
+          "name": "Southern Households",
+          "population": 14000000,
+          "turnout": 0.45,
+          "ideal": [-0.25, 0.50, -0.35, -0.15, -0.20],
+          "weights": [1.6, 1.3, 1.2, 0.8, 0.7]
+        },
+        {
+          "name": "Young Graduates",
+          "population": 8000000,
+          "turnout": 0.52,
+          "ideal": [-0.10, -0.70, 0.80, 0.25, 0.75],
+          "weights": [1.2, 1.3, 1.5, 0.8, 1.6]
+        }
+      ]
+    }
+  ]
+}

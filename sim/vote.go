@@ -2,6 +2,7 @@ package sim
 
 import (
 	"math"
+	"slices"
 )
 
 // VoteShares returns each party's vote probability (keyed by Party.ID) for group,
@@ -38,7 +39,9 @@ func VoteShares(group VoterGroup, parties []Party, temperature float64) map[stri
 	return shares
 }
 
+// SimulateRegion computes deterministic vote totals and seat allocations for r.
 func SimulateRegion(r Region, parties []Party, temperature float64) (map[string]int, map[string]int) {
+	parties = applyPartyBonus(parties, r.PartyBonus)
 	votes := make(map[string]int)
 	for _, g := range r.Groups {
 		voters := g.ExpectedVoters()
@@ -50,4 +53,14 @@ func SimulateRegion(r Region, parties []Party, temperature float64) (map[string]
 
 	seats := AllocateSeats(votes, r.Seats, r.Method, r.Threshold)
 	return votes, seats
+}
+func applyPartyBonus(parties []Party, bonus map[string]float64) []Party {
+	if len(bonus) == 0 {
+		return parties
+	}
+	adjusted := slices.Clone(parties)
+	for i, p := range adjusted {
+		adjusted[i].Appeal += bonus[p.ID]
+	}
+	return adjusted
 }

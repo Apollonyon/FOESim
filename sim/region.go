@@ -14,13 +14,14 @@ type VoterGroup struct {
 
 // Region is an electoral district with a fixed seat quota and reporting precincts.
 type Region struct {
-	ID        string           `json:"id"`
-	Name      string           `json:"name"`
-	Seats     int              `json:"seats"`
-	Precincts int              `json:"precincts"`
-	Groups    []VoterGroup     `json:"groups"`
-	Method    AllocationMethod `json:"method"`
-	Threshold float64          `json:"threshold"`
+	ID         string             `json:"id"`
+	Name       string             `json:"name"`
+	Seats      int                `json:"seats"`
+	Precincts  int                `json:"precincts"`
+	Groups     []VoterGroup       `json:"groups"`
+	Method     AllocationMethod   `json:"method"`
+	Threshold  float64            `json:"threshold"`
+	PartyBonus map[string]float64 `json:"party_bonus,omitempty"`
 }
 
 // ExpectedVoters returns the rounded number of voters expected to turn out.
