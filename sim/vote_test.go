@@ -10,17 +10,17 @@ func TestVoteShares(t *testing.T) {
 		Name:       "Test Voters",
 		Population: 100_000,
 		Turnout:    0.70,
-		Ideal:      PolicyVec{AxisEcon: -0.5, AxisSocial: -0.5, AxisEU: 0.5, AxisDefense: 0.0, AxisEnv: 0.8},
-		Weights:    PolicyVec{1, 1, 1, 1, 1},
+		Ideal:      PolicyVec{AxisEcon: -0.5, AxisSocial: -0.5, AxisEU: 0.5, AxisDefense: 0.0, AxisEnv: 0.8, AxisMigration: -0.4},
+		Weights:    PolicyVec{1, 1, 1, 1, 1, 1},
 	}
 
 	closeParty := Party{
 		ID:       "close",
-		Position: PolicyVec{AxisEcon: -0.4, AxisSocial: -0.5, AxisEU: 0.5, AxisDefense: 0.0, AxisEnv: 0.8},
+		Position: PolicyVec{AxisEcon: -0.4, AxisSocial: -0.5, AxisEU: 0.5, AxisDefense: 0.0, AxisEnv: 0.8, AxisMigration: -0.3},
 	}
 	farParty := Party{
 		ID:       "far",
-		Position: PolicyVec{AxisEcon: 0.8, AxisSocial: 0.8, AxisEU: -0.8, AxisDefense: 0.5, AxisEnv: -0.8},
+		Position: PolicyVec{AxisEcon: 0.8, AxisSocial: 0.8, AxisEU: -0.8, AxisDefense: 0.5, AxisEnv: -0.8, AxisMigration: 0.9},
 	}
 
 	t.Run("empty parties returns empty map", func(t *testing.T) {

@@ -145,14 +145,42 @@ func TestLoadScenario(t *testing.T) {
 		if s.Name == "" {
 			t.Error("expected non-empty scenario name")
 		}
-		if len(s.Parties) != 8 {
-			t.Errorf("got %d parties, want 8", len(s.Parties))
+		if !s.UsesNationalParties() || len(s.Groups) < 8 {
+			t.Errorf("expected EU political groups in starter scenario, got %d", len(s.Groups))
 		}
 		if len(s.Regions) != 3 {
 			t.Errorf("got %d regions, want 3", len(s.Regions))
 		}
-		if len(s.Regions[0].PartyBonus) == 0 {
-			t.Error("expected party_bonus to be populated on first region")
+		for _, r := range s.Regions {
+			if len(r.Parties) == 0 {
+				t.Errorf("expected national parties on region %s", r.ID)
+			}
+		}
+	})
+
+	t.Run("valid full EU-27 720-seat scenario", func(t *testing.T) {
+		s, err := LoadScenario("../scenarios/eu27.json")
+		if err != nil {
+			t.Fatalf("LoadScenario(eu27.json) failed: %v", err)
+		}
+		if len(s.Regions) != 27 {
+			t.Fatalf("got %d EU regions, want 27", len(s.Regions))
+		}
+		totalSeats := 0
+		totalCounties := 0
+		for _, r := range s.Regions {
+			totalSeats += r.Seats
+			n := r.EffectivePrecinctCount()
+			if n <= 0 {
+				t.Errorf("region %s resolved 0 NUTS-3 counties", r.ID)
+			}
+			totalCounties += n
+		}
+		if totalSeats != 720 {
+			t.Errorf("EU-27 total seats = %d, want 720", totalSeats)
+		}
+		if totalCounties != 1152 {
+			t.Errorf("EU-27 NUTS-3 counties = %d, want 1152", totalCounties)
 		}
 	})
 
@@ -163,6 +191,7 @@ func TestLoadScenario(t *testing.T) {
 	})
 
 	t.Run("validation catches empty or malformed scenarios", func(t *testing.T) {
+		validGroup := VoterGroup{ID: "g1", Name: "G1", Population: 1000, Turnout: 0.5}
 		cases := []struct {
 			name     string
 			scenario Scenario
@@ -170,11 +199,54 @@ func TestLoadScenario(t *testing.T) {
 			{name: "no parties", scenario: Scenario{Name: "empty", Regions: DefaultRegions()}},
 			{name: "no regions", scenario: Scenario{Name: "empty", Parties: DefaultParties()}},
 			{
-				name:    "unknown method",
+				name: "no voter groups",
+				scenario: Scenario{
+					Name:    "empty groups",
+					Parties: DefaultParties(),
+					Regions: []Region{{ID: "xx", Method: MethodDHondt}},
+				},
+			},
+			{
+				name: "duplicate region id",
+				scenario: Scenario{
+					Name:    "dup region",
+					Parties: DefaultParties(),
+					Regions: []Region{
+						{ID: "xx", Groups: []VoterGroup{validGroup}},
+						{ID: "xx", Groups: []VoterGroup{validGroup}},
+					},
+				},
+			},
+			{
+				name: "unknown EU group on party",
+				scenario: Scenario{
+					Name:   "bad group ref",
+					Groups: []EUGroup{{ID: "epp"}},
+					Regions: []Region{{
+						ID:      "xx",
+						Groups:  []VoterGroup{validGroup},
+						Parties: []Party{{ID: "p1", GroupID: "missing_group"}},
+					}},
+				},
+			},
+			{
+				name: "unknown voter group in district_tilts",
+				scenario: Scenario{
+					Name:    "bad tilt ref",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:            "xx",
+						Groups:        []VoterGroup{validGroup},
+						DistrictTilts: map[string]map[string]float64{"XX1": {"ghost_group": 1.5}},
+					}},
+				},
+			},
+			{
+				name: "unknown method",
 				scenario: Scenario{
 					Name:    "bad method",
 					Parties: DefaultParties(),
-					Regions: []Region{{ID: "xx", Method: "dhont"}},
+					Regions: []Region{{ID: "xx", Method: "dhont", Groups: []VoterGroup{validGroup}}},
 				},
 			},
 		}
@@ -186,4 +258,89 @@ func TestLoadScenario(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestStreamElectionNUTS3AndTargetDuration(t *testing.T) {
+	s, err := LoadScenario("../scenarios/eu_starter.json")
+	if err != nil {
+		t.Fatalf("LoadScenario failed: %v", err)
+	}
+	wantTotal := 0
+	for _, r := range s.Regions {
+		wantTotal += r.EffectivePrecinctCount()
+	}
+
+	cfg := ElectionConfig{
+		Temperature:    0.85,
+		Swing:          0.10,
+		Seed:           42,
+		TargetDuration: 20 * time.Millisecond,
+	}
+
+	got := 0
+	for range StreamElection(context.Background(), s.Regions, s.Parties, cfg) {
+		got++
+	}
+	if got != wantTotal {
+		t.Fatalf("received %d NUTS-3 reports, want %d", got, wantTotal)
+	}
+}
+
+func TestStreamElectionWavesSumExact(t *testing.T) {
+	parties := DefaultParties()
+	region := DefaultRegions()[0]
+
+	full := SimulatePrecincts(region, parties, 0.85, 0.15, 42)
+	wantByPrecinct := make(map[string]map[string]int, len(full))
+	for _, rep := range full {
+		wantByPrecinct[rep.PrecinctID] = rep.Votes
+	}
+
+	cfg := ElectionConfig{
+		Temperature: 0.85,
+		Swing:       0.15,
+		Seed:        42,
+		Waves:       3,
+	}
+
+	gotByPrecinct := make(map[string]map[string]int, len(full))
+	lastPct := make(map[string]float64, len(full))
+	waveCount := 0
+
+	var run1 []PrecinctReport
+	for rep := range StreamElection(context.Background(), []Region{region}, parties, cfg) {
+		run1 = append(run1, rep)
+		waveCount++
+		if rep.ReportedPct < lastPct[rep.PrecinctID] {
+			t.Errorf("precinct %s reported_pct went backwards: %v -> %v",
+				rep.PrecinctID, lastPct[rep.PrecinctID], rep.ReportedPct)
+		}
+		lastPct[rep.PrecinctID] = rep.ReportedPct
+		if gotByPrecinct[rep.PrecinctID] == nil {
+			gotByPrecinct[rep.PrecinctID] = make(map[string]int)
+		}
+		for pid, v := range rep.Votes {
+			gotByPrecinct[rep.PrecinctID][pid] += v
+		}
+	}
+
+	var run2 []PrecinctReport
+	for rep := range StreamElection(context.Background(), []Region{region}, parties, cfg) {
+		run2 = append(run2, rep)
+	}
+	if !reflect.DeepEqual(run1, run2) {
+		t.Errorf("same seed produced non-deterministic wave sequence")
+	}
+
+	if waveCount != len(full)*3 {
+		t.Fatalf("got %d wave events, want %d", waveCount, len(full)*3)
+	}
+	for pid, wantVotes := range wantByPrecinct {
+		if lastPct[pid] != 1.0 {
+			t.Errorf("precinct %s final reported_pct = %v, want 1.0", pid, lastPct[pid])
+		}
+		if !reflect.DeepEqual(gotByPrecinct[pid], wantVotes) {
+			t.Errorf("precinct %s wave sum %v != full %v", pid, gotByPrecinct[pid], wantVotes)
+		}
+	}
 }

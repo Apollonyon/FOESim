@@ -107,3 +107,31 @@ func TestSumSeats(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
+
+func TestRollupGroupSeats(t *testing.T) {
+	parties := []Party{
+		{ID: "de_cdu", GroupID: "epp"},
+		{ID: "de_grune", GroupID: "greens"},
+		{ID: "de_volt", GroupID: "greens"},
+		{ID: "de_bsw", GroupID: ""},
+	}
+	seats := map[string]int{
+		"de_cdu":   29,
+		"de_grune": 12,
+		"de_volt":  3,
+		"de_bsw":   6,
+		"unknown":  2,
+		"zero":     0,
+		"neg":      -1,
+	}
+
+	got := RollupGroupSeats(seats, parties)
+	want := map[string]int{
+		"epp":         29,
+		"greens":      15,
+		NonInscritsID: 8, // de_bsw (6) + unknown (2)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,55 +7,54 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Full-viewport interactive Europe map -->
-  <main id="map-stage" aria-label="Interactive European Election Map">
-    <svg id="europe-map" viewBox="120 140 780 820" preserveAspectRatio="xMidYMid meet">
-      <defs id="map-defs"></defs>
+  <main id="map-stage" aria-label="Interactive Eurostat NUTS-3 European Election Map">
+    <svg id="europe-map" viewBox="160 270 620 670" preserveAspectRatio="xMidYMid meet">
       <g id="map-viewport">
-        <g id="layer-graticule"></g>
         <g id="layer-context"></g>
-        <g id="layer-countries"></g>
-        <g id="layer-precincts"></g>
+        <g id="layer-nuts3"></g>
         <g id="layer-borders"></g>
         <g id="layer-labels"></g>
       </g>
     </svg>
 
-    <!-- Map hover tooltip -->
     <div id="map-tooltip" class="tooltip hidden"></div>
 
-    <!-- Top-left floating command strip -->
+    <!-- Top-left floating frosted command strip -->
     <header class="hud hud-top-left">
       <div class="brand-row">
         <div class="brand">
-          <span class="brand-mark">EU</span>
+          <span class="brand-mark">EP</span>
           <div>
             <h1>ParliamentSim</h1>
-            <div id="scenario-subtitle" class="subtitle">Loading scenario…</div>
+            <div id="scenario-subtitle" class="subtitle">Loading Eurostat NUTS-3 atlas…</div>
           </div>
         </div>
-        <div id="status-badge" class="status-badge status-idle">
-          <span class="status-dot"></span>
-          <span id="status-text">READY</span>
+        <div class="brand-right">
+          <span id="sim-clock" class="sim-clock mono" title="Simulated CET Election Night Clock">18:00 CET</span>
+          <div id="status-badge" class="status-badge status-idle">
+            <span class="status-dot"></span>
+            <span id="status-text">READY</span>
+          </div>
+          <button id="btn-theme" class="icon-btn" title="Switch Light / Dark theme" aria-label="Toggle theme">◐</button>
         </div>
       </div>
 
       <div class="controls-row">
-        <button id="btn-run" class="btn btn-primary">Start Election</button>
+        <button id="btn-run" class="btn btn-ink">Start</button>
         <div class="segmented" role="group" aria-label="Broadcast speed">
-          <button class="seg-btn" data-delay="320">1×</button>
-          <button class="seg-btn active" data-delay="140">2×</button>
-          <button class="seg-btn" data-delay="45">5×</button>
-          <button class="seg-btn" data-delay="0">Instant</button>
+          <button class="seg-btn active" data-duration="45000">1×</button>
+          <button class="seg-btn" data-duration="22000">2×</button>
+          <button class="seg-btn" data-duration="9000">5×</button>
+          <button class="seg-btn" data-duration="0">Instant</button>
         </div>
 
-        <label class="mini-field" title="Random seed">
+        <label class="mini-field" title="Reproducible random seed">
           <span>Seed</span>
           <input id="input-seed" type="number" value="42" />
           <button id="btn-rand-seed" class="icon-btn" title="Randomize seed">↻</button>
         </label>
 
-        <label class="mini-field" title="Voter choice temperature (lower = sharper polarization)">
+        <label class="mini-field" title="Voter choice temperature">
           <span>Temp</span>
           <input id="input-temp" type="range" min="0.35" max="1.60" step="0.05" value="0.85" />
           <output id="temp-val">0.85</output>
@@ -65,27 +64,40 @@
       <div class="nav-row">
         <div class="focus-pills" id="focus-pills">
           <button class="focus-btn active" data-focus="eu">Europe</button>
+          <select id="country-select" class="country-select hidden" aria-label="Jump to EU Member State"></select>
         </div>
         <div class="progress-wrap">
           <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
-          <span id="progress-label" class="mono">0 / 0 precincts</span>
+          <span id="progress-label" class="mono">0 / 0</span>
         </div>
       </div>
     </header>
 
-    <!-- Top-right floating overlay switcher & legend -->
+    <!-- Top-right floating overlay & color-mode switcher -->
     <aside class="hud hud-top-right">
       <div class="overlay-bar" role="group" aria-label="Map overlay">
         <button class="ov-btn active" data-overlay="winner">Winner</button>
-        <button class="ov-btn" data-overlay="party">Party %</button>
+        <button class="ov-btn" data-overlay="party">Group %</button>
         <button class="ov-btn" data-overlay="turnout">Turnout</button>
         <button class="ov-btn" data-overlay="eu_axis">Pro-EU</button>
-        <button class="ov-btn" data-overlay="econ_axis">Left–Right</button>
+        <button class="ov-btn" data-overlay="econ_axis">Econ</button>
+        <button class="ov-btn" data-overlay="mig_axis">Migration</button>
       </div>
-      <div id="party-picker-wrap" class="party-picker hidden">
-        <label for="party-select">Party</label>
+
+      <div id="color-mode-row" class="sub-control-row">
+        <span class="sub-label">Colors</span>
+        <div class="segmented" role="group" aria-label="Party color mode">
+          <button class="cm-btn active" data-colormode="auto" title="EU Groups at Europe zoom, National Parties when zoomed in">Auto</button>
+          <button class="cm-btn" data-colormode="group">EU Groups</button>
+          <button class="cm-btn" data-colormode="national">National</button>
+        </div>
+      </div>
+
+      <div id="party-picker-wrap" class="sub-control-row hidden">
+        <label class="sub-label" for="party-select">Group</label>
         <select id="party-select"></select>
       </div>
+
       <div id="map-legend" class="legend"></div>
     </aside>
 
@@ -93,32 +105,42 @@
     <div class="hud zoom-controls">
       <button id="btn-zoom-in" class="zoom-btn" title="Zoom in">+</button>
       <button id="btn-zoom-out" class="zoom-btn" title="Zoom out">−</button>
-      <button id="btn-zoom-reset" class="zoom-btn" title="Reset view">⌖</button>
+      <button id="btn-zoom-reset" class="zoom-btn" title="Reset Europe view">⌖</button>
     </div>
 
-    <!-- Bottom-left floating Parliament Hemicycle HUD -->
+    <!-- Bottom-left collapsible Parliament Hemicycle & Coalition Finder HUD -->
     <section id="hemicycle-hud" class="hud hud-bottom-left">
       <div class="hud-header">
         <div>
-          <span class="hud-kicker">EUROPEAN PARLIAMENT PROJECTION</span>
+          <span class="hud-kicker">EUROPEAN PARLIAMENT</span>
           <div class="hud-sub"><span id="hemicycle-total" class="mono">0</span> seats · majority <span id="hemicycle-maj" class="mono">0</span></div>
         </div>
-        <button id="btn-toggle-hemi" class="icon-btn" title="Collapse/Expand">▾</button>
+        <div class="hemi-head-actions">
+          <div class="segmented" role="group" aria-label="Parliament panel view">
+            <button class="htab-btn active" data-htab="seats">Seats</button>
+            <button class="htab-btn" data-htab="coalitions">Coalitions</button>
+          </div>
+          <button id="btn-toggle-hemi" class="icon-btn" title="Collapse/Expand">▾</button>
+        </div>
       </div>
       <div id="hemicycle-body" class="hemicycle-body">
         <svg id="hemicycle-svg" viewBox="0 0 360 195" aria-label="Parliament seat hemicycle"></svg>
         <div id="seat-ledger" class="seat-ledger"></div>
+        <div id="coalition-list" class="coalition-list hidden"></div>
       </div>
     </section>
 
-    <!-- Bottom-right live reporting ticker -->
-    <aside id="ticker" class="hud hud-bottom-right" aria-live="polite"></aside>
+    <!-- Bottom-right live county ticker + required Eurostat attribution -->
+    <div class="bottom-right-stack">
+      <aside id="ticker" class="hud ticker" aria-live="polite"></aside>
+      <div class="attribution">Boundaries: Eurostat GISCO NUTS-3 (2021) · © EuroGeographics</div>
+    </div>
 
-    <!-- Right slide-in inspector drawer (shown on country / precinct click) -->
+    <!-- Right slide-in inspector drawer -->
     <aside id="inspector" class="hud inspector hidden" aria-label="Selection inspector">
       <div class="inspector-head">
         <div>
-          <div id="inspector-kicker" class="hud-kicker">COUNTRY</div>
+          <div id="inspector-kicker" class="hud-kicker">REGION</div>
           <h2 id="inspector-title">—</h2>
         </div>
         <button id="btn-close-inspector" class="icon-btn" title="Close">✕</button>
@@ -129,7 +151,6 @@
     </aside>
   </main>
 
-  <script src="mapdata.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

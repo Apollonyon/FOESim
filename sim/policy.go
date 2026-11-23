@@ -11,6 +11,7 @@ const (
 	AxisEU
 	AxisDefense
 	AxisEnv
+	AxisMigration
 	NumAxes
 )
 

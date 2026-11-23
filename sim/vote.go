@@ -41,7 +41,7 @@ func VoteShares(group VoterGroup, parties []Party, temperature float64) map[stri
 
 // SimulateRegion computes deterministic vote totals and seat allocations for r.
 func SimulateRegion(r Region, parties []Party, temperature float64) (map[string]int, map[string]int) {
-	parties = applyPartyBonus(parties, r.PartyBonus)
+	parties = applyPartyBonus(r.EffectiveParties(parties), r.PartyBonus)
 	votes := make(map[string]int)
 	for _, g := range r.Groups {
 		voters := g.ExpectedVoters()
@@ -54,6 +54,7 @@ func SimulateRegion(r Region, parties []Party, temperature float64) (map[string]
 	seats := AllocateSeats(votes, r.Seats, r.Method, r.Threshold)
 	return votes, seats
 }
+
 func applyPartyBonus(parties []Party, bonus map[string]float64) []Party {
 	if len(bonus) == 0 {
 		return parties

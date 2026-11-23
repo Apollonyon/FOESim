@@ -1,0 +1,6819 @@
+{
+  "name": "European Parliament — Full EU-27 (720 Seats)",
+  "groups": [
+    {
+      "id": "left",
+      "name": "The Left in the European Parliament",
+      "short_name": "LEFT",
+      "color": "#B71C1C",
+      "position": [
+        -0.85,
+        -0.7,
+        -0.25,
+        -0.75,
+        0.65,
+        -0.75
+      ]
+    },
+    {
+      "id": "sd",
+      "name": "Socialists & Democrats",
+      "short_name": "S&D",
+      "color": "#E53935",
+      "position": [
+        -0.45,
+        -0.45,
+        0.55,
+        0.15,
+        0.45,
+        -0.25
+      ]
+    },
+    {
+      "id": "greens",
+      "name": "Greens/EFA",
+      "short_name": "GREENS",
+      "color": "#2E7D32",
+      "position": [
+        -0.3,
+        -0.8,
+        0.8,
+        0.15,
+        0.95,
+        -0.7
+      ]
+    },
+    {
+      "id": "renew",
+      "name": "Renew Europe",
+      "short_name": "RENEW",
+      "color": "#F9A825",
+      "position": [
+        0.45,
+        -0.35,
+        0.8,
+        0.5,
+        0.25,
+        -0.05
+      ]
+    },
+    {
+      "id": "epp",
+      "name": "European People's Party",
+      "short_name": "EPP",
+      "color": "#1E88E5",
+      "position": [
+        0.45,
+        0.3,
+        0.5,
+        0.6,
+        -0.05,
+        0.45
+      ]
+    },
+    {
+      "id": "ecr",
+      "name": "European Conservatives & Reformists",
+      "short_name": "ECR",
+      "color": "#1565C0",
+      "position": [
+        0.5,
+        0.7,
+        -0.35,
+        0.65,
+        -0.45,
+        0.8
+      ]
+    },
+    {
+      "id": "pfe",
+      "name": "Patriots for Europe",
+      "short_name": "PfE",
+      "color": "#1A237E",
+      "position": [
+        0.05,
+        0.85,
+        -0.8,
+        -0.3,
+        -0.7,
+        0.95
+      ]
+    },
+    {
+      "id": "esn",
+      "name": "Europe of Sovereign Nations",
+      "short_name": "ESN",
+      "color": "#0277BD",
+      "position": [
+        0.35,
+        0.95,
+        -0.95,
+        -0.6,
+        -0.9,
+        1
+      ]
+    },
+    {
+      "id": "ni",
+      "name": "Non-Inscrits",
+      "short_name": "NI",
+      "color": "#64748B",
+      "position": [
+        -0.25,
+        0.35,
+        -0.65,
+        -0.8,
+        -0.25,
+        0.65
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "de",
+      "name": "Germany",
+      "seats": 96,
+      "precincts": 16,
+      "use_nuts3": true,
+      "method": "sainte_lague",
+      "threshold": 0,
+      "district_tilts": {
+        "DE2": {
+          "traditional_cons": 1.65,
+          "civic_center": 1.15,
+          "social_left": 0.65,
+          "sovereignist": 0.75
+        },
+        "DE1": {
+          "traditional_cons": 1.35,
+          "cosmopolitan": 1.25,
+          "sovereignist": 0.8
+        },
+        "DE3": {
+          "cosmopolitan": 1.95,
+          "social_left": 1.4,
+          "traditional_cons": 0.6,
+          "sovereignist": 0.65
+        },
+        "DE6": {
+          "cosmopolitan": 1.7,
+          "social_left": 1.35,
+          "traditional_cons": 0.75,
+          "sovereignist": 0.55
+        },
+        "DE5": {
+          "cosmopolitan": 1.5,
+          "social_left": 1.55,
+          "traditional_cons": 0.7,
+          "sovereignist": 0.65
+        },
+        "DEA": {
+          "social_left": 1.25,
+          "traditional_cons": 1.1,
+          "sovereignist": 0.75
+        },
+        "DEA3": {
+          "traditional_cons": 1.55,
+          "social_left": 0.9,
+          "sovereignist": 0.65
+        },
+        "DEA5": {
+          "social_left": 1.6,
+          "traditional_cons": 0.85,
+          "sovereignist": 0.95
+        },
+        "DE9": {
+          "social_left": 1.3,
+          "traditional_cons": 1.1,
+          "sovereignist": 0.8
+        },
+        "DE4": {
+          "sovereignist": 1.9,
+          "disillusioned": 1.75,
+          "traditional_cons": 0.7,
+          "cosmopolitan": 0.65
+        },
+        "DE8": {
+          "sovereignist": 1.85,
+          "disillusioned": 1.8,
+          "traditional_cons": 0.75,
+          "cosmopolitan": 0.6
+        },
+        "DED": {
+          "sovereignist": 2.35,
+          "disillusioned": 1.85,
+          "traditional_cons": 0.8,
+          "cosmopolitan": 0.55,
+          "social_left": 0.55
+        },
+        "DEE": {
+          "sovereignist": 2.2,
+          "disillusioned": 1.9,
+          "traditional_cons": 0.75,
+          "cosmopolitan": 0.5,
+          "social_left": 0.6
+        },
+        "DEG": {
+          "sovereignist": 2.25,
+          "disillusioned": 1.95,
+          "traditional_cons": 0.75,
+          "cosmopolitan": 0.5,
+          "social_left": 0.6
+        }
+      },
+      "parties": [
+        {
+          "id": "de_cdu",
+          "name": "CDU / CSU",
+          "short_name": "CDU/CSU",
+          "color": "#1E293B",
+          "position": [
+            0.45,
+            0.35,
+            0.55,
+            0.65,
+            -0.05,
+            0.5
+          ],
+          "appeal": 0.25,
+          "group_id": "epp"
+        },
+        {
+          "id": "de_afd",
+          "name": "Alternative für Deutschland",
+          "short_name": "AfD",
+          "color": "#0284C7",
+          "position": [
+            0.35,
+            0.95,
+            -0.95,
+            -0.6,
+            -0.9,
+            1
+          ],
+          "appeal": 0.1,
+          "group_id": "esn"
+        },
+        {
+          "id": "de_spd",
+          "name": "Sozialdemokratische Partei Deutschlands",
+          "short_name": "SPD",
+          "color": "#DC2626",
+          "position": [
+            -0.45,
+            -0.45,
+            0.6,
+            0.25,
+            0.4,
+            -0.15
+          ],
+          "appeal": 0.1,
+          "group_id": "sd"
+        },
+        {
+          "id": "de_grune",
+          "name": "Bündnis 90/Die Grünen",
+          "short_name": "GRÜNE",
+          "color": "#16A34A",
+          "position": [
+            -0.3,
+            -0.8,
+            0.8,
+            0.35,
+            0.95,
+            -0.7
+          ],
+          "appeal": 0.15,
+          "group_id": "greens"
+        },
+        {
+          "id": "de_bsw",
+          "name": "Bündnis Sahra Wagenknecht",
+          "short_name": "BSW",
+          "color": "#7E22CE",
+          "position": [
+            -0.65,
+            0.45,
+            -0.7,
+            -0.9,
+            -0.4,
+            0.75
+          ],
+          "appeal": -0.7,
+          "group_id": ""
+        },
+        {
+          "id": "de_fdp",
+          "name": "Freie Demokratische Partei",
+          "short_name": "FDP",
+          "color": "#EAB308",
+          "position": [
+            0.75,
+            -0.3,
+            0.5,
+            0.55,
+            -0.15,
+            0.2
+          ],
+          "appeal": -0.65,
+          "group_id": "renew"
+        },
+        {
+          "id": "de_linke",
+          "name": "Die Linke",
+          "short_name": "LINKE",
+          "color": "#BE123C",
+          "position": [
+            -0.85,
+            -0.8,
+            0.15,
+            -0.55,
+            0.75,
+            -0.85
+          ],
+          "appeal": 0.35,
+          "group_id": "left"
+        },
+        {
+          "id": "de_volt",
+          "name": "Volt Deutschland",
+          "short_name": "VOLT",
+          "color": "#582C83",
+          "position": [
+            0.05,
+            -0.8,
+            0.95,
+            0.45,
+            0.8,
+            -0.6
+          ],
+          "appeal": -0.85,
+          "group_id": "greens"
+        }
+      ],
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 7000000,
+          "turnout": 0.69,
+          "ideal": [
+            -0.3,
+            -0.8,
+            0.85,
+            0.25,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1,
+            1.4,
+            1.3,
+            0.8,
+            1.8,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 9500000,
+          "turnout": 0.71,
+          "ideal": [
+            0.45,
+            -0.15,
+            0.65,
+            0.55,
+            0.15,
+            0.2
+          ],
+          "weights": [
+            1.6,
+            1,
+            1.3,
+            1.1,
+            1,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 9000000,
+          "turnout": 0.64,
+          "ideal": [
+            -0.6,
+            -0.55,
+            0.35,
+            -0.1,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.7,
+            1.2,
+            1,
+            0.9,
+            1.1,
+            1.1
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 16000000,
+          "turnout": 0.72,
+          "ideal": [
+            0.4,
+            0.45,
+            0.45,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.3,
+            1.5,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 6000000,
+          "turnout": 0.54,
+          "ideal": [
+            -0.55,
+            0.35,
+            -0.6,
+            -0.85,
+            -0.35,
+            0.65
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.4,
+            1,
+            1.5
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 13500000,
+          "turnout": 0.63,
+          "ideal": [
+            0.25,
+            0.9,
+            -0.9,
+            -0.55,
+            -0.85,
+            0.95
+          ],
+          "weights": [
+            1,
+            1.6,
+            1.6,
+            1.1,
+            1.3,
+            2
+          ]
+        }
+      ],
+      "poll_close_hour": 18
+    },
+    {
+      "id": "fr",
+      "name": "France",
+      "seats": 81,
+      "precincts": 14,
+      "use_nuts3": true,
+      "method": "dhondt",
+      "threshold": 0.05,
+      "district_tilts": {
+        "FR1": {
+          "cosmopolitan": 1.65,
+          "civic_center": 1.35,
+          "social_left": 1.35,
+          "sovereignist": 0.55
+        },
+        "FRH": {
+          "civic_center": 1.4,
+          "cosmopolitan": 1.3,
+          "social_left": 1.25,
+          "sovereignist": 0.65
+        },
+        "FRG": {
+          "civic_center": 1.3,
+          "cosmopolitan": 1.2,
+          "sovereignist": 0.8
+        },
+        "FRE": {
+          "sovereignist": 1.6,
+          "disillusioned": 1.45,
+          "civic_center": 0.7,
+          "cosmopolitan": 0.65
+        },
+        "FRF": {
+          "sovereignist": 1.45,
+          "traditional_cons": 1.15,
+          "cosmopolitan": 0.75
+        },
+        "FRL": {
+          "sovereignist": 1.55,
+          "traditional_cons": 1.25,
+          "social_left": 0.75
+        },
+        "FRJ": {
+          "sovereignist": 1.25,
+          "social_left": 1.2,
+          "disillusioned": 1.2
+        }
+      },
+      "parties": [
+        {
+          "id": "fr_rn",
+          "name": "Rassemblement National",
+          "short_name": "RN",
+          "color": "#1E3A8A",
+          "position": [
+            0,
+            0.85,
+            -0.8,
+            -0.2,
+            -0.7,
+            0.95
+          ],
+          "appeal": 0.45,
+          "group_id": "pfe"
+        },
+        {
+          "id": "fr_ren",
+          "name": "Besoin d'Europe (Renaissance)",
+          "short_name": "RENAISS.",
+          "color": "#F59E0B",
+          "position": [
+            0.45,
+            -0.3,
+            0.85,
+            0.65,
+            0.2,
+            0.1
+          ],
+          "appeal": -0.15,
+          "group_id": "renew"
+        },
+        {
+          "id": "fr_ps",
+          "name": "Parti Socialiste – Place Publique",
+          "short_name": "PS-PP",
+          "color": "#EC4899",
+          "position": [
+            -0.45,
+            -0.55,
+            0.65,
+            0.35,
+            0.55,
+            -0.35
+          ],
+          "appeal": -0.25,
+          "group_id": "sd"
+        },
+        {
+          "id": "fr_lfi",
+          "name": "La France Insoumise",
+          "short_name": "LFI",
+          "color": "#DC2626",
+          "position": [
+            -0.85,
+            -0.75,
+            -0.35,
+            -0.7,
+            0.65,
+            -0.85
+          ],
+          "appeal": 0.2,
+          "group_id": "left"
+        },
+        {
+          "id": "fr_lr",
+          "name": "Les Républicains",
+          "short_name": "LR",
+          "color": "#2563EB",
+          "position": [
+            0.55,
+            0.55,
+            0.15,
+            0.55,
+            -0.25,
+            0.7
+          ],
+          "appeal": -0.35,
+          "group_id": "epp"
+        },
+        {
+          "id": "fr_eelv",
+          "name": "Les Écologistes",
+          "short_name": "EELV",
+          "color": "#22C55E",
+          "position": [
+            -0.4,
+            -0.8,
+            0.65,
+            0.05,
+            0.95,
+            -0.75
+          ],
+          "appeal": -0.45,
+          "group_id": "greens"
+        },
+        {
+          "id": "fr_rec",
+          "name": "Reconquête",
+          "short_name": "REC",
+          "color": "#312E81",
+          "position": [
+            0.65,
+            0.95,
+            -0.65,
+            0.35,
+            -0.8,
+            1
+          ],
+          "appeal": -0.45,
+          "group_id": "ecr"
+        }
+      ],
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 6000000,
+          "turnout": 0.58,
+          "ideal": [
+            -0.4,
+            -0.75,
+            0.7,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.2,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 8500000,
+          "turnout": 0.64,
+          "ideal": [
+            0.45,
+            -0.25,
+            0.85,
+            0.6,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.6,
+            1.2,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 8000000,
+          "turnout": 0.57,
+          "ideal": [
+            -0.65,
+            -0.65,
+            0.25,
+            -0.15,
+            0.6,
+            -0.6
+          ],
+          "weights": [
+            1.6,
+            1.3,
+            1.1,
+            0.9,
+            1.2,
+            1.3
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 5500000,
+          "turnout": 0.65,
+          "ideal": [
+            0.55,
+            0.55,
+            0.15,
+            0.55,
+            -0.25,
+            0.7
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.1,
+            1.1,
+            0.8,
+            1.5
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 8000000,
+          "turnout": 0.48,
+          "ideal": [
+            -0.6,
+            0.15,
+            -0.65,
+            -0.55,
+            -0.1,
+            0.25
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.4,
+            1.1,
+            0.9,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 13000000,
+          "turnout": 0.59,
+          "ideal": [
+            0.1,
+            0.88,
+            -0.8,
+            -0.1,
+            -0.75,
+            0.95
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.6,
+            0.9,
+            1.2,
+            2
+          ]
+        }
+      ],
+      "poll_close_hour": 20
+    },
+    {
+      "id": "it",
+      "name": "Italy",
+      "seats": 76,
+      "precincts": 12,
+      "use_nuts3": true,
+      "method": "hare",
+      "threshold": 0.04,
+      "district_tilts": {
+        "ITC": {
+          "traditional_cons": 1.3,
+          "sovereignist": 1.2,
+          "civic_center": 1.2,
+          "disillusioned": 0.65
+        },
+        "ITH": {
+          "traditional_cons": 1.2,
+          "sovereignist": 1.2,
+          "social_left": 1.15,
+          "disillusioned": 0.6
+        },
+        "ITI": {
+          "social_left": 1.45,
+          "cosmopolitan": 1.35,
+          "sovereignist": 0.85,
+          "disillusioned": 0.85
+        },
+        "ITF": {
+          "disillusioned": 1.85,
+          "social_left": 1.05,
+          "civic_center": 0.7,
+          "traditional_cons": 0.85
+        },
+        "ITG": {
+          "disillusioned": 1.75,
+          "traditional_cons": 1.1,
+          "civic_center": 0.7
+        }
+      },
+      "parties": [
+        {
+          "id": "it_fdi",
+          "name": "Fratelli d'Italia",
+          "short_name": "FdI",
+          "color": "#1E3A8A",
+          "position": [
+            0.45,
+            0.75,
+            -0.35,
+            0.65,
+            -0.45,
+            0.85
+          ],
+          "appeal": 0.35,
+          "group_id": "ecr"
+        },
+        {
+          "id": "it_pd",
+          "name": "Partito Democratico",
+          "short_name": "PD",
+          "color": "#EF4444",
+          "position": [
+            -0.45,
+            -0.55,
+            0.7,
+            0.2,
+            0.55,
+            -0.45
+          ],
+          "appeal": 0.2,
+          "group_id": "sd"
+        },
+        {
+          "id": "it_m5s",
+          "name": "Movimento 5 Stelle",
+          "short_name": "M5S",
+          "color": "#FACC15",
+          "position": [
+            -0.6,
+            -0.1,
+            -0.2,
+            -0.75,
+            0.45,
+            0.05
+          ],
+          "appeal": 0.05,
+          "group_id": "left"
+        },
+        {
+          "id": "it_fi",
+          "name": "Forza Italia",
+          "short_name": "FI",
+          "color": "#38BDF8",
+          "position": [
+            0.6,
+            0.35,
+            0.5,
+            0.55,
+            -0.15,
+            0.45
+          ],
+          "appeal": 0.05,
+          "group_id": "epp"
+        },
+        {
+          "id": "it_lega",
+          "name": "Lega",
+          "short_name": "LEGA",
+          "color": "#15803D",
+          "position": [
+            0.3,
+            0.85,
+            -0.75,
+            -0.35,
+            -0.65,
+            0.95
+          ],
+          "appeal": -0.05,
+          "group_id": "pfe"
+        },
+        {
+          "id": "it_avs",
+          "name": "Alleanza Verdi e Sinistra",
+          "short_name": "AVS",
+          "color": "#10B981",
+          "position": [
+            -0.65,
+            -0.8,
+            0.45,
+            -0.45,
+            0.9,
+            -0.8
+          ],
+          "appeal": -0.15,
+          "group_id": "greens"
+        },
+        {
+          "id": "it_sue",
+          "name": "Stati Uniti d'Europa",
+          "short_name": "SUE",
+          "color": "#EC4899",
+          "position": [
+            0.4,
+            -0.45,
+            0.95,
+            0.5,
+            0.3,
+            -0.2
+          ],
+          "appeal": -0.5,
+          "group_id": "renew"
+        }
+      ],
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 3500000,
+          "turnout": 0.55,
+          "ideal": [
+            -0.55,
+            -0.75,
+            0.55,
+            -0.25,
+            0.85,
+            -0.75
+          ],
+          "weights": [
+            1.2,
+            1.4,
+            1.2,
+            0.9,
+            1.6,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 4000000,
+          "turnout": 0.57,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.85,
+            0.55,
+            0.15,
+            0
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.5,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 9000000,
+          "turnout": 0.56,
+          "ideal": [
+            -0.45,
+            -0.55,
+            0.7,
+            0.2,
+            0.55,
+            -0.45
+          ],
+          "weights": [
+            1.4,
+            1.3,
+            1.3,
+            0.9,
+            1.2,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 10000000,
+          "turnout": 0.58,
+          "ideal": [
+            0.5,
+            0.65,
+            -0.15,
+            0.65,
+            -0.35,
+            0.75
+          ],
+          "weights": [
+            1.5,
+            1.3,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 5500000,
+          "turnout": 0.44,
+          "ideal": [
+            -0.6,
+            -0.05,
+            -0.25,
+            -0.75,
+            0.4,
+            0.1
+          ],
+          "weights": [
+            1.6,
+            1,
+            1.2,
+            1.4,
+            1,
+            1.2
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 15000000,
+          "turnout": 0.56,
+          "ideal": [
+            0.4,
+            0.8,
+            -0.45,
+            0.45,
+            -0.5,
+            0.9
+          ],
+          "weights": [
+            1.2,
+            1.5,
+            1.4,
+            1.1,
+            1.1,
+            1.8
+          ]
+        }
+      ],
+      "poll_close_hour": 23
+    },
+    {
+      "id": "es",
+      "name": "Spain",
+      "seats": 61,
+      "method": "dhondt",
+      "threshold": 0,
+      "poll_close_hour": 20,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 4945039,
+          "turnout": 0.53,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 4238605,
+          "turnout": 0.55,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 9183644,
+          "turnout": 0.51,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 9536861,
+          "turnout": 0.55,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 3178954,
+          "turnout": 0.41,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 4238605,
+          "turnout": 0.49,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "ES5": {
+          "cosmopolitan": 1.45,
+          "social_left": 1.25,
+          "traditional_cons": 0.75
+        },
+        "ES2": {
+          "social_left": 1.35,
+          "cosmopolitan": 1.3,
+          "sovereignist": 0.65
+        },
+        "ES3": {
+          "traditional_cons": 1.45,
+          "civic_center": 1.25,
+          "sovereignist": 1.15
+        },
+        "ES6": {
+          "traditional_cons": 1.2,
+          "sovereignist": 1.25
+        }
+      },
+      "parties": [
+        {
+          "id": "es_pp",
+          "name": "Partido Popular",
+          "short_name": "PP",
+          "color": "#1D4ED8",
+          "position": [
+            0.5,
+            0.45,
+            0.55,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "appeal": 0.4,
+          "group_id": "epp"
+        },
+        {
+          "id": "es_psoe",
+          "name": "Partido Socialista Obrero Español",
+          "short_name": "PSOE",
+          "color": "#DC2626",
+          "position": [
+            -0.45,
+            -0.55,
+            0.7,
+            0.25,
+            0.55,
+            -0.45
+          ],
+          "appeal": 0.4,
+          "group_id": "sd"
+        },
+        {
+          "id": "es_vox",
+          "name": "Vox",
+          "short_name": "VOX",
+          "color": "#16A34A",
+          "position": [
+            0.45,
+            0.9,
+            -0.6,
+            0.45,
+            -0.75,
+            0.95
+          ],
+          "appeal": 0.1,
+          "group_id": "pfe"
+        },
+        {
+          "id": "es_sumar",
+          "name": "Sumar",
+          "short_name": "SUMAR",
+          "color": "#EC4899",
+          "position": [
+            -0.7,
+            -0.8,
+            0.45,
+            -0.45,
+            0.85,
+            -0.75
+          ],
+          "appeal": -0.25,
+          "group_id": "greens"
+        },
+        {
+          "id": "es_podemos",
+          "name": "Podemos",
+          "short_name": "PODEMOS",
+          "color": "#7E22CE",
+          "position": [
+            -0.85,
+            -0.85,
+            -0.15,
+            -0.85,
+            0.7,
+            -0.85
+          ],
+          "appeal": -0.35,
+          "group_id": "left"
+        },
+        {
+          "id": "es_salf",
+          "name": "Se Acabó La Fiesta",
+          "short_name": "SALF",
+          "color": "#475569",
+          "position": [
+            0.15,
+            0.75,
+            -0.75,
+            -0.25,
+            -0.6,
+            0.85
+          ],
+          "appeal": -0.3,
+          "group_id": ""
+        },
+        {
+          "id": "es_ceus",
+          "name": "Ahora Repúblicas / CEUS",
+          "short_name": "REG",
+          "color": "#F59E0B",
+          "position": [
+            -0.25,
+            -0.55,
+            0.75,
+            -0.15,
+            0.55,
+            -0.45
+          ],
+          "appeal": -0.45,
+          "group_id": "greens"
+        }
+      ],
+      "precincts": 52,
+      "use_nuts3": true
+    },
+    {
+      "id": "pl",
+      "name": "Poland",
+      "seats": 53,
+      "method": "dhondt",
+      "threshold": 0.05,
+      "poll_close_hour": 21,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 3113041,
+          "turnout": 0.45,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 6792090,
+          "turnout": 0.47,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 3113041,
+          "turnout": 0.43,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 7924106,
+          "turnout": 0.47,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 2830038,
+          "turnout": 0.33,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 4528060,
+          "turnout": 0.41,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "PL9": {
+          "civic_center": 1.5,
+          "cosmopolitan": 1.45,
+          "sovereignist": 0.65
+        },
+        "PL4": {
+          "civic_center": 1.4,
+          "cosmopolitan": 1.25,
+          "traditional_cons": 0.8
+        },
+        "PL8": {
+          "traditional_cons": 1.55,
+          "sovereignist": 1.55,
+          "civic_center": 0.6,
+          "cosmopolitan": 0.55
+        }
+      },
+      "parties": [
+        {
+          "id": "pl_ko",
+          "name": "Koalicja Obywatelska",
+          "short_name": "KO",
+          "color": "#EA580C",
+          "position": [
+            0.35,
+            -0.25,
+            0.85,
+            0.75,
+            0.2,
+            0.15
+          ],
+          "appeal": 0.45,
+          "group_id": "epp"
+        },
+        {
+          "id": "pl_pis",
+          "name": "Prawo i Sprawiedliwość",
+          "short_name": "PiS",
+          "color": "#1E3A8A",
+          "position": [
+            -0.2,
+            0.8,
+            -0.45,
+            0.8,
+            -0.55,
+            0.9
+          ],
+          "appeal": 0.45,
+          "group_id": "ecr"
+        },
+        {
+          "id": "pl_konf",
+          "name": "Konfederacja",
+          "short_name": "KONF",
+          "color": "#0F172A",
+          "position": [
+            0.85,
+            0.95,
+            -0.9,
+            0.15,
+            -0.9,
+            1
+          ],
+          "appeal": 0.15,
+          "group_id": "esn"
+        },
+        {
+          "id": "pl_td",
+          "name": "Trzecia Droga",
+          "short_name": "TD",
+          "color": "#FACC15",
+          "position": [
+            0.35,
+            0.15,
+            0.7,
+            0.65,
+            0.15,
+            0.35
+          ],
+          "appeal": -0.25,
+          "group_id": "renew"
+        },
+        {
+          "id": "pl_lew",
+          "name": "Lewica",
+          "short_name": "LEWICA",
+          "color": "#DC2626",
+          "position": [
+            -0.65,
+            -0.8,
+            0.7,
+            0.15,
+            0.7,
+            -0.55
+          ],
+          "appeal": -0.15,
+          "group_id": "sd"
+        }
+      ],
+      "precincts": 73,
+      "use_nuts3": true
+    },
+    {
+      "id": "ro",
+      "name": "Romania",
+      "seats": 33,
+      "method": "dhondt",
+      "threshold": 0.05,
+      "poll_close_hour": 21,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 1320527,
+          "turnout": 0.55,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 2641055,
+          "turnout": 0.57,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 3227956,
+          "turnout": 0.53,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 3521406,
+          "turnout": 0.57,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 1907428,
+          "turnout": 0.43,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 2054154,
+          "turnout": 0.51,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "RO3": {
+          "civic_center": 1.55,
+          "cosmopolitan": 1.5,
+          "sovereignist": 0.75
+        },
+        "RO1": {
+          "civic_center": 1.3,
+          "traditional_cons": 1.15
+        }
+      },
+      "parties": [
+        {
+          "id": "ro_psd",
+          "name": "Partidul Social Democrat",
+          "short_name": "PSD",
+          "color": "#DC2626",
+          "position": [
+            -0.4,
+            0.3,
+            0.45,
+            0.45,
+            -0.1,
+            0.35
+          ],
+          "appeal": 0.45,
+          "group_id": "sd"
+        },
+        {
+          "id": "ro_pnl",
+          "name": "Partidul Național Liberal",
+          "short_name": "PNL",
+          "color": "#FACC15",
+          "position": [
+            0.5,
+            0.35,
+            0.65,
+            0.65,
+            -0.05,
+            0.4
+          ],
+          "appeal": 0.2,
+          "group_id": "epp"
+        },
+        {
+          "id": "ro_aur",
+          "name": "Alianța pentru Unirea Românilor",
+          "short_name": "AUR",
+          "color": "#CA8A04",
+          "position": [
+            0.1,
+            0.85,
+            -0.65,
+            0.15,
+            -0.7,
+            0.9
+          ],
+          "appeal": 0.2,
+          "group_id": "ecr"
+        },
+        {
+          "id": "ro_usr",
+          "name": "Alianța Dreapta Unită (USR)",
+          "short_name": "USR",
+          "color": "#0284C7",
+          "position": [
+            0.6,
+            -0.35,
+            0.85,
+            0.65,
+            0.3,
+            -0.05
+          ],
+          "appeal": 0.05,
+          "group_id": "renew"
+        },
+        {
+          "id": "ro_udmr",
+          "name": "UDMR",
+          "short_name": "UDMR",
+          "color": "#16A34A",
+          "position": [
+            0.25,
+            0.45,
+            0.4,
+            0.3,
+            -0.1,
+            0.45
+          ],
+          "appeal": -0.45,
+          "group_id": "epp"
+        },
+        {
+          "id": "ro_sos",
+          "name": "S.O.S. România",
+          "short_name": "SOS",
+          "color": "#1E293B",
+          "position": [
+            -0.15,
+            0.95,
+            -0.95,
+            -0.65,
+            -0.8,
+            0.95
+          ],
+          "appeal": -0.35,
+          "group_id": ""
+        }
+      ],
+      "precincts": 42,
+      "use_nuts3": true
+    },
+    {
+      "id": "nl",
+      "name": "Netherlands",
+      "seats": 31,
+      "method": "dhondt",
+      "threshold": 0,
+      "poll_close_hour": 18,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 2742939,
+          "turnout": 0.5,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 2742939,
+          "turnout": 0.52,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 1920057,
+          "turnout": 0.48,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 2331498,
+          "turnout": 0.52,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 1508616,
+          "turnout": 0.38,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 2468645,
+          "turnout": 0.46,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "NL3": {
+          "cosmopolitan": 1.35,
+          "civic_center": 1.2,
+          "sovereignist": 0.85
+        },
+        "NL4": {
+          "sovereignist": 1.35,
+          "traditional_cons": 1.15
+        }
+      },
+      "parties": [
+        {
+          "id": "nl_glpvda",
+          "name": "GroenLinks–PvdA",
+          "short_name": "GL-PvdA",
+          "color": "#16A34A",
+          "position": [
+            -0.5,
+            -0.75,
+            0.8,
+            0.2,
+            0.9,
+            -0.65
+          ],
+          "appeal": 0.3,
+          "group_id": "sd"
+        },
+        {
+          "id": "nl_pvv",
+          "name": "Partij voor de Vrijheid",
+          "short_name": "PVV",
+          "color": "#1E3A8A",
+          "position": [
+            -0.1,
+            0.85,
+            -0.85,
+            -0.15,
+            -0.8,
+            1
+          ],
+          "appeal": 0.35,
+          "group_id": "pfe"
+        },
+        {
+          "id": "nl_vvd",
+          "name": "VVD",
+          "short_name": "VVD",
+          "color": "#F97316",
+          "position": [
+            0.75,
+            -0.1,
+            0.55,
+            0.65,
+            -0.1,
+            0.55
+          ],
+          "appeal": 0.15,
+          "group_id": "renew"
+        },
+        {
+          "id": "nl_cda",
+          "name": "CDA",
+          "short_name": "CDA",
+          "color": "#15803D",
+          "position": [
+            0.35,
+            0.4,
+            0.6,
+            0.55,
+            0.05,
+            0.4
+          ],
+          "appeal": 0.05,
+          "group_id": "epp"
+        },
+        {
+          "id": "nl_d66",
+          "name": "D66",
+          "short_name": "D66",
+          "color": "#22C55E",
+          "position": [
+            0.35,
+            -0.75,
+            0.9,
+            0.45,
+            0.65,
+            -0.45
+          ],
+          "appeal": -0.1,
+          "group_id": "renew"
+        },
+        {
+          "id": "nl_bbb",
+          "name": "BBB",
+          "short_name": "BBB",
+          "color": "#84CC16",
+          "position": [
+            0.3,
+            0.6,
+            -0.35,
+            0.25,
+            -0.85,
+            0.65
+          ],
+          "appeal": -0.25,
+          "group_id": "epp"
+        },
+        {
+          "id": "nl_volt",
+          "name": "Volt Nederland",
+          "short_name": "VOLT",
+          "color": "#582C83",
+          "position": [
+            0.1,
+            -0.8,
+            0.95,
+            0.45,
+            0.8,
+            -0.6
+          ],
+          "appeal": -0.35,
+          "group_id": "greens"
+        },
+        {
+          "id": "nl_pvdd",
+          "name": "Partij voor de Dieren",
+          "short_name": "PvdD",
+          "color": "#065F46",
+          "position": [
+            -0.6,
+            -0.8,
+            0.2,
+            -0.55,
+            1,
+            -0.6
+          ],
+          "appeal": -0.45,
+          "group_id": "left"
+        }
+      ],
+      "precincts": 40,
+      "use_nuts3": true
+    },
+    {
+      "id": "be",
+      "name": "Belgium",
+      "seats": 22,
+      "method": "dhondt",
+      "threshold": 0.05,
+      "poll_close_hour": 18,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 1356293,
+          "turnout": 0.92,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 1808391,
+          "turnout": 0.92,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 1808391,
+          "turnout": 0.9,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 1627552,
+          "turnout": 0.92,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 994615,
+          "turnout": 0.8,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 1446712,
+          "turnout": 0.88,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "BE1": {
+          "cosmopolitan": 1.75,
+          "social_left": 1.45,
+          "sovereignist": 0.4
+        },
+        "BE2": {
+          "sovereignist": 1.45,
+          "traditional_cons": 1.25,
+          "social_left": 0.75
+        },
+        "BE3": {
+          "social_left": 1.5,
+          "civic_center": 1.2,
+          "sovereignist": 0.45
+        }
+      },
+      "parties": [
+        {
+          "id": "be_nva",
+          "name": "N-VA",
+          "short_name": "N-VA",
+          "color": "#FACC15",
+          "position": [
+            0.65,
+            0.5,
+            0.1,
+            0.6,
+            -0.3,
+            0.75
+          ],
+          "appeal": 0.25,
+          "group_id": "ecr"
+        },
+        {
+          "id": "be_vb",
+          "name": "Vlaams Belang",
+          "short_name": "VB",
+          "color": "#CA8A04",
+          "position": [
+            0.15,
+            0.9,
+            -0.8,
+            -0.2,
+            -0.75,
+            1
+          ],
+          "appeal": 0.2,
+          "group_id": "pfe"
+        },
+        {
+          "id": "be_mr",
+          "name": "MR / Open Vld",
+          "short_name": "MR/VLD",
+          "color": "#2563EB",
+          "position": [
+            0.7,
+            -0.2,
+            0.8,
+            0.6,
+            0,
+            0.3
+          ],
+          "appeal": 0.2,
+          "group_id": "renew"
+        },
+        {
+          "id": "be_ps",
+          "name": "PS / Vooruit",
+          "short_name": "PS/VRT",
+          "color": "#DC2626",
+          "position": [
+            -0.55,
+            -0.5,
+            0.6,
+            0.15,
+            0.45,
+            -0.35
+          ],
+          "appeal": 0.2,
+          "group_id": "sd"
+        },
+        {
+          "id": "be_cdv",
+          "name": "CD&V / Les Engagés",
+          "short_name": "CD&V/LE",
+          "color": "#F97316",
+          "position": [
+            0.3,
+            0.35,
+            0.65,
+            0.45,
+            0.1,
+            0.35
+          ],
+          "appeal": 0.1,
+          "group_id": "epp"
+        },
+        {
+          "id": "be_ptb",
+          "name": "PTB / PVDA",
+          "short_name": "PTB",
+          "color": "#991B1B",
+          "position": [
+            -0.9,
+            -0.65,
+            -0.35,
+            -0.85,
+            0.55,
+            -0.7
+          ],
+          "appeal": 0,
+          "group_id": "left"
+        },
+        {
+          "id": "be_groen",
+          "name": "Groen / Ecolo",
+          "short_name": "GRN/ECO",
+          "color": "#16A34A",
+          "position": [
+            -0.4,
+            -0.85,
+            0.8,
+            0.05,
+            0.95,
+            -0.75
+          ],
+          "appeal": -0.15,
+          "group_id": "greens"
+        }
+      ],
+      "precincts": 44,
+      "use_nuts3": true
+    },
+    {
+      "id": "cz",
+      "name": "Czechia",
+      "seats": 21,
+      "method": "dhondt",
+      "threshold": 0.05,
+      "poll_close_hour": 19,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 1083836,
+          "turnout": 0.39,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 1500695,
+          "turnout": 0.41,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 833720,
+          "turnout": 0.37,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 1834183,
+          "turnout": 0.41,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 1584067,
+          "turnout": 0.27,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 1500695,
+          "turnout": 0.35,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "CZ0": {
+          "cosmopolitan": 1.2,
+          "civic_center": 1.15
+        }
+      },
+      "parties": [
+        {
+          "id": "cz_ano",
+          "name": "ANO 2011",
+          "short_name": "ANO",
+          "color": "#1E3A8A",
+          "position": [
+            -0.1,
+            0.55,
+            -0.55,
+            -0.15,
+            -0.6,
+            0.8
+          ],
+          "appeal": 0.45,
+          "group_id": "pfe"
+        },
+        {
+          "id": "cz_spolu",
+          "name": "SPOLU (ODS–TOP09–KDU)",
+          "short_name": "SPOLU",
+          "color": "#2563EB",
+          "position": [
+            0.65,
+            0.35,
+            0.4,
+            0.8,
+            -0.25,
+            0.5
+          ],
+          "appeal": 0.35,
+          "group_id": "epp"
+        },
+        {
+          "id": "cz_prisaha",
+          "name": "Přísaha a Motoristé",
+          "short_name": "MOT",
+          "color": "#0284C7",
+          "position": [
+            0.4,
+            0.75,
+            -0.7,
+            0.1,
+            -0.95,
+            0.85
+          ],
+          "appeal": 0,
+          "group_id": "pfe"
+        },
+        {
+          "id": "cz_stacilo",
+          "name": "Stačilo!",
+          "short_name": "STAC",
+          "color": "#B91C1C",
+          "position": [
+            -0.75,
+            0.45,
+            -0.8,
+            -0.9,
+            -0.35,
+            0.75
+          ],
+          "appeal": -0.05,
+          "group_id": ""
+        },
+        {
+          "id": "cz_stan",
+          "name": "STAN",
+          "short_name": "STAN",
+          "color": "#EC4899",
+          "position": [
+            0.35,
+            -0.35,
+            0.8,
+            0.65,
+            0.3,
+            0.05
+          ],
+          "appeal": 0.05,
+          "group_id": "epp"
+        },
+        {
+          "id": "cz_pirati",
+          "name": "Piráti",
+          "short_name": "PIRÁTI",
+          "color": "#111827",
+          "position": [
+            -0.25,
+            -0.8,
+            0.85,
+            0.45,
+            0.8,
+            -0.55
+          ],
+          "appeal": -0.15,
+          "group_id": "greens"
+        }
+      ],
+      "precincts": 14,
+      "use_nuts3": true
+    },
+    {
+      "id": "el",
+      "name": "Greece",
+      "seats": 21,
+      "method": "hare",
+      "threshold": 0.03,
+      "poll_close_hour": 18,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 800944,
+          "turnout": 0.44,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 1201416,
+          "turnout": 0.46,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 1922265,
+          "turnout": 0.42,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 2002360,
+          "turnout": 0.46,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 1041227,
+          "turnout": 0.32,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 1041227,
+          "turnout": 0.4,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "EL3": {
+          "cosmopolitan": 1.35,
+          "civic_center": 1.25
+        },
+        "EL5": {
+          "sovereignist": 1.35,
+          "traditional_cons": 1.15
+        }
+      },
+      "parties": [
+        {
+          "id": "el_nd",
+          "name": "Nea Dimokratia",
+          "short_name": "ND",
+          "color": "#1D4ED8",
+          "position": [
+            0.55,
+            0.35,
+            0.65,
+            0.65,
+            -0.05,
+            0.55
+          ],
+          "appeal": 0.45,
+          "group_id": "epp"
+        },
+        {
+          "id": "el_syr",
+          "name": "SYRIZA",
+          "short_name": "SYRIZA",
+          "color": "#EC4899",
+          "position": [
+            -0.65,
+            -0.65,
+            0.3,
+            -0.35,
+            0.55,
+            -0.6
+          ],
+          "appeal": 0.15,
+          "group_id": "left"
+        },
+        {
+          "id": "el_pasok",
+          "name": "PASOK–KINAL",
+          "short_name": "PASOK",
+          "color": "#16A34A",
+          "position": [
+            -0.35,
+            -0.35,
+            0.65,
+            0.35,
+            0.4,
+            -0.2
+          ],
+          "appeal": 0.15,
+          "group_id": "sd"
+        },
+        {
+          "id": "el_el",
+          "name": "Elliniki Lysi",
+          "short_name": "EL",
+          "color": "#0284C7",
+          "position": [
+            0.15,
+            0.9,
+            -0.65,
+            0.3,
+            -0.7,
+            0.95
+          ],
+          "appeal": 0.05,
+          "group_id": "ecr"
+        },
+        {
+          "id": "el_kke",
+          "name": "KKE",
+          "short_name": "KKE",
+          "color": "#B91C1C",
+          "position": [
+            -0.95,
+            0.1,
+            -0.9,
+            -0.9,
+            0.1,
+            -0.2
+          ],
+          "appeal": 0,
+          "group_id": ""
+        },
+        {
+          "id": "el_niki",
+          "name": "Niki / Voice of Reason",
+          "short_name": "NIKI",
+          "color": "#92400E",
+          "position": [
+            0.1,
+            0.95,
+            -0.75,
+            0.1,
+            -0.75,
+            0.95
+          ],
+          "appeal": -0.45,
+          "group_id": ""
+        }
+      ],
+      "precincts": 52,
+      "use_nuts3": true
+    },
+    {
+      "id": "hu",
+      "name": "Hungary",
+      "seats": 21,
+      "method": "dhondt",
+      "threshold": 0.05,
+      "poll_close_hour": 19,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 739180,
+          "turnout": 0.62,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 1626197,
+          "turnout": 0.64,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 887016,
+          "turnout": 0.6,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 1478361,
+          "turnout": 0.64,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 813098,
+          "turnout": 0.5,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 1847951,
+          "turnout": 0.58,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "HU1": {
+          "cosmopolitan": 1.65,
+          "civic_center": 1.45,
+          "sovereignist": 0.55
+        },
+        "HU3": {
+          "sovereignist": 1.35,
+          "traditional_cons": 1.15
+        }
+      },
+      "parties": [
+        {
+          "id": "hu_fidesz",
+          "name": "Fidesz–KDNP",
+          "short_name": "FIDESZ",
+          "color": "#F97316",
+          "position": [
+            0.15,
+            0.9,
+            -0.75,
+            -0.55,
+            -0.65,
+            1
+          ],
+          "appeal": 0.65,
+          "group_id": "pfe"
+        },
+        {
+          "id": "hu_tisza",
+          "name": "TISZA",
+          "short_name": "TISZA",
+          "color": "#0284C7",
+          "position": [
+            0.35,
+            0.05,
+            0.7,
+            0.45,
+            0.15,
+            0.3
+          ],
+          "appeal": 0.45,
+          "group_id": "epp"
+        },
+        {
+          "id": "hu_dk",
+          "name": "DK–MSZP–Párbeszéd",
+          "short_name": "DK",
+          "color": "#2563EB",
+          "position": [
+            -0.5,
+            -0.6,
+            0.8,
+            0.25,
+            0.5,
+            -0.45
+          ],
+          "appeal": -0.15,
+          "group_id": "sd"
+        },
+        {
+          "id": "hu_mh",
+          "name": "Mi Hazánk",
+          "short_name": "MH",
+          "color": "#15803D",
+          "position": [
+            0.15,
+            0.95,
+            -0.95,
+            -0.45,
+            -0.8,
+            1
+          ],
+          "appeal": -0.35,
+          "group_id": "esn"
+        },
+        {
+          "id": "hu_mom",
+          "name": "Momentum",
+          "short_name": "MOM",
+          "color": "#7E22CE",
+          "position": [
+            0.25,
+            -0.75,
+            0.9,
+            0.5,
+            0.65,
+            -0.5
+          ],
+          "appeal": -0.55,
+          "group_id": "renew"
+        }
+      ],
+      "precincts": 20,
+      "use_nuts3": true
+    },
+    {
+      "id": "pt",
+      "name": "Portugal",
+      "seats": 21,
+      "method": "dhondt",
+      "threshold": 0,
+      "poll_close_hour": 21,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 1091327,
+          "turnout": 0.4,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 1403134,
+          "turnout": 0.42,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 2182653,
+          "turnout": 0.38,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 1714942,
+          "turnout": 0.42,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 623615,
+          "turnout": 0.28,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 779519,
+          "turnout": 0.36,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "pt_ps",
+          "name": "Partido Socialista",
+          "short_name": "PS",
+          "color": "#EC4899",
+          "position": [
+            -0.45,
+            -0.5,
+            0.75,
+            0.2,
+            0.45,
+            -0.4
+          ],
+          "appeal": 0.4,
+          "group_id": "sd"
+        },
+        {
+          "id": "pt_ad",
+          "name": "Aliança Democrática",
+          "short_name": "AD",
+          "color": "#F97316",
+          "position": [
+            0.45,
+            0.35,
+            0.7,
+            0.55,
+            -0.05,
+            0.35
+          ],
+          "appeal": 0.4,
+          "group_id": "epp"
+        },
+        {
+          "id": "pt_ch",
+          "name": "Chega",
+          "short_name": "CHEGA",
+          "color": "#1E3A8A",
+          "position": [
+            0.35,
+            0.9,
+            -0.6,
+            0.2,
+            -0.7,
+            0.95
+          ],
+          "appeal": 0.15,
+          "group_id": "pfe"
+        },
+        {
+          "id": "pt_il",
+          "name": "Iniciativa Liberal",
+          "short_name": "IL",
+          "color": "#0284C7",
+          "position": [
+            0.85,
+            -0.45,
+            0.8,
+            0.5,
+            0,
+            0.05
+          ],
+          "appeal": 0,
+          "group_id": "renew"
+        },
+        {
+          "id": "pt_be",
+          "name": "Bloco de Esquerda / PCP",
+          "short_name": "BE/PCP",
+          "color": "#DC2626",
+          "position": [
+            -0.85,
+            -0.75,
+            -0.1,
+            -0.75,
+            0.7,
+            -0.8
+          ],
+          "appeal": -0.15,
+          "group_id": "left"
+        },
+        {
+          "id": "pt_livre",
+          "name": "Livre",
+          "short_name": "LIVRE",
+          "color": "#16A34A",
+          "position": [
+            -0.45,
+            -0.85,
+            0.85,
+            0.15,
+            0.95,
+            -0.75
+          ],
+          "appeal": -0.4,
+          "group_id": "greens"
+        }
+      ],
+      "precincts": 23,
+      "use_nuts3": true
+    },
+    {
+      "id": "se",
+      "name": "Sweden",
+      "seats": 21,
+      "method": "sainte_lague",
+      "threshold": 0.04,
+      "poll_close_hour": 21,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 1620320,
+          "turnout": 0.56,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 1620320,
+          "turnout": 0.58,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 1944384,
+          "turnout": 0.54,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 1377272,
+          "turnout": 0.58,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 486096,
+          "turnout": 0.44,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 1053208,
+          "turnout": 0.52,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "SE1": {
+          "cosmopolitan": 1.4,
+          "civic_center": 1.25,
+          "sovereignist": 0.7
+        },
+        "SE2": {
+          "sovereignist": 1.35
+        }
+      },
+      "parties": [
+        {
+          "id": "se_s",
+          "name": "Socialdemokraterna",
+          "short_name": "S",
+          "color": "#DC2626",
+          "position": [
+            -0.45,
+            -0.5,
+            0.55,
+            0.45,
+            0.45,
+            0.1
+          ],
+          "appeal": 0.4,
+          "group_id": "sd"
+        },
+        {
+          "id": "se_m",
+          "name": "Moderaterna",
+          "short_name": "M",
+          "color": "#2563EB",
+          "position": [
+            0.65,
+            0.25,
+            0.65,
+            0.75,
+            -0.1,
+            0.6
+          ],
+          "appeal": 0.3,
+          "group_id": "epp"
+        },
+        {
+          "id": "se_mp",
+          "name": "Miljöpartiet",
+          "short_name": "MP",
+          "color": "#16A34A",
+          "position": [
+            -0.4,
+            -0.85,
+            0.7,
+            0.15,
+            1,
+            -0.8
+          ],
+          "appeal": 0.15,
+          "group_id": "greens"
+        },
+        {
+          "id": "se_sd",
+          "name": "Sverigedemokraterna",
+          "short_name": "SD",
+          "color": "#CA8A04",
+          "position": [
+            0.15,
+            0.85,
+            -0.65,
+            0.45,
+            -0.75,
+            1
+          ],
+          "appeal": 0.15,
+          "group_id": "ecr"
+        },
+        {
+          "id": "se_v",
+          "name": "Vänsterpartiet",
+          "short_name": "V",
+          "color": "#B91C1C",
+          "position": [
+            -0.85,
+            -0.8,
+            -0.15,
+            -0.4,
+            0.75,
+            -0.8
+          ],
+          "appeal": 0.05,
+          "group_id": "left"
+        },
+        {
+          "id": "se_c",
+          "name": "Centerpartiet / Liberalerna",
+          "short_name": "C/L",
+          "color": "#15803D",
+          "position": [
+            0.55,
+            -0.55,
+            0.85,
+            0.65,
+            0.55,
+            -0.3
+          ],
+          "appeal": -0.05,
+          "group_id": "renew"
+        }
+      ],
+      "precincts": 21,
+      "use_nuts3": true
+    },
+    {
+      "id": "at",
+      "name": "Austria",
+      "seats": 20,
+      "method": "dhondt",
+      "threshold": 0.04,
+      "poll_close_hour": 18,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 1051601,
+          "turnout": 0.59,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 1121708,
+          "turnout": 0.61,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 1402135,
+          "turnout": 0.57,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 1612455,
+          "turnout": 0.61,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 560854,
+          "turnout": 0.47,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 1261921,
+          "turnout": 0.55,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "district_tilts": {
+        "AT1": {
+          "cosmopolitan": 1.45,
+          "social_left": 1.35,
+          "sovereignist": 0.75
+        },
+        "AT2": {
+          "sovereignist": 1.35
+        }
+      },
+      "parties": [
+        {
+          "id": "at_fpo",
+          "name": "FPÖ",
+          "short_name": "FPÖ",
+          "color": "#0284C7",
+          "position": [
+            0.2,
+            0.9,
+            -0.85,
+            -0.55,
+            -0.8,
+            1
+          ],
+          "appeal": 0.4,
+          "group_id": "pfe"
+        },
+        {
+          "id": "at_ovp",
+          "name": "ÖVP",
+          "short_name": "ÖVP",
+          "color": "#0D9488",
+          "position": [
+            0.55,
+            0.45,
+            0.55,
+            0.4,
+            -0.15,
+            0.65
+          ],
+          "appeal": 0.35,
+          "group_id": "epp"
+        },
+        {
+          "id": "at_spo",
+          "name": "SPÖ",
+          "short_name": "SPÖ",
+          "color": "#DC2626",
+          "position": [
+            -0.55,
+            -0.5,
+            0.6,
+            -0.1,
+            0.45,
+            -0.25
+          ],
+          "appeal": 0.3,
+          "group_id": "sd"
+        },
+        {
+          "id": "at_grune",
+          "name": "Die Grünen",
+          "short_name": "GRÜNE",
+          "color": "#16A34A",
+          "position": [
+            -0.35,
+            -0.85,
+            0.8,
+            0.05,
+            0.95,
+            -0.75
+          ],
+          "appeal": 0.05,
+          "group_id": "greens"
+        },
+        {
+          "id": "at_neos",
+          "name": "NEOS",
+          "short_name": "NEOS",
+          "color": "#EC4899",
+          "position": [
+            0.65,
+            -0.55,
+            0.95,
+            0.55,
+            0.35,
+            -0.2
+          ],
+          "appeal": 0,
+          "group_id": "renew"
+        }
+      ],
+      "precincts": 35,
+      "use_nuts3": true
+    },
+    {
+      "id": "bg",
+      "name": "Bulgaria",
+      "seats": 17,
+      "method": "hare",
+      "threshold": 0.0588,
+      "poll_close_hour": 19,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 496474,
+          "turnout": 0.37,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 893653,
+          "turnout": 0.39,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 744711,
+          "turnout": 0.35,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 1290832,
+          "turnout": 0.39,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 744711,
+          "turnout": 0.25,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 794358,
+          "turnout": 0.33,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "bg_gerb",
+          "name": "GERB–SDS",
+          "short_name": "GERB",
+          "color": "#2563EB",
+          "position": [
+            0.45,
+            0.4,
+            0.65,
+            0.6,
+            -0.15,
+            0.45
+          ],
+          "appeal": 0.45,
+          "group_id": "epp"
+        },
+        {
+          "id": "bg_dps",
+          "name": "DPS",
+          "short_name": "DPS",
+          "color": "#0284C7",
+          "position": [
+            0.35,
+            0.1,
+            0.6,
+            0.45,
+            -0.1,
+            0.1
+          ],
+          "appeal": 0.15,
+          "group_id": "renew"
+        },
+        {
+          "id": "bg_ppdb",
+          "name": "PP–DB",
+          "short_name": "PP-DB",
+          "color": "#FACC15",
+          "position": [
+            0.45,
+            -0.4,
+            0.9,
+            0.7,
+            0.35,
+            -0.1
+          ],
+          "appeal": 0.15,
+          "group_id": "renew"
+        },
+        {
+          "id": "bg_vaz",
+          "name": "Vazrazhdane",
+          "short_name": "VAZ",
+          "color": "#1E293B",
+          "position": [
+            -0.15,
+            0.95,
+            -0.95,
+            -0.85,
+            -0.75,
+            0.95
+          ],
+          "appeal": 0.2,
+          "group_id": "esn"
+        },
+        {
+          "id": "bg_bsp",
+          "name": "BSP",
+          "short_name": "BSP",
+          "color": "#DC2626",
+          "position": [
+            -0.65,
+            0.55,
+            -0.25,
+            -0.75,
+            -0.2,
+            0.6
+          ],
+          "appeal": -0.1,
+          "group_id": "sd"
+        },
+        {
+          "id": "bg_itn",
+          "name": "ITN",
+          "short_name": "ITN",
+          "color": "#38BDF8",
+          "position": [
+            0.1,
+            0.5,
+            -0.35,
+            -0.2,
+            -0.3,
+            0.6
+          ],
+          "appeal": -0.3,
+          "group_id": "ecr"
+        }
+      ],
+      "precincts": 28,
+      "use_nuts3": true
+    },
+    {
+      "id": "dk",
+      "name": "Denmark",
+      "seats": 15,
+      "method": "dhondt",
+      "threshold": 0,
+      "poll_close_hour": 20,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 1004992,
+          "turnout": 0.62,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 1004992,
+          "turnout": 0.64,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 1004992,
+          "turnout": 0.6,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 822266,
+          "turnout": 0.64,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 274089,
+          "turnout": 0.5,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 456814,
+          "turnout": 0.58,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "dk_sf",
+          "name": "Socialistisk Folkeparti",
+          "short_name": "SF",
+          "color": "#16A34A",
+          "position": [
+            -0.55,
+            -0.75,
+            0.65,
+            0.3,
+            0.95,
+            -0.45
+          ],
+          "appeal": 0.3,
+          "group_id": "greens"
+        },
+        {
+          "id": "dk_s",
+          "name": "Socialdemokratiet",
+          "short_name": "S",
+          "color": "#DC2626",
+          "position": [
+            -0.45,
+            -0.25,
+            0.6,
+            0.6,
+            0.4,
+            0.6
+          ],
+          "appeal": 0.25,
+          "group_id": "sd"
+        },
+        {
+          "id": "dk_v",
+          "name": "Venstre",
+          "short_name": "V",
+          "color": "#2563EB",
+          "position": [
+            0.6,
+            0.1,
+            0.75,
+            0.7,
+            0.05,
+            0.55
+          ],
+          "appeal": 0.25,
+          "group_id": "renew"
+        },
+        {
+          "id": "dk_k",
+          "name": "Konservative",
+          "short_name": "K",
+          "color": "#15803D",
+          "position": [
+            0.55,
+            0.45,
+            0.55,
+            0.75,
+            0,
+            0.6
+          ],
+          "appeal": 0.05,
+          "group_id": "epp"
+        },
+        {
+          "id": "dk_dd",
+          "name": "Danmarksdemokraterne / DF",
+          "short_name": "DD/DF",
+          "color": "#1E3A8A",
+          "position": [
+            0.1,
+            0.8,
+            -0.7,
+            0.25,
+            -0.75,
+            0.95
+          ],
+          "appeal": 0.1,
+          "group_id": "ecr"
+        },
+        {
+          "id": "dk_el",
+          "name": "Enhedslisten",
+          "short_name": "EL",
+          "color": "#B91C1C",
+          "position": [
+            -0.85,
+            -0.8,
+            -0.25,
+            -0.55,
+            0.85,
+            -0.8
+          ],
+          "appeal": -0.15,
+          "group_id": "left"
+        }
+      ],
+      "precincts": 11,
+      "use_nuts3": true
+    },
+    {
+      "id": "fi",
+      "name": "Finland",
+      "seats": 15,
+      "method": "dhondt",
+      "threshold": 0,
+      "poll_close_hour": 19,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 771166,
+          "turnout": 0.45,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 942537,
+          "turnout": 0.47,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 942537,
+          "turnout": 0.43,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 856851,
+          "turnout": 0.47,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 257055,
+          "turnout": 0.33,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 514111,
+          "turnout": 0.41,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "fi_kok",
+          "name": "Kokoomus",
+          "short_name": "KOK",
+          "color": "#1D4ED8",
+          "position": [
+            0.7,
+            0.15,
+            0.8,
+            0.85,
+            0.05,
+            0.45
+          ],
+          "appeal": 0.4,
+          "group_id": "epp"
+        },
+        {
+          "id": "fi_vas",
+          "name": "Vasemmistoliitto",
+          "short_name": "VAS",
+          "color": "#B91C1C",
+          "position": [
+            -0.8,
+            -0.85,
+            0.35,
+            -0.25,
+            0.85,
+            -0.8
+          ],
+          "appeal": 0.3,
+          "group_id": "left"
+        },
+        {
+          "id": "fi_sdp",
+          "name": "SDP",
+          "short_name": "SDP",
+          "color": "#DC2626",
+          "position": [
+            -0.45,
+            -0.5,
+            0.7,
+            0.6,
+            0.45,
+            -0.25
+          ],
+          "appeal": 0.25,
+          "group_id": "sd"
+        },
+        {
+          "id": "fi_kesk",
+          "name": "Keskusta",
+          "short_name": "KESK",
+          "color": "#15803D",
+          "position": [
+            0.25,
+            0.35,
+            0.35,
+            0.65,
+            -0.15,
+            0.4
+          ],
+          "appeal": 0.1,
+          "group_id": "renew"
+        },
+        {
+          "id": "fi_vihr",
+          "name": "Vihreät",
+          "short_name": "VIHR",
+          "color": "#22C55E",
+          "position": [
+            -0.2,
+            -0.85,
+            0.85,
+            0.55,
+            0.95,
+            -0.7
+          ],
+          "appeal": 0.05,
+          "group_id": "greens"
+        },
+        {
+          "id": "fi_ps",
+          "name": "Perussuomalaiset",
+          "short_name": "PS",
+          "color": "#CA8A04",
+          "position": [
+            0.25,
+            0.85,
+            -0.75,
+            0.6,
+            -0.8,
+            0.95
+          ],
+          "appeal": -0.05,
+          "group_id": "ecr"
+        }
+      ],
+      "precincts": 19,
+      "use_nuts3": true
+    },
+    {
+      "id": "sk",
+      "name": "Slovakia",
+      "seats": 15,
+      "method": "hare",
+      "threshold": 0.05,
+      "poll_close_hour": 22,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 752431,
+          "turnout": 0.37,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 668827,
+          "turnout": 0.39,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 585224,
+          "turnout": 0.35,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 668827,
+          "turnout": 0.39,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 752431,
+          "turnout": 0.25,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 752431,
+          "turnout": 0.33,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "sk_ps",
+          "name": "Progresívne Slovensko",
+          "short_name": "PS",
+          "color": "#0284C7",
+          "position": [
+            0.15,
+            -0.8,
+            0.9,
+            0.6,
+            0.7,
+            -0.55
+          ],
+          "appeal": 0.45,
+          "group_id": "renew"
+        },
+        {
+          "id": "sk_smer",
+          "name": "SMER–SD",
+          "short_name": "SMER",
+          "color": "#DC2626",
+          "position": [
+            -0.5,
+            0.7,
+            -0.55,
+            -0.8,
+            -0.4,
+            0.85
+          ],
+          "appeal": 0.45,
+          "group_id": ""
+        },
+        {
+          "id": "sk_rep",
+          "name": "Republika",
+          "short_name": "REP",
+          "color": "#1E293B",
+          "position": [
+            0.1,
+            0.95,
+            -0.95,
+            -0.75,
+            -0.8,
+            1
+          ],
+          "appeal": 0.05,
+          "group_id": "esn"
+        },
+        {
+          "id": "sk_hlas",
+          "name": "HLAS–SD",
+          "short_name": "HLAS",
+          "color": "#EC4899",
+          "position": [
+            -0.35,
+            0.3,
+            0.2,
+            -0.25,
+            -0.1,
+            0.5
+          ],
+          "appeal": -0.05,
+          "group_id": ""
+        },
+        {
+          "id": "sk_kdh",
+          "name": "KDH",
+          "short_name": "KDH",
+          "color": "#1D4ED8",
+          "position": [
+            0.35,
+            0.75,
+            0.45,
+            0.55,
+            -0.15,
+            0.6
+          ],
+          "appeal": -0.05,
+          "group_id": "epp"
+        }
+      ],
+      "precincts": 8,
+      "use_nuts3": true
+    },
+    {
+      "id": "ie",
+      "name": "Ireland",
+      "seats": 14,
+      "method": "hare",
+      "threshold": 0,
+      "poll_close_hour": 22,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 649436,
+          "turnout": 0.54,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 974154,
+          "turnout": 0.56,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 811795,
+          "turnout": 0.52,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 892974,
+          "turnout": 0.56,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 487077,
+          "turnout": 0.42,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 243538,
+          "turnout": 0.5,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "ie_fg",
+          "name": "Fine Gael",
+          "short_name": "FG",
+          "color": "#2563EB",
+          "position": [
+            0.6,
+            -0.15,
+            0.85,
+            0.4,
+            0.1,
+            0.2
+          ],
+          "appeal": 0.35,
+          "group_id": "epp"
+        },
+        {
+          "id": "ie_ff",
+          "name": "Fianna Fáil",
+          "short_name": "FF",
+          "color": "#16A34A",
+          "position": [
+            0.35,
+            0.15,
+            0.8,
+            0.25,
+            0,
+            0.25
+          ],
+          "appeal": 0.35,
+          "group_id": "renew"
+        },
+        {
+          "id": "ie_sf",
+          "name": "Sinn Féin",
+          "short_name": "SF",
+          "color": "#15803D",
+          "position": [
+            -0.65,
+            -0.45,
+            0.15,
+            -0.6,
+            0.35,
+            0.1
+          ],
+          "appeal": 0.25,
+          "group_id": "left"
+        },
+        {
+          "id": "ie_lab",
+          "name": "Labour / Social Democrats",
+          "short_name": "LAB/SD",
+          "color": "#DC2626",
+          "position": [
+            -0.55,
+            -0.75,
+            0.75,
+            -0.1,
+            0.65,
+            -0.6
+          ],
+          "appeal": -0.05,
+          "group_id": "sd"
+        },
+        {
+          "id": "ie_ind",
+          "name": "Independents / II",
+          "short_name": "IND",
+          "color": "#64748B",
+          "position": [
+            0.15,
+            0.45,
+            -0.2,
+            -0.3,
+            -0.45,
+            0.55
+          ],
+          "appeal": 0.1,
+          "group_id": "renew"
+        }
+      ],
+      "precincts": 8,
+      "use_nuts3": true
+    },
+    {
+      "id": "hr",
+      "name": "Croatia",
+      "seats": 12,
+      "method": "dhondt",
+      "threshold": 0.05,
+      "poll_close_hour": 19,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 355823,
+          "turnout": 0.25,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 474430,
+          "turnout": 0.26,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 652341,
+          "turnout": 0.25,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 889556,
+          "turnout": 0.26,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 237215,
+          "turnout": 0.25,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 355823,
+          "turnout": 0.25,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "hr_hdz",
+          "name": "HDZ",
+          "short_name": "HDZ",
+          "color": "#1D4ED8",
+          "position": [
+            0.4,
+            0.5,
+            0.7,
+            0.65,
+            -0.1,
+            0.55
+          ],
+          "appeal": 0.55,
+          "group_id": "epp"
+        },
+        {
+          "id": "hr_sdp",
+          "name": "SDP",
+          "short_name": "SDP",
+          "color": "#DC2626",
+          "position": [
+            -0.45,
+            -0.55,
+            0.7,
+            0.2,
+            0.45,
+            -0.4
+          ],
+          "appeal": 0.4,
+          "group_id": "sd"
+        },
+        {
+          "id": "hr_dp",
+          "name": "Domovinski Pokret",
+          "short_name": "DP",
+          "color": "#1E293B",
+          "position": [
+            0.25,
+            0.9,
+            -0.45,
+            0.45,
+            -0.65,
+            0.95
+          ],
+          "appeal": 0.05,
+          "group_id": "ecr"
+        },
+        {
+          "id": "hr_moz",
+          "name": "Možemo!",
+          "short_name": "MOŽEMO",
+          "color": "#16A34A",
+          "position": [
+            -0.6,
+            -0.85,
+            0.75,
+            -0.1,
+            0.95,
+            -0.75
+          ],
+          "appeal": -0.05,
+          "group_id": "greens"
+        }
+      ],
+      "precincts": 21,
+      "use_nuts3": true
+    },
+    {
+      "id": "lt",
+      "name": "Lithuania",
+      "seats": 11,
+      "method": "hare",
+      "threshold": 0.05,
+      "poll_close_hour": 19,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 264013,
+          "turnout": 0.32,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 484023,
+          "turnout": 0.34,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 484023,
+          "turnout": 0.3,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 528025,
+          "turnout": 0.34,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 220011,
+          "turnout": 0.25,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 220011,
+          "turnout": 0.28,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "lt_tslkd",
+          "name": "TS–LKD",
+          "short_name": "TS-LKD",
+          "color": "#0284C7",
+          "position": [
+            0.55,
+            0.35,
+            0.85,
+            0.95,
+            0.05,
+            0.45
+          ],
+          "appeal": 0.4,
+          "group_id": "epp"
+        },
+        {
+          "id": "lt_lsdp",
+          "name": "LSDP",
+          "short_name": "LSDP",
+          "color": "#DC2626",
+          "position": [
+            -0.45,
+            -0.35,
+            0.75,
+            0.75,
+            0.35,
+            -0.15
+          ],
+          "appeal": 0.35,
+          "group_id": "sd"
+        },
+        {
+          "id": "lt_lvzs",
+          "name": "LVŽS",
+          "short_name": "LVŽS",
+          "color": "#15803D",
+          "position": [
+            -0.15,
+            0.7,
+            0.05,
+            0.65,
+            -0.25,
+            0.75
+          ],
+          "appeal": 0.1,
+          "group_id": "ecr"
+        },
+        {
+          "id": "lt_lp",
+          "name": "Liberalų Sąjūdis / LP",
+          "short_name": "LS/LP",
+          "color": "#F97316",
+          "position": [
+            0.7,
+            -0.55,
+            0.9,
+            0.85,
+            0.3,
+            -0.25
+          ],
+          "appeal": 0.1,
+          "group_id": "renew"
+        },
+        {
+          "id": "lt_dsvl",
+          "name": "Demokratai Vardan Lietuvos",
+          "short_name": "DSVL",
+          "color": "#1E3A8A",
+          "position": [
+            -0.15,
+            0.2,
+            0.6,
+            0.75,
+            0.25,
+            0.35
+          ],
+          "appeal": -0.15,
+          "group_id": "greens"
+        }
+      ],
+      "precincts": 10,
+      "use_nuts3": true
+    },
+    {
+      "id": "lv",
+      "name": "Latvia",
+      "seats": 9,
+      "method": "sainte_lague",
+      "threshold": 0.05,
+      "poll_close_hour": 19,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 203426,
+          "turnout": 0.37,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 348730,
+          "turnout": 0.39,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 203426,
+          "turnout": 0.35,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 377791,
+          "turnout": 0.39,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 116243,
+          "turnout": 0.25,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 203426,
+          "turnout": 0.33,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "lv_jv",
+          "name": "Jaunā Vienotība",
+          "short_name": "JV",
+          "color": "#16A34A",
+          "position": [
+            0.5,
+            -0.15,
+            0.9,
+            0.95,
+            0.2,
+            0.35
+          ],
+          "appeal": 0.45,
+          "group_id": "epp"
+        },
+        {
+          "id": "lv_na",
+          "name": "Nacionālā Apvienība",
+          "short_name": "NA",
+          "color": "#991B1B",
+          "position": [
+            0.35,
+            0.8,
+            0.15,
+            0.95,
+            -0.45,
+            0.9
+          ],
+          "appeal": 0.4,
+          "group_id": "ecr"
+        },
+        {
+          "id": "lv_la",
+          "name": "Latvijas Attīstībai",
+          "short_name": "LA",
+          "color": "#FACC15",
+          "position": [
+            0.65,
+            -0.45,
+            0.9,
+            0.9,
+            0.2,
+            0.05
+          ],
+          "appeal": 0,
+          "group_id": "renew"
+        },
+        {
+          "id": "lv_pro",
+          "name": "Progresīvie",
+          "short_name": "PRO",
+          "color": "#DC2626",
+          "position": [
+            -0.55,
+            -0.8,
+            0.85,
+            0.7,
+            0.8,
+            -0.6
+          ],
+          "appeal": 0,
+          "group_id": "greens"
+        },
+        {
+          "id": "lv_sas",
+          "name": "Saskaņa",
+          "short_name": "SASK",
+          "color": "#EF4444",
+          "position": [
+            -0.55,
+            0.25,
+            0.15,
+            -0.35,
+            -0.05,
+            0.1
+          ],
+          "appeal": -0.05,
+          "group_id": "sd"
+        }
+      ],
+      "precincts": 6,
+      "use_nuts3": true
+    },
+    {
+      "id": "si",
+      "name": "Slovenia",
+      "seats": 9,
+      "method": "dhondt",
+      "threshold": 0,
+      "poll_close_hour": 19,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 260811,
+          "turnout": 0.44,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 358615,
+          "turnout": 0.46,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 260811,
+          "turnout": 0.42,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 456419,
+          "turnout": 0.46,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 130405,
+          "turnout": 0.32,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 163007,
+          "turnout": 0.4,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "si_sds",
+          "name": "SDS",
+          "short_name": "SDS",
+          "color": "#FACC15",
+          "position": [
+            0.55,
+            0.7,
+            0.25,
+            0.65,
+            -0.4,
+            0.85
+          ],
+          "appeal": 0.5,
+          "group_id": "epp"
+        },
+        {
+          "id": "si_gs",
+          "name": "Gibanje Svoboda",
+          "short_name": "GS",
+          "color": "#0284C7",
+          "position": [
+            0.15,
+            -0.6,
+            0.85,
+            0.35,
+            0.65,
+            -0.45
+          ],
+          "appeal": 0.4,
+          "group_id": "renew"
+        },
+        {
+          "id": "si_vesna",
+          "name": "Vesna",
+          "short_name": "VESNA",
+          "color": "#16A34A",
+          "position": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.05,
+            0.95,
+            -0.7
+          ],
+          "appeal": 0,
+          "group_id": "greens"
+        },
+        {
+          "id": "si_sd",
+          "name": "SD",
+          "short_name": "SD",
+          "color": "#DC2626",
+          "position": [
+            -0.5,
+            -0.55,
+            0.7,
+            0.15,
+            0.5,
+            -0.4
+          ],
+          "appeal": -0.05,
+          "group_id": "sd"
+        },
+        {
+          "id": "si_nsi",
+          "name": "Nova Slovenija",
+          "short_name": "NSi",
+          "color": "#1D4ED8",
+          "position": [
+            0.55,
+            0.55,
+            0.6,
+            0.55,
+            -0.1,
+            0.55
+          ],
+          "appeal": -0.15,
+          "group_id": "epp"
+        }
+      ],
+      "precincts": 12,
+      "use_nuts3": true
+    },
+    {
+      "id": "ee",
+      "name": "Estonia",
+      "seats": 7,
+      "method": "dhondt",
+      "threshold": 0,
+      "poll_close_hour": 19,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 147242,
+          "turnout": 0.41,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 273450,
+          "turnout": 0.43,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 189312,
+          "turnout": 0.39,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 231381,
+          "turnout": 0.43,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 84138,
+          "turnout": 0.29,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 126208,
+          "turnout": 0.37,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "ee_isa",
+          "name": "Isamaa",
+          "short_name": "ISAMAA",
+          "color": "#0284C7",
+          "position": [
+            0.55,
+            0.65,
+            0.45,
+            0.95,
+            -0.25,
+            0.75
+          ],
+          "appeal": 0.4,
+          "group_id": "epp"
+        },
+        {
+          "id": "ee_sde",
+          "name": "SDE",
+          "short_name": "SDE",
+          "color": "#DC2626",
+          "position": [
+            -0.45,
+            -0.6,
+            0.8,
+            0.85,
+            0.55,
+            -0.35
+          ],
+          "appeal": 0.35,
+          "group_id": "sd"
+        },
+        {
+          "id": "ee_ref",
+          "name": "Reformierakond",
+          "short_name": "REF",
+          "color": "#FACC15",
+          "position": [
+            0.8,
+            -0.35,
+            0.9,
+            0.95,
+            0.15,
+            0.1
+          ],
+          "appeal": 0.3,
+          "group_id": "renew"
+        },
+        {
+          "id": "ee_ekre",
+          "name": "EKRE",
+          "short_name": "EKRE",
+          "color": "#1E3A8A",
+          "position": [
+            0.25,
+            0.95,
+            -0.8,
+            0.65,
+            -0.85,
+            1
+          ],
+          "appeal": 0.1,
+          "group_id": "pfe"
+        },
+        {
+          "id": "ee_kesk",
+          "name": "Keskerakond",
+          "short_name": "KESK",
+          "color": "#16A34A",
+          "position": [
+            -0.3,
+            0.25,
+            0.3,
+            0.2,
+            -0.1,
+            0.2
+          ],
+          "appeal": 0,
+          "group_id": "renew"
+        }
+      ],
+      "precincts": 5,
+      "use_nuts3": true
+    },
+    {
+      "id": "cy",
+      "name": "Cyprus",
+      "seats": 6,
+      "method": "hare",
+      "threshold": 0.018,
+      "poll_close_hour": 18,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 73080,
+          "turnout": 0.62,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 116927,
+          "turnout": 0.64,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 175391,
+          "turnout": 0.6,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 190007,
+          "turnout": 0.64,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 102311,
+          "turnout": 0.5,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 73080,
+          "turnout": 0.58,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "cy_disy",
+          "name": "DISY",
+          "short_name": "DISY",
+          "color": "#1D4ED8",
+          "position": [
+            0.55,
+            0.35,
+            0.75,
+            0.55,
+            -0.05,
+            0.55
+          ],
+          "appeal": 0.4,
+          "group_id": "epp"
+        },
+        {
+          "id": "cy_akel",
+          "name": "AKEL",
+          "short_name": "AKEL",
+          "color": "#DC2626",
+          "position": [
+            -0.8,
+            -0.45,
+            0.1,
+            -0.65,
+            0.45,
+            -0.55
+          ],
+          "appeal": 0.35,
+          "group_id": "left"
+        },
+        {
+          "id": "cy_ind",
+          "name": "Fidias (Independent)",
+          "short_name": "FIDIAS",
+          "color": "#64748B",
+          "position": [
+            0,
+            0.05,
+            -0.25,
+            -0.4,
+            0,
+            0.2
+          ],
+          "appeal": 0.25,
+          "group_id": ""
+        },
+        {
+          "id": "cy_elam",
+          "name": "ELAM",
+          "short_name": "ELAM",
+          "color": "#1E293B",
+          "position": [
+            0.2,
+            0.95,
+            -0.65,
+            0.5,
+            -0.7,
+            1
+          ],
+          "appeal": 0.1,
+          "group_id": "ecr"
+        },
+        {
+          "id": "cy_diko",
+          "name": "DIKO",
+          "short_name": "DIKO",
+          "color": "#F97316",
+          "position": [
+            0.1,
+            0.3,
+            0.55,
+            0.45,
+            0.05,
+            0.45
+          ],
+          "appeal": -0.05,
+          "group_id": "sd"
+        }
+      ],
+      "precincts": 1,
+      "use_nuts3": true
+    },
+    {
+      "id": "lu",
+      "name": "Luxembourg",
+      "seats": 6,
+      "method": "dhondt",
+      "threshold": 0,
+      "poll_close_hour": 18,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 101765,
+          "turnout": 0.85,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 122118,
+          "turnout": 0.87,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 101765,
+          "turnout": 0.83,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 122118,
+          "turnout": 0.87,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 20353,
+          "turnout": 0.73,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 40706,
+          "turnout": 0.81,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "lu_csv",
+          "name": "CSV",
+          "short_name": "CSV",
+          "color": "#F97316",
+          "position": [
+            0.4,
+            0.35,
+            0.85,
+            0.55,
+            0.05,
+            0.3
+          ],
+          "appeal": 0.4,
+          "group_id": "epp"
+        },
+        {
+          "id": "lu_lsap",
+          "name": "LSAP",
+          "short_name": "LSAP",
+          "color": "#DC2626",
+          "position": [
+            -0.5,
+            -0.55,
+            0.85,
+            0.2,
+            0.5,
+            -0.4
+          ],
+          "appeal": 0.3,
+          "group_id": "sd"
+        },
+        {
+          "id": "lu_dp",
+          "name": "DP",
+          "short_name": "DP",
+          "color": "#2563EB",
+          "position": [
+            0.65,
+            -0.45,
+            0.9,
+            0.55,
+            0.2,
+            -0.15
+          ],
+          "appeal": 0.25,
+          "group_id": "renew"
+        },
+        {
+          "id": "lu_gr",
+          "name": "Déi Gréng",
+          "short_name": "GRÉNG",
+          "color": "#16A34A",
+          "position": [
+            -0.3,
+            -0.8,
+            0.9,
+            0.2,
+            0.95,
+            -0.7
+          ],
+          "appeal": 0.05,
+          "group_id": "greens"
+        },
+        {
+          "id": "lu_adr",
+          "name": "ADR",
+          "short_name": "ADR",
+          "color": "#0284C7",
+          "position": [
+            0.35,
+            0.8,
+            -0.55,
+            0.25,
+            -0.7,
+            0.9
+          ],
+          "appeal": 0.05,
+          "group_id": "ecr"
+        }
+      ],
+      "precincts": 1,
+      "use_nuts3": true
+    },
+    {
+      "id": "mt",
+      "name": "Malta",
+      "seats": 6,
+      "method": "hare",
+      "threshold": 0,
+      "poll_close_hour": 22,
+      "groups": [
+        {
+          "id": "cosmopolitan",
+          "name": "Cosmopolitan Progressives",
+          "population": 41738,
+          "turnout": 0.76,
+          "ideal": [
+            -0.35,
+            -0.8,
+            0.8,
+            0.15,
+            0.9,
+            -0.7
+          ],
+          "weights": [
+            1.1,
+            1.4,
+            1.3,
+            0.8,
+            1.7,
+            1.3
+          ]
+        },
+        {
+          "id": "civic_center",
+          "name": "Civic Centrists",
+          "population": 66781,
+          "turnout": 0.78,
+          "ideal": [
+            0.45,
+            -0.2,
+            0.75,
+            0.55,
+            0.15,
+            0.1
+          ],
+          "weights": [
+            1.5,
+            1,
+            1.4,
+            1.1,
+            0.9,
+            1.1
+          ]
+        },
+        {
+          "id": "social_left",
+          "name": "Social-Solidarity Left",
+          "population": 150256,
+          "turnout": 0.74,
+          "ideal": [
+            -0.55,
+            -0.5,
+            0.45,
+            0,
+            0.45,
+            -0.4
+          ],
+          "weights": [
+            1.6,
+            1.2,
+            1.1,
+            0.9,
+            1.1,
+            1.2
+          ]
+        },
+        {
+          "id": "traditional_cons",
+          "name": "Traditional Conservatives",
+          "population": 125214,
+          "turnout": 0.78,
+          "ideal": [
+            0.45,
+            0.45,
+            0.35,
+            0.6,
+            -0.15,
+            0.55
+          ],
+          "weights": [
+            1.4,
+            1.4,
+            1.2,
+            1.1,
+            0.9,
+            1.4
+          ]
+        },
+        {
+          "id": "disillusioned",
+          "name": "Disillusioned Anti-Establishment",
+          "population": 16695,
+          "turnout": 0.64,
+          "ideal": [
+            -0.55,
+            0.2,
+            -0.5,
+            -0.7,
+            -0.15,
+            0.35
+          ],
+          "weights": [
+            1.6,
+            1.1,
+            1.3,
+            1.3,
+            1,
+            1.3
+          ]
+        },
+        {
+          "id": "sovereignist",
+          "name": "Nationalist Sovereignists",
+          "population": 16695,
+          "turnout": 0.72,
+          "ideal": [
+            0.25,
+            0.85,
+            -0.75,
+            -0.1,
+            -0.7,
+            0.92
+          ],
+          "weights": [
+            1.1,
+            1.6,
+            1.5,
+            1,
+            1.2,
+            1.9
+          ]
+        }
+      ],
+      "parties": [
+        {
+          "id": "mt_pl",
+          "name": "Partit Laburista",
+          "short_name": "PL",
+          "color": "#DC2626",
+          "position": [
+            -0.35,
+            -0.25,
+            0.65,
+            -0.15,
+            0.15,
+            0.25
+          ],
+          "appeal": 0.45,
+          "group_id": "sd"
+        },
+        {
+          "id": "mt_pn",
+          "name": "Partit Nazzjonalista",
+          "short_name": "PN",
+          "color": "#2563EB",
+          "position": [
+            0.45,
+            0.45,
+            0.8,
+            0.3,
+            0.15,
+            0.35
+          ],
+          "appeal": 0.4,
+          "group_id": "epp"
+        },
+        {
+          "id": "mt_adpd",
+          "name": "ADPD",
+          "short_name": "ADPD",
+          "color": "#16A34A",
+          "position": [
+            -0.35,
+            -0.75,
+            0.85,
+            -0.2,
+            0.95,
+            -0.6
+          ],
+          "appeal": -0.45,
+          "group_id": "greens"
+        }
+      ],
+      "precincts": 2,
+      "use_nuts3": true
+    }
+  ]
+}

@@ -108,4 +108,79 @@ func TestServerRoutes(t *testing.T) {
 			t.Errorf("did not expect complete event on canceled client context")
 		}
 	})
+
+	t.Run("embedded geo and JS static assets serve 200 OK", func(t *testing.T) {
+		for _, path := range []string{"/geo/europe_nuts0.json", "/geo/nuts3.json", "/js/app.js"} {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK || rec.Body.Len() == 0 {
+				t.Errorf("GET %s: status=%d len=%d, want 200 non-empty", path, rec.Code, rec.Body.Len())
+			}
+		}
+	})
+}
+
+func TestServerNationalPartiesAndNUTS3Stream(t *testing.T) {
+	scenario, err := sim.LoadScenario("../scenarios/eu_starter.json")
+	if err != nil {
+		t.Fatalf("LoadScenario failed: %v", err)
+	}
+	handler := NewServer(scenario).Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=0&seed=42", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	body := rec.Body.String()
+	wantPrecincts := 0
+	for _, r := range scenario.Regions {
+		wantPrecincts += r.EffectivePrecinctCount()
+	}
+	if got := strings.Count(body, "event: precinct\n"); got != wantPrecincts {
+		t.Fatalf("got %d NUTS-3 precinct events, want %d", got, wantPrecincts)
+	}
+
+	// Verify exit_poll payload carries EU Group IDs in eu_seats and national Party IDs in region_seats.
+	for _, block := range strings.Split(body, "\n\n") {
+		if !strings.HasPrefix(block, "event: exit_poll\n") {
+			continue
+		}
+		dataLine := strings.TrimPrefix(strings.Split(block, "\n")[1], "data: ")
+		var payload exitPollPayload
+		if err := json.Unmarshal([]byte(dataLine), &payload); err != nil {
+			t.Fatalf("decode exit_poll: %v", err)
+		}
+		if payload.TotalPrecincts != wantPrecincts {
+			t.Errorf("exit_poll total_precincts = %d, want %d", payload.TotalPrecincts, wantPrecincts)
+		}
+		if payload.EUSeats["epp"] == 0 {
+			t.Errorf("expected EU group 'epp' seats in exit_poll eu_seats, got %v", payload.EUSeats)
+		}
+		if len(payload.Coalitions) == 0 {
+			t.Errorf("expected viable coalitions in exit_poll payload, got none")
+		}
+		if payload.RegionSeats["de"]["de_cdu"] == 0 {
+			t.Errorf("expected national party 'de_cdu' seats in region_seats[de], got %v", payload.RegionSeats["de"])
+		}
+		break
+	}
+
+	t.Run("waves=3 streams partial batches and reaches 100% counted", func(t *testing.T) {
+		wReq := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=0&waves=3&seed=42", nil)
+		wRec := httptest.NewRecorder()
+		handler.ServeHTTP(wRec, wReq)
+
+		wBody := wRec.Body.String()
+		if got := strings.Count(wBody, "event: precinct\n"); got != wantPrecincts*3 {
+			t.Fatalf("got %d wave events, want %d", got, wantPrecincts*3)
+		}
+		if !strings.Contains(wBody, `"reported_precincts":604`) {
+			t.Errorf("expected final reported_precincts to reach 604")
+		}
+	})
 }

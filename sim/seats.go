@@ -129,3 +129,25 @@ func SumSeats(regionSeats map[string]map[string]int) map[string]int {
 	}
 	return totals
 }
+
+// RollupGroupSeats aggregates national party seats into EU political group totals.
+// Parties without a GroupID are assigned to NonInscritsID ("ni").
+func RollupGroupSeats(seats map[string]int, parties []Party) map[string]int {
+	groupOf := make(map[string]string, len(parties))
+	for _, p := range parties {
+		groupOf[p.ID] = p.GroupID
+	}
+
+	grouped := make(map[string]int)
+	for partyID, count := range seats {
+		if count <= 0 {
+			continue
+		}
+		gid := groupOf[partyID]
+		if gid == "" {
+			gid = NonInscritsID
+		}
+		grouped[gid] += count
+	}
+	return grouped
+}
