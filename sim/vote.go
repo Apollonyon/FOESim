@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-// VoteShares returns each party's vote probability (keyed by Party.ID) for group,
+// VoteShares returns each party's vote probability for group,
 // using softmax over (-WeightedDistance + Appeal) / temperature.
 // Non-positive temperatures default to 1.0.
 func VoteShares(group VoterGroup, parties []Party, temperature float64) map[string]float64 {
