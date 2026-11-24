@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -195,16 +196,18 @@ func TestLoadScenario(t *testing.T) {
 		cases := []struct {
 			name     string
 			scenario Scenario
+			wantErr  string
 		}{
-			{name: "no parties", scenario: Scenario{Name: "empty", Regions: DefaultRegions()}},
-			{name: "no regions", scenario: Scenario{Name: "empty", Parties: DefaultParties()}},
+			{name: "no parties", scenario: Scenario{Name: "empty", Regions: DefaultRegions()}, wantErr: "has no parties"},
+			{name: "no regions", scenario: Scenario{Name: "empty", Parties: DefaultParties()}, wantErr: "has no regions"},
 			{
 				name: "no voter groups",
 				scenario: Scenario{
 					Name:    "empty groups",
 					Parties: DefaultParties(),
-					Regions: []Region{{ID: "xx", Method: MethodDHondt}},
+					Regions: []Region{{ID: "xx", Seats: 10, Method: MethodDHondt}},
 				},
+				wantErr: "has no voter groups",
 			},
 			{
 				name: "duplicate region id",
@@ -212,10 +215,11 @@ func TestLoadScenario(t *testing.T) {
 					Name:    "dup region",
 					Parties: DefaultParties(),
 					Regions: []Region{
-						{ID: "xx", Groups: []VoterGroup{validGroup}},
-						{ID: "xx", Groups: []VoterGroup{validGroup}},
+						{ID: "xx", Seats: 10, Groups: []VoterGroup{validGroup}},
+						{ID: "xx", Seats: 10, Groups: []VoterGroup{validGroup}},
 					},
 				},
+				wantErr: "duplicate region id",
 			},
 			{
 				name: "unknown EU group on party",
@@ -224,10 +228,12 @@ func TestLoadScenario(t *testing.T) {
 					Groups: []EUGroup{{ID: "epp"}},
 					Regions: []Region{{
 						ID:      "xx",
+						Seats:   10,
 						Groups:  []VoterGroup{validGroup},
 						Parties: []Party{{ID: "p1", GroupID: "missing_group"}},
 					}},
 				},
+				wantErr: "unknown EU group",
 			},
 			{
 				name: "unknown voter group in district_tilts",
@@ -236,24 +242,114 @@ func TestLoadScenario(t *testing.T) {
 					Parties: DefaultParties(),
 					Regions: []Region{{
 						ID:            "xx",
+						Seats:         10,
 						Groups:        []VoterGroup{validGroup},
 						DistrictTilts: map[string]map[string]float64{"XX1": {"ghost_group": 1.5}},
 					}},
 				},
+				wantErr: "unknown voter group",
 			},
 			{
 				name: "unknown method",
 				scenario: Scenario{
 					Name:    "bad method",
 					Parties: DefaultParties(),
-					Regions: []Region{{ID: "xx", Method: "dhont", Groups: []VoterGroup{validGroup}}},
+					Regions: []Region{{ID: "xx", Seats: 10, Method: "dhont", Groups: []VoterGroup{validGroup}}},
 				},
+				wantErr: "unknown allocation method",
+			},
+			{
+				name: "zero seats",
+				scenario: Scenario{
+					Name:    "no seats",
+					Parties: DefaultParties(),
+					Regions: []Region{{ID: "xx", Seats: 0, Groups: []VoterGroup{validGroup}}},
+				},
+				wantErr: "has no seats",
+			},
+			{
+				name: "invalid threshold",
+				scenario: Scenario{
+					Name:    "bad threshold",
+					Parties: DefaultParties(),
+					Regions: []Region{{ID: "xx", Seats: 10, Threshold: 1.5, Groups: []VoterGroup{validGroup}}},
+				},
+				wantErr: "invalid threshold",
+			},
+			{
+				name: "empty party id",
+				scenario: Scenario{
+					Name: "empty party",
+					Regions: []Region{{
+						ID:      "xx",
+						Seats:   10,
+						Groups:  []VoterGroup{validGroup},
+						Parties: []Party{{ID: ""}},
+					}},
+				},
+				wantErr: "empty id",
+			},
+			{
+				name: "negative population",
+				scenario: Scenario{
+					Name:    "neg pop",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:     "xx",
+						Seats:  10,
+						Groups: []VoterGroup{{ID: "g1", Population: -10, Turnout: 0.5}},
+					}},
+				},
+				wantErr: "negative population",
+			},
+			{
+				name: "invalid turnout",
+				scenario: Scenario{
+					Name:    "bad turnout",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:     "xx",
+						Seats:  10,
+						Groups: []VoterGroup{{ID: "g1", Population: 1000, Turnout: 1.2}},
+					}},
+				},
+				wantErr: "invalid turnout",
+			},
+			{
+				name: "negative weight",
+				scenario: Scenario{
+					Name:    "neg weight",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:     "xx",
+						Seats:  10,
+						Groups: []VoterGroup{{ID: "g1", Population: 1000, Turnout: 0.5, Weights: PolicyVec{-1}}},
+					}},
+				},
+				wantErr: "invalid weight",
+			},
+			{
+				name: "NaN weight",
+				scenario: Scenario{
+					Name:    "nan weight",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:     "xx",
+						Seats:  10,
+						Groups: []VoterGroup{{ID: "g1", Population: 1000, Turnout: 0.5, Weights: PolicyVec{math.NaN()}}},
+					}},
+				},
+				wantErr: "invalid weight",
 			},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				if err := tc.scenario.validate(); err == nil {
-					t.Errorf("expected validation error for %s, got nil", tc.name)
+				err := tc.scenario.validate()
+				if err == nil {
+					t.Fatalf("expected validation error for %s, got nil", tc.name)
+				}
+				if tc.wantErr != "" && !strings.Contains(err.Error(), tc.wantErr) {
+					t.Errorf("error = %q, want substring %q", err.Error(), tc.wantErr)
 				}
 			})
 		}

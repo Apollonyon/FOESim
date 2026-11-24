@@ -3,6 +3,7 @@ package sim
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 )
 
@@ -100,17 +101,24 @@ func (s Scenario) validate() error {
 			return fmt.Errorf("scenario %q has duplicate region id %q", s.Name, r.ID)
 		}
 		seenRegions[r.ID] = true
-
+		if r.Seats <= 0 {
+			return fmt.Errorf("region %q in scenario %q has no seats", r.ID, s.Name)
+		}
 		if len(r.Groups) == 0 {
 			return fmt.Errorf("region %q in scenario %q has no voter groups", r.ID, s.Name)
 		}
-
+		if r.Threshold < 0 || r.Threshold > 1 || math.IsNaN(r.Threshold) {
+			return fmt.Errorf("region %q in scenario %q has invalid threshold %g", r.ID, s.Name, r.Threshold)
+		}
 		parties := r.EffectiveParties(s.Parties)
 		if len(parties) == 0 {
 			return fmt.Errorf("region %q in scenario %q has no parties", r.ID, s.Name)
 		}
 		seenParties := make(map[string]bool, len(parties))
 		for _, p := range parties {
+			if p.ID == "" {
+				return fmt.Errorf("region %q has a party with empty id", r.ID)
+			}
 			if seenParties[p.ID] {
 				return fmt.Errorf("region %q has duplicate party id %q", r.ID, p.ID)
 			}
@@ -120,6 +128,19 @@ func (s Scenario) validate() error {
 			}
 		}
 
+		for _, vg := range r.Groups {
+			if vg.Population < 0 {
+				return fmt.Errorf("region %q has a voter group %q with negative population", r.ID, vg.ID)
+			}
+			if vg.Turnout < 0 || vg.Turnout > 1 || math.IsNaN(vg.Turnout) {
+				return fmt.Errorf("region %q has a voter group %q with invalid turnout %g", r.ID, vg.ID, vg.Turnout)
+			}
+			for ax, w := range vg.Weights {
+				if w < 0 || math.IsNaN(w) || math.IsInf(w, 0) {
+					return fmt.Errorf("region %q has a voter group %q with invalid weight %g for axis %d", r.ID, vg.ID, w, ax)
+				}
+			}
+		}
 		if len(r.DistrictTilts) > 0 {
 			knownVoterGroups := make(map[string]bool, len(r.Groups))
 			for _, vg := range r.Groups {
