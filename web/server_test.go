@@ -182,6 +182,32 @@ func TestServerNationalPartiesAndNUTS3Stream(t *testing.T) {
 		if !strings.Contains(wBody, `"reported_precincts":604`) {
 			t.Errorf("expected final reported_precincts to reach 604")
 		}
+
+		var omitted, included int
+		for _, block := range strings.Split(wBody, "\n\n") {
+			if !strings.HasPrefix(block, "event: precinct\n") {
+				continue
+			}
+			dataLine := strings.TrimPrefix(strings.Split(block, "\n")[1], "data: ")
+			var payload precinctPayload
+			if err := json.Unmarshal([]byte(dataLine), &payload); err != nil {
+				t.Fatalf("decode precinct payload: %v", err)
+			}
+			if payload.EUSeats == nil {
+				omitted++
+				if strings.Contains(dataLine, `"coalitions"`) || strings.Contains(dataLine, `"eu_seats"`) {
+					t.Fatalf("expected unchanged precinct payload to omit eu_seats and coalitions, got %s", dataLine)
+				}
+			} else {
+				included++
+				if len(payload.Coalitions) == 0 {
+					t.Errorf("expected changed precinct payload to include coalitions")
+				}
+			}
+		}
+		if omitted == 0 || included == 0 {
+			t.Errorf("expected mix of omitted (%d) and included (%d) delta payloads across %d waves", omitted, included, wantPrecincts*3)
+		}
 	})
 }
 

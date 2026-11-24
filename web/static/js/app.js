@@ -336,8 +336,11 @@ function startStream() {
 
     state.regionVotes[rep.region_id] = data.region_votes;
     state.regionSeats[rep.region_id] = data.region_seats;
-    state.euSeats = data.eu_seats;
-    if (data.coalitions) state.coalitions = data.coalitions;
+    if (data.eu_seats) {
+      state.euSeats = data.eu_seats;
+      state.coalitions = data.coalitions || [];
+      scheduleHemicycleRender();
+    }
     state.reportedPrecincts = data.reported_precincts;
     state.countedPct = data.counted_pct ?? (state.totalPrecincts > 0 ? (state.reportedPrecincts / state.totalPrecincts) * 100 : 0);
 
@@ -358,7 +361,6 @@ function startStream() {
     setStatus('live', `LIVE · ${Math.round(state.countedPct)}%`);
     updateProgress();
     map.queueRecolor(rep.precinct_id);
-    scheduleHemicycleRender();
 
     if (state.durationMs > 0 || state.reportedPrecincts % 15 === 0) {
       inspector.pushTicker(state.precincts[rep.precinct_id]);

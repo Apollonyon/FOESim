@@ -689,3 +689,38 @@ func TestExitPollSeatsMatchesZeroSwing(t *testing.T) {
 		}
 	}
 }
+
+func TestPrepareElectionMatchesStreamAndExitPoll(t *testing.T) {
+	parties := DefaultParties()
+	regions := DefaultRegions()
+	cfg := ElectionConfig{
+		Temperature: 0.85,
+		Swing:       0.15,
+		Seed:        42,
+		Waves:       3,
+	}
+
+	prep := PrepareElection(regions, parties, cfg)
+	if !reflect.DeepEqual(prep.ExitPollSeats(), ExitPollSeats(regions, parties, cfg)) {
+		t.Fatalf("PreparedElection.ExitPollSeats() diverged from ExitPollSeats()")
+	}
+
+	collectByPrecinct := func(ch <-chan PrecinctReport) map[string]map[string]int {
+		out := make(map[string]map[string]int)
+		for rep := range ch {
+			if out[rep.PrecinctID] == nil {
+				out[rep.PrecinctID] = make(map[string]int)
+			}
+			for pid, v := range rep.Votes {
+				out[rep.PrecinctID][pid] += v
+			}
+		}
+		return out
+	}
+
+	gotPrep := collectByPrecinct(prep.Stream(context.Background()))
+	gotStream := collectByPrecinct(StreamElection(context.Background(), regions, parties, cfg))
+	if !reflect.DeepEqual(gotPrep, gotStream) {
+		t.Fatalf("PreparedElection.Stream() votes diverged from StreamElection()")
+	}
+}

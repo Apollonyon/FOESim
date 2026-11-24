@@ -85,8 +85,8 @@ type precinctPayload struct {
 	Report            sim.PrecinctReport `json:"report"`
 	RegionVotes       map[string]int     `json:"region_votes"`
 	RegionSeats       map[string]int     `json:"region_seats"`
-	EUSeats           map[string]int     `json:"eu_seats"`
-	Coalitions        []sim.Coalition    `json:"coalitions"`
+	EUSeats           *map[string]int    `json:"eu_seats,omitempty"`
+	Coalitions        []sim.Coalition    `json:"coalitions,omitempty"`
 	ReportedPrecincts int                `json:"reported_precincts"`
 	TotalPrecincts    int                `json:"total_precincts"`
 	CountedPct        float64            `json:"counted_pct"`
@@ -121,7 +121,8 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 
 	state := sim.NewElectionState(s.scenario)
-	exitRegionSeats := sim.ExitPollSeats(s.scenario.Regions, s.scenario.Parties, cfg)
+	prepared := sim.PrepareElection(s.scenario.Regions, s.scenario.Parties, cfg)
+	exitRegionSeats := prepared.ExitPollSeats()
 	var prevEUSeats map[string]int
 	if len(s.scenario.PrevSeats) > 0 {
 		prevEUSeats = maps.Clone(s.scenario.PrevSeats)
@@ -145,21 +146,24 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reports := sim.StreamElection(r.Context(), s.scenario.Regions, s.scenario.Parties, cfg)
+	reports := prepared.Stream(r.Context())
 
 	for rep := range reports {
-		state.Apply(rep)
+		euChanged := state.Apply(rep)
 		completed, total, countedPct := state.Progress()
 
 		payload := precinctPayload{
 			Report:            rep,
 			RegionVotes:       state.RegionVotes(rep.RegionID),
 			RegionSeats:       state.RegionSeats(rep.RegionID),
-			EUSeats:           state.EUSeats(),
-			Coalitions:        state.Coalitions(),
 			ReportedPrecincts: completed,
 			TotalPrecincts:    total,
 			CountedPct:        countedPct,
+		}
+		if euChanged {
+			eu := state.EUSeats()
+			payload.EUSeats = &eu
+			payload.Coalitions = state.Coalitions()
 		}
 		if err := writeSSE(w, flusher, "precinct", payload); err != nil {
 			return

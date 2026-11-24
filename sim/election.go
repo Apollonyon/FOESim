@@ -45,36 +45,112 @@ func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 	return simulatePrecincts(r, parties, temperature, swing, seed, PolicyVec{})
 }
 
-// ExitPollSeats computes an initial per-region seat projection correlated with
-// the exact same pan-European and national shocks that StreamElection will stream
-// for cfg. When cfg.Swing > 0, realistic small exit-poll sampling noise is added
-// on top of the true regional vote totals; when cfg.Swing == 0, it matches exactly.
-func ExitPollSeats(regions []Region, parties []Party, cfg ElectionConfig) map[string]map[string]int {
+// PreparedElection holds concurrently simulated region reports and correlated
+// exit-poll projections ready to stream without recomputing precinct votes.
+type PreparedElection struct {
+	regions   []Region
+	cfg       ElectionConfig
+	perRegion [][]PrecinctReport
+	exitSeats map[string]map[string]int
+}
+
+// PrepareElection simulates all regions concurrently once and derives correlated
+// exit-poll seat projections, allowing callers to inspect ExitPollSeats and
+// stream the same precinct reports via Stream without simulating twice.
+func PrepareElection(regions []Region, parties []Party, cfg ElectionConfig) *PreparedElection {
 	euShift := euPolicyShock(cfg.Seed, cfg.Swing)
-	out := make(map[string]map[string]int, len(regions))
 	pollSigma := 0.0
 	if cfg.Swing > 0 {
 		pollSigma = math.Min(0.06, 0.02+cfg.Swing*0.20)
 	}
 
+	perRegion := make([][]PrecinctReport, len(regions))
+	exitByIdx := make([]map[string]int, len(regions))
+	var wg sync.WaitGroup
+
 	for ri, reg := range regions {
-		reports := simulatePrecincts(reg, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift)
-		votes := make(map[string]int)
-		for _, rep := range reports {
-			for pid, v := range rep.Votes {
-				votes[pid] += v
-			}
-		}
-		if pollSigma > 0 {
-			rng := rand.New(rand.NewPCG(uint64(cfg.Seed)^0x51a7, uint64(ri+1)))
-			for _, pid := range slices.Sorted(maps.Keys(votes)) {
-				mult := math.Max(0.5, 1.0+rng.NormFloat64()*pollSigma)
-				votes[pid] = int(math.Round(float64(votes[pid]) * mult))
-			}
-		}
-		out[reg.ID] = AllocateSeats(votes, reg.Seats, reg.Method, reg.Threshold)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			reports := simulatePrecincts(reg, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift)
+			perRegion[ri] = reports
+			exitByIdx[ri] = computeExitPollRegionSeats(reg, reports, cfg.Seed, ri, pollSigma)
+		}()
+	}
+	wg.Wait()
+
+	exitSeats := make(map[string]map[string]int, len(regions))
+	for ri, reg := range regions {
+		exitSeats[reg.ID] = exitByIdx[ri]
+	}
+
+	return &PreparedElection{
+		regions:   slices.Clone(regions),
+		cfg:       cfg,
+		perRegion: perRegion,
+		exitSeats: exitSeats,
+	}
+}
+
+// ExitPollSeats returns a copy of the precomputed exit-poll seat projection by region.
+func (p *PreparedElection) ExitPollSeats() map[string]map[string]int {
+	out := make(map[string]map[string]int, len(p.exitSeats))
+	for rid, seats := range p.exitSeats {
+		out[rid] = maps.Clone(seats)
 	}
 	return out
+}
+
+// Stream emits the precomputed precinct reports concurrently across regions,
+// closing the returned channel when all regions finish or ctx is canceled.
+func (p *PreparedElection) Stream(ctx context.Context) <-chan PrecinctReport {
+	out := make(chan PrecinctReport, max(1, len(p.regions)*4))
+	var wg sync.WaitGroup
+	minClose, closeSpan := pollCloseWindow(p.regions)
+
+	for ri, r := range p.regions {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			regionDuration, ok := waitStartOffset(ctx, r, p.cfg.TargetDuration, minClose, closeSpan)
+			if !ok {
+				return
+			}
+			streamRegionReports(ctx, out, ri, r, slices.Clone(p.perRegion[ri]), p.cfg, regionDuration)
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
+}
+
+// ExitPollSeats computes an initial per-region seat projection correlated with
+// the exact same pan-European and national shocks that StreamElection will stream
+// for cfg. When cfg.Swing > 0, realistic small exit-poll sampling noise is added
+// on top of the true regional vote totals; when cfg.Swing == 0, it matches exactly.
+func ExitPollSeats(regions []Region, parties []Party, cfg ElectionConfig) map[string]map[string]int {
+	return PrepareElection(regions, parties, cfg).ExitPollSeats()
+}
+
+func computeExitPollRegionSeats(reg Region, reports []PrecinctReport, seed int64, ri int, pollSigma float64) map[string]int {
+	votes := make(map[string]int)
+	for _, rep := range reports {
+		for pid, v := range rep.Votes {
+			votes[pid] += v
+		}
+	}
+	if pollSigma > 0 {
+		rng := rand.New(rand.NewPCG(uint64(seed)^0x51a7, uint64(ri+1)))
+		for _, pid := range slices.Sorted(maps.Keys(votes)) {
+			mult := math.Max(0.5, 1.0+rng.NormFloat64()*pollSigma)
+			votes[pid] = int(math.Round(float64(votes[pid]) * mult))
+		}
+	}
+	return AllocateSeats(votes, reg.Seats, reg.Method, reg.Threshold)
 }
 
 func euPolicyShock(seed int64, swing float64) PolicyVec {
@@ -306,8 +382,33 @@ func expandIntoWaves(full []PrecinctReport, w int, rng *rand.Rand) []scheduledRe
 func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg ElectionConfig) <-chan PrecinctReport {
 	out := make(chan PrecinctReport, max(1, len(regions)*4))
 	var wg sync.WaitGroup
+	minClose, closeSpan := pollCloseWindow(regions)
+	euShift := euPolicyShock(cfg.Seed, cfg.Swing)
 
-	minClose, maxClose := math.Inf(1), math.Inf(-1)
+	for ri, r := range regions {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			regionDuration, ok := waitStartOffset(ctx, r, cfg.TargetDuration, minClose, closeSpan)
+			if !ok {
+				return
+			}
+			reports := simulatePrecincts(r, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift)
+			streamRegionReports(ctx, out, ri, r, reports, cfg, regionDuration)
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
+}
+
+func pollCloseWindow(regions []Region) (minClose, closeSpan float64) {
+	minClose = math.Inf(1)
+	maxClose := math.Inf(-1)
 	for _, r := range regions {
 		if r.PollCloseHour > 0 {
 			if r.PollCloseHour < minClose {
@@ -318,26 +419,53 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 			}
 		}
 	}
-	closeSpan := 0.0
 	if !math.IsInf(minClose, 1) && maxClose > minClose {
 		closeSpan = maxClose - minClose
 	}
+	return minClose, closeSpan
+}
 
-	euShift := euPolicyShock(cfg.Seed, cfg.Swing)
+func waitStartOffset(ctx context.Context, r Region, targetDuration time.Duration, minClose, closeSpan float64) (time.Duration, bool) {
+	// Stagger poll-closing start across the first 30% of TargetDuration.
+	startOffset := time.Duration(0)
+	if targetDuration > 0 && closeSpan > 0 && r.PollCloseHour > minClose {
+		frac := (r.PollCloseHour - minClose) / closeSpan
+		startOffset = time.Duration(frac * 0.30 * float64(targetDuration))
+	}
+	if startOffset > 0 {
+		timer := time.NewTimer(startOffset)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return 0, false
+		case <-timer.C:
+		}
+	}
 
-	for ri, r := range regions {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	regionDuration := targetDuration - startOffset
+	if regionDuration < 0 {
+		regionDuration = 0
+	}
+	return regionDuration, true
+}
 
-			// Stagger poll-closing start across the first 30% of TargetDuration.
-			startOffset := time.Duration(0)
-			if cfg.TargetDuration > 0 && closeSpan > 0 && r.PollCloseHour > minClose {
-				frac := (r.PollCloseHour - minClose) / closeSpan
-				startOffset = time.Duration(frac * 0.30 * float64(cfg.TargetDuration))
+func streamRegionReports(ctx context.Context, out chan<- PrecinctReport, ri int, r Region, reports []PrecinctReport, cfg ElectionConfig, regionDuration time.Duration) {
+	rng := rand.New(rand.NewPCG(uint64(cfg.Seed), uint64(ri+1)))
+
+	if cfg.Waves > 1 {
+		schedule := expandIntoWaves(reports, cfg.Waves, rng)
+		prevAt := 0.0
+		for _, item := range schedule {
+			var delay time.Duration
+			if regionDuration > 0 {
+				delta := math.Max(0, item.at-prevAt)
+				delay = time.Duration(delta * float64(regionDuration))
+				prevAt = item.at
+			} else if cfg.BaseDelay > 0 {
+				delay = time.Duration(float64(cfg.BaseDelay) * (0.5 + rng.Float64()))
 			}
-			if startOffset > 0 {
-				timer := time.NewTimer(startOffset)
+			if delay > 0 {
+				timer := time.NewTimer(delay)
 				select {
 				case <-ctx.Done():
 					timer.Stop()
@@ -345,85 +473,46 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 				case <-timer.C:
 				}
 			}
-
-			regionDuration := cfg.TargetDuration - startOffset
-			if regionDuration < 0 {
-				regionDuration = 0
-			}
-
-			reports := simulatePrecincts(r, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift)
-			rng := rand.New(rand.NewPCG(uint64(cfg.Seed), uint64(ri+1)))
-
-			if cfg.Waves > 1 {
-				schedule := expandIntoWaves(reports, cfg.Waves, rng)
-				prevAt := 0.0
-				for _, item := range schedule {
-					var delay time.Duration
-					if regionDuration > 0 {
-						delta := math.Max(0, item.at-prevAt)
-						delay = time.Duration(delta * float64(regionDuration))
-						prevAt = item.at
-					} else if cfg.BaseDelay > 0 {
-						delay = time.Duration(float64(cfg.BaseDelay) * (0.5 + rng.Float64()))
-					}
-					if delay > 0 {
-						timer := time.NewTimer(delay)
-						select {
-						case <-ctx.Done():
-							timer.Stop()
-							return
-						case <-timer.C:
-						}
-					}
-					select {
-					case <-ctx.Done():
-						return
-					case out <- item.report:
-					}
-				}
+			select {
+			case <-ctx.Done():
 				return
+			case out <- item.report:
 			}
-
-			if r.UseNUTS3 && len(reports) > 1 {
-				rng.Shuffle(len(reports), func(i, j int) {
-					reports[i], reports[j] = reports[j], reports[i]
-				})
-				for idx := range reports {
-					reports[idx].Precinct = idx + 1
-				}
-			}
-
-			stepDelay := cfg.BaseDelay
-			if regionDuration > 0 && len(reports) > 0 {
-				// Floor denominator at 3 so 1-2 county states (LU, CY, MT) don't overrun TargetDuration.
-				stepDelay = regionDuration / time.Duration(max(3, len(reports)))
-			}
-
-			for _, report := range reports {
-				if stepDelay > 0 {
-					delay := time.Duration(float64(stepDelay) * (0.5 + rng.Float64()))
-					timer := time.NewTimer(delay)
-					select {
-					case <-ctx.Done():
-						timer.Stop()
-						return
-					case <-timer.C:
-					}
-				}
-
-				select {
-				case <-ctx.Done():
-					return
-				case out <- report:
-				}
-			}
-		}()
+		}
+		return
 	}
 
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
+	if r.UseNUTS3 && len(reports) > 1 {
+		rng.Shuffle(len(reports), func(i, j int) {
+			reports[i], reports[j] = reports[j], reports[i]
+		})
+		for idx := range reports {
+			reports[idx].Precinct = idx + 1
+		}
+	}
 
-	return out
+	stepDelay := cfg.BaseDelay
+	if regionDuration > 0 && len(reports) > 0 {
+		// Floor denominator at 3 so 1-2 county states (LU, CY, MT) don't overrun TargetDuration.
+		stepDelay = regionDuration / time.Duration(max(3, len(reports)))
+	}
+
+	for _, report := range reports {
+		if stepDelay > 0 {
+			delay := time.Duration(float64(stepDelay) * (0.5 + rng.Float64()))
+			timer := time.NewTimer(delay)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case out <- report:
+		}
+	}
 }

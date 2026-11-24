@@ -231,3 +231,103 @@ func TestElectionStateDefensiveClones(t *testing.T) {
 			got.Seats, got.GroupIDs[0], origSeats, origGroupID)
 	}
 }
+
+func TestElectionStateApplyChangeAndZeroSeatRemoval(t *testing.T) {
+	st := NewElectionState(testStateScenario())
+
+	// First report allocates 10 seats in Germany -> EU seats change.
+	changed := st.Apply(PrecinctReport{
+		RegionID:    "de",
+		PrecinctID:  "de-1",
+		ReportedPct: 1.0,
+		Votes:       map[string]int{"cdu": 500, "spd": 300, "ind": 200},
+	})
+	if !changed {
+		t.Fatal("expected first Apply to report EU seat change")
+	}
+
+	// Tiny follow-up vote batch that doesn't alter seat counts -> false.
+	changed = st.Apply(PrecinctReport{
+		RegionID:    "de",
+		PrecinctID:  "de-2",
+		ReportedPct: 1.0,
+		Votes:       map[string]int{"cdu": 1},
+	})
+	if changed {
+		t.Fatal("expected unchanged seat allocation to return false")
+	}
+
+	// Overwhelming SPD batch drops CDU (epp) and IND (ni) to 0 seats; keys must be removed.
+	changed = st.Apply(PrecinctReport{
+		RegionID:    "de",
+		PrecinctID:  "de-2",
+		ReportedPct: 1.0,
+		Votes:       map[string]int{"spd": 100_000},
+	})
+	if !changed {
+		t.Fatal("expected sweeping SPD batch to report EU seat change")
+	}
+	eu := st.EUSeats()
+	if _, exists := eu["epp"]; exists {
+		t.Errorf("expected 0-seat group epp to be deleted from EUSeats, got %v", eu)
+	}
+	if _, exists := eu[NonInscritsID]; exists {
+		t.Errorf("expected 0-seat group ni to be deleted from EUSeats, got %v", eu)
+	}
+	if eu["sd"] != 10 {
+		t.Errorf("EUSeats[sd] = %d, want 10", eu["sd"])
+	}
+}
+
+func TestElectionStateClampsReportedPct(t *testing.T) {
+	s := testStateScenario()
+	s.Regions = s.Regions[:1] // 2 precincts
+	st := NewElectionState(s)
+
+	st.Apply(PrecinctReport{
+		RegionID:    "de",
+		PrecinctID:  "de-1",
+		ReportedPct: 1.5,
+		Votes:       map[string]int{"cdu": 100},
+	})
+	completed, total, pct := st.Progress()
+	if completed != 1 || total != 2 || math.Abs(pct-50.0) > 1e-9 {
+		t.Fatalf("after clamped >1.0 report: Progress() = (%d, %d, %g), want (1, 2, 50)", completed, total, pct)
+	}
+
+	st.Apply(PrecinctReport{
+		RegionID:    "de",
+		PrecinctID:  "de-2",
+		ReportedPct: 2.0,
+		Votes:       map[string]int{"spd": 100},
+	})
+	completed, total, pct = st.Progress()
+	if completed != 2 || total != 2 || math.Abs(pct-100.0) > 1e-9 {
+		t.Fatalf("after second clamped >1.0 report: Progress() = (%d, %d, %g), want (2, 2, 100)", completed, total, pct)
+	}
+}
+
+func BenchmarkElectionStateApply(b *testing.B) {
+	s, err := LoadScenario("../scenarios/eu27.json")
+	if err != nil {
+		b.Fatal(err)
+	}
+	prep := PrepareElection(s.Regions, s.Parties, ElectionConfig{
+		Temperature: 0.45,
+		Swing:       0.15,
+		Seed:        42,
+	})
+	var reports []PrecinctReport
+	for _, regionReps := range prep.perRegion {
+		reports = append(reports, regionReps...)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		st := NewElectionState(s)
+		for _, rep := range reports {
+			st.Apply(rep)
+		}
+	}
+}
