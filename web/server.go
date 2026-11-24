@@ -15,9 +15,14 @@ import (
 )
 
 const (
-	defaultMaxStreams = 256
-	maxTargetDuration = 5 * time.Minute
-	maxBaseDelay      = 2 * time.Second
+	defaultMaxStreams   = 256
+	maxTargetDuration   = 5 * time.Minute
+	maxTargetDurationMs = int(maxTargetDuration / time.Millisecond)
+	maxBaseDelay        = 2 * time.Second
+	maxBaseDelayMs      = int(maxBaseDelay / time.Millisecond)
+	minTemperature      = 0.05
+	maxTemperature      = 10.0
+	maxSwing            = 2.0
 )
 
 //go:embed static
@@ -38,7 +43,7 @@ func NewServer(scenario sim.Scenario) *Server {
 }
 
 // SetMaxStreams overrides the maximum number of concurrent SSE streams.
-// Values <= 0 disable the cap.
+// Values <= 0 disable the cap. Must be called before serving requests.
 func (s *Server) SetMaxStreams(n int) {
 	if n <= 0 {
 		s.streamSem = nil
@@ -105,6 +110,10 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if r.Context().Err() != nil {
+		return
+	}
+
 	cfg := s.parseElectionConfig(r)
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -112,17 +121,13 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 
 	state := sim.NewElectionState(s.scenario)
-	exitRegionSeats := make(map[string]map[string]int, len(s.scenario.Regions))
+	exitRegionSeats := sim.ExitPollSeats(s.scenario.Regions, s.scenario.Parties, cfg)
 	var prevEUSeats map[string]int
 	if len(s.scenario.PrevSeats) > 0 {
-		for ri, reg := range s.scenario.Regions {
-			exitRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature, 0.25, (cfg.Seed^0x51a7)+int64(ri))
-		}
 		prevEUSeats = maps.Clone(s.scenario.PrevSeats)
 	} else {
 		prevRegionSeats := make(map[string]map[string]int, len(s.scenario.Regions))
 		for ri, reg := range s.scenario.Regions {
-			exitRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature, 0.25, (cfg.Seed^0x51a7)+int64(ri))
 			prevRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature*1.15, 0.20, 1001+int64(ri))
 		}
 		prevEUSeats = s.scenario.AggregateEUSeats(prevRegionSeats)
@@ -174,16 +179,16 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 func (s *Server) parseElectionConfig(r *http.Request) sim.ElectionConfig {
 	q := r.URL.Query()
 	cfg := sim.ElectionConfig{
-		Temperature:    0.85,
+		Temperature:    0.45,
 		Swing:          0.15,
 		Seed:           42,
 		TargetDuration: 45 * time.Second,
 	}
 	if v, err := strconv.ParseFloat(q.Get("temp"), 64); err == nil && v > 0 && !math.IsNaN(v) && !math.IsInf(v, 0) {
-		cfg.Temperature = v
+		cfg.Temperature = max(minTemperature, min(v, maxTemperature))
 	}
 	if v, err := strconv.ParseFloat(q.Get("swing"), 64); err == nil && v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) {
-		cfg.Swing = v
+		cfg.Swing = min(v, maxSwing)
 	}
 	if v, err := strconv.ParseInt(q.Get("seed"), 10, 64); err == nil {
 		cfg.Seed = v
@@ -192,10 +197,10 @@ func (s *Server) parseElectionConfig(r *http.Request) sim.ElectionConfig {
 		cfg.Waves = v
 	}
 	if v, err := strconv.Atoi(q.Get("duration_ms")); err == nil && v >= 0 {
-		cfg.TargetDuration = min(time.Duration(v)*time.Millisecond, maxTargetDuration)
+		cfg.TargetDuration = time.Duration(min(v, maxTargetDurationMs)) * time.Millisecond
 		cfg.BaseDelay = 0
 	} else if v, err := strconv.Atoi(q.Get("delay_ms")); err == nil && v >= 0 {
-		cfg.BaseDelay = min(time.Duration(v)*time.Millisecond, maxBaseDelay)
+		cfg.BaseDelay = time.Duration(min(v, maxBaseDelayMs)) * time.Millisecond
 		cfg.TargetDuration = 0
 	}
 	return cfg

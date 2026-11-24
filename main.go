@@ -82,7 +82,7 @@ func runCLI(scenario sim.Scenario) {
 	state := sim.NewElectionState(scenario)
 
 	cfg := sim.ElectionConfig{
-		Temperature:    0.85,
+		Temperature:    0.45,
 		Swing:          0.15,
 		Seed:           42,
 		TargetDuration: 4 * time.Second,

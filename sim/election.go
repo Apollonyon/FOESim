@@ -38,10 +38,43 @@ type ElectionConfig struct {
 
 // SimulatePrecincts splits r into reporting batches with a seeded hierarchical swing
 // (country-level policy & party-valence shocks, NUTS-1 regional tilts, and local county noise).
+// Unlike StreamElection, it does not apply a cross-region pan-European euPolicyShock.
 // When r.UseNUTS3 is true and embedded Eurostat NUTS-3 units exist for r.ID,
 // those units (with urban/rural demographic tilt) are simulated instead of synthetic batches.
 func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, seed int64) []PrecinctReport {
 	return simulatePrecincts(r, parties, temperature, swing, seed, PolicyVec{})
+}
+
+// ExitPollSeats computes an initial per-region seat projection correlated with
+// the exact same pan-European and national shocks that StreamElection will stream
+// for cfg. When cfg.Swing > 0, realistic small exit-poll sampling noise is added
+// on top of the true regional vote totals; when cfg.Swing == 0, it matches exactly.
+func ExitPollSeats(regions []Region, parties []Party, cfg ElectionConfig) map[string]map[string]int {
+	euShift := euPolicyShock(cfg.Seed, cfg.Swing)
+	out := make(map[string]map[string]int, len(regions))
+	pollSigma := 0.0
+	if cfg.Swing > 0 {
+		pollSigma = math.Min(0.06, 0.02+cfg.Swing*0.20)
+	}
+
+	for ri, reg := range regions {
+		reports := simulatePrecincts(reg, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift)
+		votes := make(map[string]int)
+		for _, rep := range reports {
+			for pid, v := range rep.Votes {
+				votes[pid] += v
+			}
+		}
+		if pollSigma > 0 {
+			rng := rand.New(rand.NewPCG(uint64(cfg.Seed)^0x51a7, uint64(ri+1)))
+			for _, pid := range slices.Sorted(maps.Keys(votes)) {
+				mult := math.Max(0.5, 1.0+rng.NormFloat64()*pollSigma)
+				votes[pid] = int(math.Round(float64(votes[pid]) * mult))
+			}
+		}
+		out[reg.ID] = AllocateSeats(votes, reg.Seats, reg.Method, reg.Threshold)
+	}
+	return out
 }
 
 func euPolicyShock(seed int64, swing float64) PolicyVec {

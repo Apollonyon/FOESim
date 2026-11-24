@@ -289,7 +289,7 @@ function startStream() {
   const parsedSeed = parseInt(inputSeed.value, 10);
   const seed = Number.isNaN(parsedSeed) ? 42 : parsedSeed;
   const parsedTemp = parseFloat(inputTemp.value);
-  const temp = Number.isNaN(parsedTemp) || parsedTemp <= 0 ? 0.85 : parsedTemp;
+  const temp = Number.isNaN(parsedTemp) || parsedTemp <= 0 ? 0.45 : parsedTemp;
   const waves = state.durationMs > 0 ? 3 : 1;
   const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&swing=0.15`;
 

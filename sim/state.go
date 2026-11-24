@@ -93,7 +93,16 @@ func (e *ElectionState) EUSeats() map[string]int {
 }
 
 func (e *ElectionState) Coalitions() []Coalition {
-	return slices.Clone(e.coalitions)
+	if len(e.coalitions) == 0 {
+		return nil
+	}
+	out := make([]Coalition, len(e.coalitions))
+	for i, c := range e.coalitions {
+		c.GroupIDs = slices.Clone(c.GroupIDs)
+		c.Names = slices.Clone(c.Names)
+		out[i] = c
+	}
+	return out
 }
 
 func (e *ElectionState) Progress() (completed, total int, countedPct float64) {

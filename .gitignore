@@ -13,5 +13,6 @@
 .DS_Store
 .vscode/
 .idea/
+# Local data prep scripts
 calibrate_eu27.py
-PROGRESS.md
+/scripts

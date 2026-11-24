@@ -188,22 +188,28 @@ func TestServerNationalPartiesAndNUTS3Stream(t *testing.T) {
 func TestParseElectionConfigClamps(t *testing.T) {
 	srv := NewServer(sim.Scenario{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=999999999&temp=NaN&swing=Inf", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=10000000000000&temp=NaN&swing=Inf", nil)
 	cfg := srv.parseElectionConfig(req)
 	if cfg.TargetDuration != maxTargetDuration {
 		t.Errorf("TargetDuration = %v, want clamped %v", cfg.TargetDuration, maxTargetDuration)
 	}
-	if cfg.Temperature != 0.85 {
-		t.Errorf("Temperature = %v, want fallback 0.85 for NaN", cfg.Temperature)
+	if cfg.Temperature != 0.45 {
+		t.Errorf("Temperature = %v, want fallback 0.45 for NaN", cfg.Temperature)
 	}
 	if cfg.Swing != 0.15 {
 		t.Errorf("Swing = %v, want fallback 0.15 for Inf", cfg.Swing)
 	}
 
-	delayReq := httptest.NewRequest(http.MethodGet, "/api/stream?delay_ms=999999999", nil)
-	delayCfg := srv.parseElectionConfig(delayReq)
-	if delayCfg.BaseDelay != maxBaseDelay {
-		t.Errorf("BaseDelay = %v, want clamped %v", delayCfg.BaseDelay, maxBaseDelay)
+	extremeReq := httptest.NewRequest(http.MethodGet, "/api/stream?delay_ms=10000000000000&temp=1e-300&swing=100", nil)
+	extremeCfg := srv.parseElectionConfig(extremeReq)
+	if extremeCfg.BaseDelay != maxBaseDelay {
+		t.Errorf("BaseDelay = %v, want clamped %v", extremeCfg.BaseDelay, maxBaseDelay)
+	}
+	if extremeCfg.Temperature != minTemperature {
+		t.Errorf("Temperature = %v, want clamped %v", extremeCfg.Temperature, minTemperature)
+	}
+	if extremeCfg.Swing != maxSwing {
+		t.Errorf("Swing = %v, want clamped %v", extremeCfg.Swing, maxSwing)
 	}
 }
 
@@ -247,10 +253,7 @@ func TestServerEU27RealPrevSeatsBaseline(t *testing.T) {
 	}
 	handler := NewServer(scenario).Handler()
 
-	// Cancel immediately after exit_poll? Simpler: run with duration_ms=0 (fast) and inspect exit_poll.
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	req := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=0&seed=42", nil).WithContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=0&swing=0&seed=42", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 

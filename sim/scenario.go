@@ -77,7 +77,7 @@ func (s Scenario) AggregateEUSeats(regionSeats map[string]map[string]int) map[st
 	return SumSeats(groupedByRegion)
 }
 
-// Validating variants of Scenarios so no faulty scenarios can be loaded
+// Validate checks structural and numeric invariants of s.
 func (s Scenario) Validate() error {
 	if len(s.Regions) == 0 {
 		return fmt.Errorf("scenario %q has no regions", s.Name)
@@ -97,12 +97,10 @@ func (s Scenario) Validate() error {
 		knownGroups[g.ID] = true
 	}
 
-	for id, seats := range s.PrevSeats {
-		if seats < 0 {
-			return fmt.Errorf("scenario %q prev_seats[%q] has negative seat count %d", s.Name, id, seats)
-		}
-		if s.UsesNationalParties() && !knownGroups[id] {
-			return fmt.Errorf("scenario %q prev_seats references unknown EU group %q", s.Name, id)
+	allPartyIDs := make(map[string]bool, len(s.Parties))
+	for _, p := range s.Parties {
+		if p.ID != "" {
+			allPartyIDs[p.ID] = true
 		}
 	}
 
@@ -124,6 +122,14 @@ func (s Scenario) Validate() error {
 		if r.Threshold < 0 || r.Threshold > 1 || math.IsNaN(r.Threshold) {
 			return fmt.Errorf("region %q in scenario %q has invalid threshold %g", r.ID, s.Name, r.Threshold)
 		}
+		if r.PollCloseHour < 0 || r.PollCloseHour > 24 || isNonFinite(r.PollCloseHour) {
+			return fmt.Errorf("region %q in scenario %q has invalid poll_close_hour %g", r.ID, s.Name, r.PollCloseHour)
+		}
+		for pid, bonus := range r.PartyBonus {
+			if isNonFinite(bonus) {
+				return fmt.Errorf("region %q party_bonus[%q] has non-finite value %g", r.ID, pid, bonus)
+			}
+		}
 		parties := r.EffectiveParties(s.Parties)
 		if len(parties) == 0 {
 			return fmt.Errorf("region %q in scenario %q has no parties", r.ID, s.Name)
@@ -143,6 +149,7 @@ func (s Scenario) Validate() error {
 				return fmt.Errorf("region %q has duplicate party id %q", r.ID, p.ID)
 			}
 			seenParties[p.ID] = true
+			allPartyIDs[p.ID] = true
 			if s.UsesNationalParties() && p.GroupID != "" && !knownGroups[p.GroupID] {
 				return fmt.Errorf("party %q in region %q references unknown EU group %q", p.ID, r.ID, p.GroupID)
 			}
@@ -172,9 +179,12 @@ func (s Scenario) Validate() error {
 				}
 			}
 			for districtID, tilts := range r.DistrictTilts {
-				for vgID := range tilts {
+				for vgID, mult := range tilts {
 					if !knownVoterGroups[vgID] {
 						return fmt.Errorf("region %q district_tilts[%q] references unknown voter group %q", r.ID, districtID, vgID)
+					}
+					if mult < 0 || isNonFinite(mult) {
+						return fmt.Errorf("region %q district_tilts[%q][%q] has invalid multiplier %g", r.ID, districtID, vgID, mult)
 					}
 				}
 			}
@@ -184,6 +194,19 @@ func (s Scenario) Validate() error {
 		case "", MethodSainteLague, MethodDHondt, MethodHare:
 		default:
 			return fmt.Errorf("region %q has unknown allocation method %q", r.ID, r.Method)
+		}
+	}
+
+	for id, seats := range s.PrevSeats {
+		if seats < 0 {
+			return fmt.Errorf("scenario %q prev_seats[%q] has negative seat count %d", s.Name, id, seats)
+		}
+		if s.UsesNationalParties() {
+			if !knownGroups[id] {
+				return fmt.Errorf("scenario %q prev_seats references unknown EU group %q", s.Name, id)
+			}
+		} else if !allPartyIDs[id] {
+			return fmt.Errorf("scenario %q prev_seats references unknown party %q", s.Name, id)
 		}
 	}
 	return nil

@@ -212,7 +212,9 @@ func TestElectionStateDefensiveClones(t *testing.T) {
 		t.Fatal("expected non-empty coalitions")
 	}
 	origSeats := coalitions[0].Seats
+	origGroupID := coalitions[0].GroupIDs[0]
 	coalitions[0].Seats = 999
+	coalitions[0].GroupIDs[0] = "tampered"
 
 	// Re-read and verify internal state is intact.
 	if got := st.RegionVotes("de"); got["cdu"] != 600 || got["spd"] != 400 {
@@ -224,7 +226,8 @@ func TestElectionStateDefensiveClones(t *testing.T) {
 	if got := st.EUSeats()["epp"]; got == 999 {
 		t.Fatalf("EUSeats mutated internal state: %d", got)
 	}
-	if got := st.Coalitions()[0].Seats; got != origSeats {
-		t.Fatalf("Coalitions mutated internal state: got %d, want %d", got, origSeats)
+	if got := st.Coalitions()[0]; got.Seats != origSeats || got.GroupIDs[0] != origGroupID {
+		t.Fatalf("Coalitions mutated internal state: got seats=%d group0=%q, want seats=%d group0=%q",
+			got.Seats, got.GroupIDs[0], origSeats, origGroupID)
 	}
 }

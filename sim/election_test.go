@@ -464,6 +464,58 @@ func TestLoadScenario(t *testing.T) {
 				},
 				wantErr: "unknown EU group",
 			},
+			{
+				name: "unknown party in prev_seats without groups",
+				scenario: Scenario{
+					Name:      "unknown prev party",
+					Parties:   DefaultParties(),
+					PrevSeats: map[string]int{"ghost": 10},
+					Regions:   []Region{{ID: "xx", Seats: 10, Groups: []VoterGroup{validGroup}}},
+				},
+				wantErr: "unknown party",
+			},
+			{
+				name: "NaN party bonus",
+				scenario: Scenario{
+					Name:    "nan bonus",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:         "xx",
+						Seats:      10,
+						Groups:     []VoterGroup{validGroup},
+						PartyBonus: map[string]float64{"epp": math.NaN()},
+					}},
+				},
+				wantErr: "party_bonus",
+			},
+			{
+				name: "negative district tilt",
+				scenario: Scenario{
+					Name:    "neg tilt",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:            "xx",
+						Seats:         10,
+						Groups:        []VoterGroup{validGroup},
+						DistrictTilts: map[string]map[string]float64{"XX1": {"g1": -0.5}},
+					}},
+				},
+				wantErr: "invalid multiplier",
+			},
+			{
+				name: "invalid poll close hour",
+				scenario: Scenario{
+					Name:    "bad poll close",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:            "xx",
+						Seats:         10,
+						Groups:        []VoterGroup{validGroup},
+						PollCloseHour: 25.0,
+					}},
+				},
+				wantErr: "poll_close_hour",
+			},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -576,7 +628,7 @@ func TestHierarchicalCorrelatedSwingsSpread(t *testing.T) {
 	pfeSeats := make([]float64, runs)
 	for i := range runs {
 		cfg := ElectionConfig{
-			Temperature: 0.85,
+			Temperature: 0.45,
 			Swing:       0.15,
 			Seed:        int64(100 + i),
 		}
@@ -618,5 +670,22 @@ func TestHierarchicalCorrelatedSwingsSpread(t *testing.T) {
 	}
 	if eppSD > 45.0 || pfeSD > 45.0 {
 		t.Errorf("multi-seed seat spread too extreme (>45 seats), got EPP sd=%.2f, PfE sd=%.2f", eppSD, pfeSD)
+	}
+}
+
+func TestExitPollSeatsMatchesZeroSwing(t *testing.T) {
+	parties := DefaultParties()
+	regions := DefaultRegions()
+	cfg := ElectionConfig{Temperature: 0.85, Swing: 0, Seed: 42}
+
+	exitSeats := ExitPollSeats(regions, parties, cfg)
+	st := NewElectionState(Scenario{Name: "zero", Parties: parties, Regions: regions})
+	for rep := range StreamElection(context.Background(), regions, parties, cfg) {
+		st.Apply(rep)
+	}
+	for _, r := range regions {
+		if !reflect.DeepEqual(exitSeats[r.ID], st.RegionSeats(r.ID)) {
+			t.Errorf("region %s zero-swing exit poll %v != final %v", r.ID, exitSeats[r.ID], st.RegionSeats(r.ID))
+		}
 	}
 }
