@@ -36,21 +36,80 @@ type ElectionConfig struct {
 	TargetDuration time.Duration // optional total stream duration per region (scales cleanly for NUTS-3)
 }
 
-// SimulatePrecincts splits r into reporting batches with a seeded random swing.
+// SimulatePrecincts splits r into reporting batches with a seeded hierarchical swing
+// (country-level policy & party-valence shocks, NUTS-1 regional tilts, and local county noise).
 // When r.UseNUTS3 is true and embedded Eurostat NUTS-3 units exist for r.ID,
 // those units (with urban/rural demographic tilt) are simulated instead of synthetic batches.
 func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, seed int64) []PrecinctReport {
-	parties = applyPartyBonus(r.EffectiveParties(parties), r.PartyBonus)
+	return simulatePrecincts(r, parties, temperature, swing, seed, PolicyVec{})
+}
 
+func euPolicyShock(seed int64, swing float64) PolicyVec {
+	var shift PolicyVec
+	if swing <= 0 {
+		return shift
+	}
+	rng := rand.New(rand.NewPCG(uint64(seed)^0x9e3779b97f4a7c15, 0x6a09e667f3bcc908))
+	sigma := swing * 0.40
+	for ax := range shift {
+		shift[ax] = rng.NormFloat64() * sigma
+	}
+	return shift
+}
+
+func simulatePrecincts(r Region, parties []Party, temperature, swing float64, seed int64, euShift PolicyVec) []PrecinctReport {
+	parties = applyPartyBonus(r.EffectiveParties(parties), r.PartyBonus)
 	units := resolveUnits(r)
 	n := len(units)
 
+	rng := rand.New(rand.NewPCG(uint64(seed), 0))
+
+	// Hierarchical Level 2: country-wide policy shift and per-party valence shock.
+	var countryShift PolicyVec
+	countryTurnoutNoise := 0.0
+	if swing > 0 {
+		parties = slices.Clone(parties)
+		policySigma := swing * 0.50
+		for ax := range countryShift {
+			countryShift[ax] = rng.NormFloat64() * policySigma
+		}
+		appealSigma := swing * 0.65
+		for i := range parties {
+			parties[i].Appeal += rng.NormFloat64() * appealSigma
+		}
+		countryTurnoutNoise = rng.NormFloat64() * math.Min(0.03, swing*0.18)
+	}
+
+	// Precompute per-group party vote shares under combined EU + country policy shift.
 	groupShares := make([]map[string]float64, len(r.Groups))
 	for gi, g := range r.Groups {
+		if swing > 0 {
+			for ax := range g.Ideal {
+				g.Ideal[ax] = math.Max(-1.0, math.Min(1.0, g.Ideal[ax]+euShift[ax]+countryShift[ax]))
+			}
+		}
 		groupShares[gi] = VoteShares(g, parties, temperature)
 	}
 
-	rng := rand.New(rand.NewPCG(uint64(seed), 0))
+	// Hierarchical Level 3a: NUTS-1 regional (district) demographic shocks in deterministic order.
+	districtShocks := make(map[string][]float64)
+	if swing > 0 {
+		districtSet := make(map[string]struct{})
+		for _, u := range units {
+			if u.DistrictID != "" {
+				districtSet[u.DistrictID] = struct{}{}
+			}
+		}
+		districtSigma := swing * 0.35
+		for _, did := range slices.Sorted(maps.Keys(districtSet)) {
+			shocks := make([]float64, len(r.Groups))
+			for gi := range shocks {
+				shocks[gi] = rng.NormFloat64() * districtSigma
+			}
+			districtShocks[did] = shocks
+		}
+	}
+
 	reports := make([]PrecinctReport, 0, n)
 
 	totalPop := float64(r.TotalPopulation())
@@ -61,10 +120,16 @@ func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 		// Normalize tilts and swing so each county keeps its Eurostat electorate size.
 		tiltedSum := 0.0
 		tilts := make([]float64, len(r.Groups))
+		dShock := districtShocks[u.DistrictID]
 		for gi, g := range r.Groups {
 			factor := 1.0
 			if swing > 0 {
-				factor = math.Max(0.1, 1.0+rng.NormFloat64()*swing)
+				local := rng.NormFloat64() * (swing * 0.65)
+				regional := 0.0
+				if gi < len(dShock) {
+					regional = dShock[gi]
+				}
+				factor = math.Max(0.1, 1.0+regional+local)
 			}
 			tilts[gi] = countyTilt(g, u) * r.unitTilt(u.ID, u.DistrictID, g.ID) * factor
 			tiltedSum += float64(g.Population) * tilts[gi]
@@ -75,7 +140,8 @@ func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 		}
 		turnoutNoise := 1.0
 		if swing > 0 {
-			turnoutNoise = math.Max(0.75, math.Min(1.25, 1.0+rng.NormFloat64()*math.Min(0.04, swing*0.25)))
+			localTurnout := rng.NormFloat64() * math.Min(0.03, swing*0.18)
+			turnoutNoise = math.Max(0.75, math.Min(1.25, 1.0+countryTurnoutNoise+localTurnout))
 		}
 
 		for gi, g := range r.Groups {
@@ -224,6 +290,8 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 		closeSpan = maxClose - minClose
 	}
 
+	euShift := euPolicyShock(cfg.Seed, cfg.Swing)
+
 	for ri, r := range regions {
 		wg.Add(1)
 		go func() {
@@ -250,7 +318,7 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 				regionDuration = 0
 			}
 
-			reports := SimulatePrecincts(r, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri))
+			reports := simulatePrecincts(r, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift)
 			rng := rand.New(rand.NewPCG(uint64(cfg.Seed), uint64(ri+1)))
 
 			if cfg.Waves > 1 {

@@ -9,10 +9,11 @@ import (
 
 // Scenario bundles the EU groups, parties, and regions for an election simulation.
 type Scenario struct {
-	Name    string    `json:"name"`
-	Groups  []EUGroup `json:"groups,omitempty"`
-	Parties []Party   `json:"parties,omitempty"`
-	Regions []Region  `json:"regions"`
+	Name      string         `json:"name"`
+	Groups    []EUGroup      `json:"groups,omitempty"`
+	Parties   []Party        `json:"parties,omitempty"`
+	PrevSeats map[string]int `json:"prev_seats,omitempty"`
+	Regions   []Region       `json:"regions"`
 }
 
 // LoadScenario reads and validates a JSON election scenario from path.
@@ -94,6 +95,15 @@ func (s Scenario) Validate() error {
 			return fmt.Errorf("scenario %q has duplicate EU group id %q", s.Name, g.ID)
 		}
 		knownGroups[g.ID] = true
+	}
+
+	for id, seats := range s.PrevSeats {
+		if seats < 0 {
+			return fmt.Errorf("scenario %q prev_seats[%q] has negative seat count %d", s.Name, id, seats)
+		}
+		if s.UsesNationalParties() && !knownGroups[id] {
+			return fmt.Errorf("scenario %q prev_seats references unknown EU group %q", s.Name, id)
+		}
 	}
 
 	seenRegions := make(map[string]bool, len(s.Regions))

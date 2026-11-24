@@ -19,3 +19,7 @@ Third-Party Data Attribution:
 - Administrative boundaries: Eurostat GISCO NUTS 2021 (© EuroGeographics).
 - Sub-national socioeconomic statistics: Eurostat (demo_r_pjanaggr3,
   nama_10r_3gdp, demo_r_pjanind3).
+- Party ideological positions: 2024 Chapel Hill Expert Survey (CHES-Europe,
+  chesdata.eu).
+- 2024 European Parliament baseline results: European Parliament Open Data
+  (results.elections.europa.eu).

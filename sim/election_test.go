@@ -439,6 +439,31 @@ func TestLoadScenario(t *testing.T) {
 				},
 				wantErr: "non-finite ideal",
 			},
+			{
+				name: "negative prev_seats",
+				scenario: Scenario{
+					Name:      "neg prev",
+					Parties:   DefaultParties(),
+					PrevSeats: map[string]int{"epp": -5},
+					Regions:   []Region{{ID: "xx", Seats: 10, Groups: []VoterGroup{validGroup}}},
+				},
+				wantErr: "negative seat count",
+			},
+			{
+				name: "unknown EU group in prev_seats",
+				scenario: Scenario{
+					Name:      "unknown prev group",
+					Groups:    []EUGroup{{ID: "epp"}},
+					PrevSeats: map[string]int{"ghost": 10},
+					Regions: []Region{{
+						ID:      "xx",
+						Seats:   10,
+						Groups:  []VoterGroup{validGroup},
+						Parties: []Party{{ID: "p1", GroupID: "epp"}},
+					}},
+				},
+				wantErr: "unknown EU group",
+			},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -484,21 +509,22 @@ func TestStreamElectionWavesSumExact(t *testing.T) {
 	parties := DefaultParties()
 	region := DefaultRegions()[0]
 
-	full := SimulatePrecincts(region, parties, 0.85, 0.15, 42)
-	wantByPrecinct := make(map[string]map[string]int, len(full))
-	for _, rep := range full {
-		wantByPrecinct[rep.PrecinctID] = rep.Votes
-	}
-
-	cfg := ElectionConfig{
+	baseCfg := ElectionConfig{
 		Temperature: 0.85,
 		Swing:       0.15,
 		Seed:        42,
-		Waves:       3,
+		Waves:       1,
+	}
+	wantByPrecinct := make(map[string]map[string]int, region.Precincts)
+	for rep := range StreamElection(context.Background(), []Region{region}, parties, baseCfg) {
+		wantByPrecinct[rep.PrecinctID] = rep.Votes
 	}
 
-	gotByPrecinct := make(map[string]map[string]int, len(full))
-	lastPct := make(map[string]float64, len(full))
+	cfg := baseCfg
+	cfg.Waves = 3
+
+	gotByPrecinct := make(map[string]map[string]int, len(wantByPrecinct))
+	lastPct := make(map[string]float64, len(wantByPrecinct))
 	waveCount := 0
 
 	var run1 []PrecinctReport
@@ -526,8 +552,8 @@ func TestStreamElectionWavesSumExact(t *testing.T) {
 		t.Errorf("same seed produced non-deterministic wave sequence")
 	}
 
-	if waveCount != len(full)*3 {
-		t.Fatalf("got %d wave events, want %d", waveCount, len(full)*3)
+	if waveCount != len(wantByPrecinct)*3 {
+		t.Fatalf("got %d wave events, want %d", waveCount, len(wantByPrecinct)*3)
 	}
 	for pid, wantVotes := range wantByPrecinct {
 		if lastPct[pid] != 1.0 {
@@ -536,5 +562,61 @@ func TestStreamElectionWavesSumExact(t *testing.T) {
 		if !reflect.DeepEqual(gotByPrecinct[pid], wantVotes) {
 			t.Errorf("precinct %s wave sum %v != full %v", pid, gotByPrecinct[pid], wantVotes)
 		}
+	}
+}
+
+func TestHierarchicalCorrelatedSwingsSpread(t *testing.T) {
+	s, err := LoadScenario("../scenarios/eu27.json")
+	if err != nil {
+		t.Fatalf("LoadScenario(eu27.json) failed: %v", err)
+	}
+
+	const runs = 30
+	eppSeats := make([]float64, runs)
+	pfeSeats := make([]float64, runs)
+	for i := range runs {
+		cfg := ElectionConfig{
+			Temperature: 0.85,
+			Swing:       0.15,
+			Seed:        int64(100 + i),
+		}
+		euShift := euPolicyShock(cfg.Seed, cfg.Swing)
+		regionSeats := make(map[string]map[string]int, len(s.Regions))
+		for ri, reg := range s.Regions {
+			votes := make(map[string]int)
+			for _, rep := range simulatePrecincts(reg, s.Parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift) {
+				for pid, v := range rep.Votes {
+					votes[pid] += v
+				}
+			}
+			regionSeats[reg.ID] = AllocateSeats(votes, reg.Seats, reg.Method, reg.Threshold)
+		}
+		eu := s.AggregateEUSeats(regionSeats)
+		eppSeats[i] = float64(eu["epp"])
+		pfeSeats[i] = float64(eu["pfe"])
+	}
+
+	stdDev := func(vals []float64) (mean, sd float64) {
+		for _, v := range vals {
+			mean += v
+		}
+		mean /= float64(len(vals))
+		var sumSq float64
+		for _, v := range vals {
+			d := v - mean
+			sumSq += d * d
+		}
+		return mean, math.Sqrt(sumSq / float64(len(vals)))
+	}
+
+	eppMean, eppSD := stdDev(eppSeats)
+	pfeMean, pfeSD := stdDev(pfeSeats)
+	t.Logf("30-seed spread: EPP mean=%.1f sd=%.1f | PfE mean=%.1f sd=%.1f", eppMean, eppSD, pfeMean, pfeSD)
+
+	if eppSD < 3.0 || pfeSD < 3.0 {
+		t.Errorf("expected realistic multi-seed seat spread (>=3 seats), got EPP sd=%.2f, PfE sd=%.2f", eppSD, pfeSD)
+	}
+	if eppSD > 45.0 || pfeSD > 45.0 {
+		t.Errorf("multi-seed seat spread too extreme (>45 seats), got EPP sd=%.2f, PfE sd=%.2f", eppSD, pfeSD)
 	}
 }

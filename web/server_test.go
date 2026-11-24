@@ -239,3 +239,49 @@ func TestServerStreamConcurrencyCap(t *testing.T) {
 		t.Errorf("expected stream to complete after slot freed")
 	}
 }
+
+func TestServerEU27RealPrevSeatsBaseline(t *testing.T) {
+	scenario, err := sim.LoadScenario("../scenarios/eu27.json")
+	if err != nil {
+		t.Fatalf("LoadScenario(eu27.json) failed: %v", err)
+	}
+	handler := NewServer(scenario).Handler()
+
+	// Cancel immediately after exit_poll? Simpler: run with duration_ms=0 (fast) and inspect exit_poll.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=0&seed=42", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	found := false
+	for _, block := range strings.Split(rec.Body.String(), "\n\n") {
+		if !strings.HasPrefix(block, "event: exit_poll\n") {
+			continue
+		}
+		found = true
+		dataLine := strings.TrimPrefix(strings.Split(block, "\n")[1], "data: ")
+		var payload exitPollPayload
+		if err := json.Unmarshal([]byte(dataLine), &payload); err != nil {
+			t.Fatalf("decode exit_poll: %v", err)
+		}
+		if payload.PrevEUSeats["epp"] != 188 || payload.PrevEUSeats["sd"] != 136 || payload.PrevEUSeats["pfe"] != 84 {
+			t.Fatalf("unexpected 2024 PrevEUSeats: %v", payload.PrevEUSeats)
+		}
+		sum := 0
+		for _, seats := range payload.PrevEUSeats {
+			sum += seats
+		}
+		if sum != 720 {
+			t.Fatalf("PrevEUSeats sum = %d, want 720 (%v)", sum, payload.PrevEUSeats)
+		}
+		break
+	}
+	if !found {
+		t.Fatal("expected exit_poll event in stream")
+	}
+}

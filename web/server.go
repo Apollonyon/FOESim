@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"maps"
 	"math"
 	"net/http"
 	"strconv"
@@ -112,10 +113,19 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 
 	state := sim.NewElectionState(s.scenario)
 	exitRegionSeats := make(map[string]map[string]int, len(s.scenario.Regions))
-	prevRegionSeats := make(map[string]map[string]int, len(s.scenario.Regions))
-	for ri, reg := range s.scenario.Regions {
-		exitRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature, 0.25, (cfg.Seed^0x51a7)+int64(ri))
-		prevRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature*1.15, 0.20, 1001+int64(ri))
+	var prevEUSeats map[string]int
+	if len(s.scenario.PrevSeats) > 0 {
+		for ri, reg := range s.scenario.Regions {
+			exitRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature, 0.25, (cfg.Seed^0x51a7)+int64(ri))
+		}
+		prevEUSeats = maps.Clone(s.scenario.PrevSeats)
+	} else {
+		prevRegionSeats := make(map[string]map[string]int, len(s.scenario.Regions))
+		for ri, reg := range s.scenario.Regions {
+			exitRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature, 0.25, (cfg.Seed^0x51a7)+int64(ri))
+			prevRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature*1.15, 0.20, 1001+int64(ri))
+		}
+		prevEUSeats = s.scenario.AggregateEUSeats(prevRegionSeats)
 	}
 	state.SeedSeats(exitRegionSeats)
 	_, totalPrecincts, _ := state.Progress()
@@ -123,7 +133,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	if err := writeSSE(w, flusher, "exit_poll", exitPollPayload{
 		RegionSeats:    exitRegionSeats,
 		EUSeats:        state.EUSeats(),
-		PrevEUSeats:    s.scenario.AggregateEUSeats(prevRegionSeats),
+		PrevEUSeats:    prevEUSeats,
 		Coalitions:     state.Coalitions(),
 		TotalPrecincts: totalPrecincts,
 	}); err != nil {
