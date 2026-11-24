@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ParliamentSim — European Election Atlas</title>
+  <title>ParliamentSim</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
   <main id="map-stage" aria-label="Interactive Eurostat NUTS-3 European Election Map">
     <svg id="europe-map" viewBox="160 270 620 670" preserveAspectRatio="xMidYMid meet">
@@ -67,7 +69,9 @@
           <select id="country-select" class="country-select hidden" aria-label="Jump to EU Member State"></select>
         </div>
         <div class="progress-wrap">
-          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <div class="progress-bar">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
           <span id="progress-label" class="mono">0 / 0</span>
         </div>
       </div>
@@ -87,7 +91,8 @@
       <div id="color-mode-row" class="sub-control-row">
         <span class="sub-label">Colors</span>
         <div class="segmented" role="group" aria-label="Party color mode">
-          <button class="cm-btn active" data-colormode="auto" title="EU Groups at Europe zoom, National Parties when zoomed in">Auto</button>
+          <button class="cm-btn active" data-colormode="auto"
+            title="EU Groups at Europe zoom, National Parties when zoomed in">Auto</button>
           <button class="cm-btn" data-colormode="group">EU Groups</button>
           <button class="cm-btn" data-colormode="national">National</button>
         </div>
@@ -113,7 +118,8 @@
       <div class="hud-header">
         <div>
           <span class="hud-kicker">EUROPEAN PARLIAMENT</span>
-          <div class="hud-sub"><span id="hemicycle-total" class="mono">0</span> seats · majority <span id="hemicycle-maj" class="mono">0</span></div>
+          <div class="hud-sub"><span id="hemicycle-total" class="mono">0</span> seats · majority <span
+              id="hemicycle-maj" class="mono">0</span></div>
         </div>
         <div class="hemi-head-actions">
           <div class="segmented" role="group" aria-label="Parliament panel view">
@@ -153,4 +159,5 @@
 
   <script type="module" src="js/app.js"></script>
 </body>
+
 </html>

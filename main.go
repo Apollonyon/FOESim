@@ -39,13 +39,7 @@ func runCLI(scenario sim.Scenario) {
 	regions := scenario.Regions
 	euGroups := scenario.EffectiveGroups()
 
-	regionByID := make(map[string]sim.Region, len(regions))
-	tallies := make(map[string]map[string]int, len(regions))
-	regionSeats := make(map[string]map[string]int, len(regions))
-	for _, r := range regions {
-		regionByID[r.ID] = r
-		tallies[r.ID] = make(map[string]int)
-	}
+	state := sim.NewElectionState(scenario)
 
 	cfg := sim.ElectionConfig{
 		Temperature:    0.85,
@@ -58,16 +52,10 @@ func runCLI(scenario sim.Scenario) {
 	reports := sim.StreamElection(context.Background(), regions, parties, cfg)
 
 	for rep := range reports {
-		for partyID, v := range rep.Votes {
-			tallies[rep.RegionID][partyID] += v
-		}
-
-		r := regionByID[rep.RegionID]
-		regionSeats[rep.RegionID] = sim.AllocateSeats(tallies[rep.RegionID], r.Seats, r.Method, r.Threshold)
-
-		euProjected := scenario.AggregateEUSeats(regionSeats)
+		state.Apply(rep)
+		euProjected := state.EUSeats()
 		pct := float64(rep.Precinct) / float64(rep.TotalPrecincts) * 100
-		fmt.Printf("[%s %2d/%2d (%3.0f%%)]", strings.ToUpper(r.ID), rep.Precinct, rep.TotalPrecincts, pct)
+		fmt.Printf("[%s %2d/%2d (%3.0f%%)]", strings.ToUpper(rep.RegionID), rep.Precinct, rep.TotalPrecincts, pct)
 		for _, g := range euGroups {
 			if s := euProjected[g.ID]; s > 0 {
 				fmt.Printf("  %s:%d", g.ShortName, s)
@@ -79,12 +67,14 @@ func runCLI(scenario sim.Scenario) {
 	fmt.Println("\n=== Final Results by Region ===")
 	for _, r := range regions {
 		fmt.Printf("\n--- %s (%s) ---\n", r.Name, r.Method)
+		seats := state.RegionSeats(r.ID)
+		votes := state.RegionVotes(r.ID)
 		for _, p := range r.EffectiveParties(parties) {
-			fmt.Printf("  %-8s %3d seats (%d votes)\n", p.ShortName, regionSeats[r.ID][p.ID], tallies[r.ID][p.ID])
+			fmt.Printf("  %-8s %3d seats (%d votes)\n", p.ShortName, seats[p.ID], votes[p.ID])
 		}
 	}
 
-	totalSeats := scenario.AggregateEUSeats(regionSeats)
+	totalSeats := state.EUSeats()
 	fmt.Println("\n=== European Parliament Final Total ===")
 	for _, g := range euGroups {
 		fmt.Printf("  %-8s %3d seats\n", g.ShortName, totalSeats[g.ID])

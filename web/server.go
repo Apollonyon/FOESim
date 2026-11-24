@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"maps"
 	"net/http"
 	"strconv"
 	"time"
@@ -79,80 +78,40 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	regionByID := make(map[string]sim.Region, len(s.scenario.Regions))
-	tallies := make(map[string]map[string]int, len(s.scenario.Regions))
-	regionSeats := make(map[string]map[string]int, len(s.scenario.Regions))
+	state := sim.NewElectionState(s.scenario)
+	exitRegionSeats := make(map[string]map[string]int, len(s.scenario.Regions))
 	prevRegionSeats := make(map[string]map[string]int, len(s.scenario.Regions))
-	totalPrecincts := 0
-
 	for ri, reg := range s.scenario.Regions {
-		regionByID[reg.ID] = reg
-		tallies[reg.ID] = make(map[string]int)
-		totalPrecincts += reg.EffectivePrecinctCount()
-
-		regionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature, 0.25, (cfg.Seed^0x51a7)+int64(ri))
+		exitRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature, 0.25, (cfg.Seed^0x51a7)+int64(ri))
 		prevRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature*1.15, 0.20, 1001+int64(ri))
 	}
-
-	euGroups := s.scenario.EffectiveGroups()
-	lastEU := s.scenario.AggregateEUSeats(regionSeats)
-	lastCoalitions := sim.FindCoalitions(lastEU, euGroups, 5)
+	state.SeedSeats(exitRegionSeats)
+	_, totalPrecincts, _ := state.Progress()
 
 	if err := writeSSE(w, flusher, "exit_poll", exitPollPayload{
-		RegionSeats:    regionSeats,
-		EUSeats:        lastEU,
+		RegionSeats:    exitRegionSeats,
+		EUSeats:        state.EUSeats(),
 		PrevEUSeats:    s.scenario.AggregateEUSeats(prevRegionSeats),
-		Coalitions:     lastCoalitions,
+		Coalitions:     state.Coalitions(),
 		TotalPrecincts: totalPrecincts,
 	}); err != nil {
 		return
 	}
 
 	reports := sim.StreamElection(r.Context(), s.scenario.Regions, s.scenario.Parties, cfg)
-	precinctPct := make(map[string]float64, totalPrecincts)
-	sumPct := 0.0
-	completed := 0
 
 	for rep := range reports {
-		for partyID, v := range rep.Votes {
-			tallies[rep.RegionID][partyID] += v
-		}
-
-		prev := precinctPct[rep.PrecinctID]
-		cur := rep.ReportedPct
-		if cur <= 0 {
-			cur = 1.0
-		}
-		if cur > prev {
-			sumPct += cur - prev
-			precinctPct[rep.PrecinctID] = cur
-			if prev < 1.0 && cur >= 1.0 {
-				completed++
-			}
-		}
-
-		reg := regionByID[rep.RegionID]
-		regionSeats[rep.RegionID] = sim.AllocateSeats(tallies[rep.RegionID], reg.Seats, reg.Method, reg.Threshold)
-
-		countedPct := 0.0
-		if totalPrecincts > 0 {
-			countedPct = (sumPct / float64(totalPrecincts)) * 100
-		}
-
-		curEU := s.scenario.AggregateEUSeats(regionSeats)
-		if !maps.Equal(curEU, lastEU) {
-			lastEU = curEU
-			lastCoalitions = sim.FindCoalitions(curEU, euGroups, 5)
-		}
+		state.Apply(rep)
+		completed, total, countedPct := state.Progress()
 
 		payload := precinctPayload{
 			Report:            rep,
-			RegionVotes:       tallies[rep.RegionID],
-			RegionSeats:       regionSeats[rep.RegionID],
-			EUSeats:           curEU,
-			Coalitions:        lastCoalitions,
+			RegionVotes:       state.RegionVotes(rep.RegionID),
+			RegionSeats:       state.RegionSeats(rep.RegionID),
+			EUSeats:           state.EUSeats(),
+			Coalitions:        state.Coalitions(),
 			ReportedPrecincts: completed,
-			TotalPrecincts:    totalPrecincts,
+			TotalPrecincts:    total,
 			CountedPct:        countedPct,
 		}
 		if err := writeSSE(w, flusher, "precinct", payload); err != nil {
@@ -162,9 +121,10 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 
 	// Only emit complete if the client did not cancel early.
 	if r.Context().Err() == nil {
+		completed, total, _ := state.Progress()
 		_ = writeSSE(w, flusher, "complete", map[string]int{
 			"reported_precincts": completed,
-			"total_precincts":    totalPrecincts,
+			"total_precincts":    total,
 		})
 	}
 }
