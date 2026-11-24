@@ -184,3 +184,58 @@ func TestServerNationalPartiesAndNUTS3Stream(t *testing.T) {
 		}
 	})
 }
+
+func TestParseElectionConfigClamps(t *testing.T) {
+	srv := NewServer(sim.Scenario{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=999999999&temp=NaN&swing=Inf", nil)
+	cfg := srv.parseElectionConfig(req)
+	if cfg.TargetDuration != maxTargetDuration {
+		t.Errorf("TargetDuration = %v, want clamped %v", cfg.TargetDuration, maxTargetDuration)
+	}
+	if cfg.Temperature != 0.85 {
+		t.Errorf("Temperature = %v, want fallback 0.85 for NaN", cfg.Temperature)
+	}
+	if cfg.Swing != 0.15 {
+		t.Errorf("Swing = %v, want fallback 0.15 for Inf", cfg.Swing)
+	}
+
+	delayReq := httptest.NewRequest(http.MethodGet, "/api/stream?delay_ms=999999999", nil)
+	delayCfg := srv.parseElectionConfig(delayReq)
+	if delayCfg.BaseDelay != maxBaseDelay {
+		t.Errorf("BaseDelay = %v, want clamped %v", delayCfg.BaseDelay, maxBaseDelay)
+	}
+}
+
+func TestServerStreamConcurrencyCap(t *testing.T) {
+	scenario := sim.Scenario{
+		Name:    "Cap Test",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}
+	srv := NewServer(scenario)
+	srv.streamSem = make(chan struct{}, 1)
+	handler := srv.Handler()
+
+	// Occupy the only stream slot to simulate an active SSE client.
+	srv.streamSem <- struct{}{}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stream?delay_ms=0", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status when at cap = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+
+	// Releasing the slot lets the next stream succeed normally.
+	<-srv.streamSem
+	req2 := httptest.NewRequest(http.MethodGet, "/api/stream?delay_ms=0", nil)
+	rec2 := httptest.NewRecorder()
+	handler.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("status after slot freed = %d, want %d", rec2.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec2.Body.String(), "event: complete\n") {
+		t.Errorf("expected stream to complete after slot freed")
+	}
+}

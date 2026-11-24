@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"parliamentsim/sim"
@@ -17,6 +22,7 @@ func main() {
 	scenarioPath := flag.String("scenario", "scenarios/eu27.json", "path to JSON scenario file")
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	cliMode := flag.Bool("cli", false, "run live election night in the terminal instead of starting the web server")
+	maxStreams := flag.Int("max-streams", 256, "maximum concurrent SSE election streams (0 = unlimited)")
 	flag.Parse()
 
 	scenario, err := sim.LoadScenario(*scenarioPath)
@@ -29,9 +35,43 @@ func main() {
 		return
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	srv := web.NewServer(scenario)
-	log.Printf("ParliamentSim dashboard listening on http://localhost%s", *addr)
-	log.Fatal(http.ListenAndServe(*addr, srv.Handler()))
+	srv.SetMaxStreams(*maxStreams)
+	httpSrv := &http.Server{
+		Addr:              *addr,
+		Handler:           srv.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		log.Printf("ParliamentSim dashboard listening on http://localhost%s", *addr)
+		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			log.Fatal(err)
+		}
+	case <-ctx.Done():
+		log.Println("Shutting down server...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("graceful shutdown error: %v", err)
+		}
+	}
 }
 
 func runCLI(scenario sim.Scenario) {

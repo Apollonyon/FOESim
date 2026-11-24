@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,17 +13,37 @@ import (
 	"parliamentsim/sim"
 )
 
+const (
+	defaultMaxStreams = 256
+	maxTargetDuration = 5 * time.Minute
+	maxBaseDelay      = 2 * time.Second
+)
+
 //go:embed static
 var staticFiles embed.FS
 
 // Server serves the ParliamentSim web dashboard and JSON/SSE API endpoints.
 type Server struct {
-	scenario sim.Scenario
+	scenario  sim.Scenario
+	streamSem chan struct{}
 }
 
 // NewServer creates a Server configured with the given election scenario.
 func NewServer(scenario sim.Scenario) *Server {
-	return &Server{scenario: scenario}
+	return &Server{
+		scenario:  scenario,
+		streamSem: make(chan struct{}, defaultMaxStreams),
+	}
+}
+
+// SetMaxStreams overrides the maximum number of concurrent SSE streams.
+// Values <= 0 disable the cap.
+func (s *Server) SetMaxStreams(n int) {
+	if n <= 0 {
+		s.streamSem = nil
+		return
+	}
+	s.streamSem = make(chan struct{}, n)
 }
 
 // Handler returns the HTTP router for the dashboard and API routes.
@@ -70,6 +91,17 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
+	}
+
+	if s.streamSem != nil {
+		select {
+		case s.streamSem <- struct{}{}:
+			defer func() { <-s.streamSem }()
+		default:
+			w.Header().Set("Retry-After", "5")
+			http.Error(w, "too many concurrent streams", http.StatusServiceUnavailable)
+			return
+		}
 	}
 
 	cfg := s.parseElectionConfig(r)
@@ -137,10 +169,10 @@ func (s *Server) parseElectionConfig(r *http.Request) sim.ElectionConfig {
 		Seed:           42,
 		TargetDuration: 45 * time.Second,
 	}
-	if v, err := strconv.ParseFloat(q.Get("temp"), 64); err == nil && v > 0 {
+	if v, err := strconv.ParseFloat(q.Get("temp"), 64); err == nil && v > 0 && !math.IsNaN(v) && !math.IsInf(v, 0) {
 		cfg.Temperature = v
 	}
-	if v, err := strconv.ParseFloat(q.Get("swing"), 64); err == nil && v >= 0 {
+	if v, err := strconv.ParseFloat(q.Get("swing"), 64); err == nil && v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) {
 		cfg.Swing = v
 	}
 	if v, err := strconv.ParseInt(q.Get("seed"), 10, 64); err == nil {
@@ -150,10 +182,10 @@ func (s *Server) parseElectionConfig(r *http.Request) sim.ElectionConfig {
 		cfg.Waves = v
 	}
 	if v, err := strconv.Atoi(q.Get("duration_ms")); err == nil && v >= 0 {
-		cfg.TargetDuration = time.Duration(v) * time.Millisecond
+		cfg.TargetDuration = min(time.Duration(v)*time.Millisecond, maxTargetDuration)
 		cfg.BaseDelay = 0
 	} else if v, err := strconv.Atoi(q.Get("delay_ms")); err == nil && v >= 0 {
-		cfg.BaseDelay = time.Duration(v) * time.Millisecond
+		cfg.BaseDelay = min(time.Duration(v)*time.Millisecond, maxBaseDelay)
 		cfg.TargetDuration = 0
 	}
 	return cfg
