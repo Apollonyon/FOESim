@@ -317,7 +317,6 @@ function startStream() {
     const data = JSON.parse(ev.data);
     const rep = data.report;
 
-    // Accumulate partial reporting waves into the county's running tally.
     const existing = state.precincts[rep.precinct_id];
     const prevPct = existing?.reported_pct || 0;
     const curPct = rep.reported_pct > 0 ? rep.reported_pct : 1.0;
@@ -350,7 +349,6 @@ function startStream() {
     const totalCount = state.regionTotalCount[rep.region_id] || reg.precincts;
     const sub = document.getElementById(`label-sub-${rep.region_id}`);
     if (sub) {
-      // Track running per-region percentage sum cleanly in O(1)
       state.regionPctSum = state.regionPctSum || {};
       state.regionPctSum[rep.region_id] = (state.regionPctSum[rep.region_id] || 0) + Math.max(0, curPct - prevPct);
       const pct = Math.min(100, Math.round((state.regionPctSum[rep.region_id] / Math.max(1, totalCount)) * 100));
@@ -362,7 +360,6 @@ function startStream() {
     map.queueRecolor(rep.precinct_id);
     scheduleHemicycleRender();
 
-    // Update live ticker smoothly (every report at normal speed, sampled at Instant)
     if (state.durationMs > 0 || state.reportedPrecincts % 15 === 0) {
       inspector.pushTicker(state.precincts[rep.precinct_id]);
     }

@@ -66,12 +66,11 @@ func FindCoalitions(euSeats map[string]int, groups []EUGroup, maxResults int) []
 		if seats < majority {
 			continue
 		}
-		// Keep only minimal-winning coalitions (removing any single partner loses the majority).
+		// Keep only minimal-winning coalitions (dropping any member loses the majority).
 		if seats-minMemberSeats >= majority {
 			continue
 		}
 
-		// Compute seat-weighted ideological centroid and weighted average distance.
 		var centroid PolicyVec
 		var members []EUGroup
 		for i := range n {
@@ -90,12 +89,10 @@ func FindCoalitions(euSeats map[string]int, groups []EUGroup, maxResults int) []
 			w := float64(euSeats[g.ID]) / float64(seats)
 			spread += w * g.Position.WeightedDistance(centroid, unitWeights)
 		}
-		// Small coordination penalty per extra coalition partner beyond 2.
 		if len(members) > 2 {
 			spread += 0.04 * float64(len(members)-2)
 		}
 
-		// Sort members by seat count descending so lead partner appears first.
 		slices.SortFunc(members, func(a, b EUGroup) int {
 			if c := cmp.Compare(euSeats[b.ID], euSeats[a.ID]); c != 0 {
 				return c

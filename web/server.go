@@ -90,8 +90,6 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		tallies[reg.ID] = make(map[string]int)
 		totalPrecincts += reg.EffectivePrecinctCount()
 
-		// Generate a noisy 0%-reported exit poll and a baseline previous-election result
-		// using the exact same NUTS-3/district tilt pipeline so there is zero systematic bias.
 		regionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature, 0.25, (cfg.Seed^0x51a7)+int64(ri))
 		prevRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature*1.15, 0.20, 1001+int64(ri))
 	}

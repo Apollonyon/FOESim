@@ -45,7 +45,6 @@ func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 	units := resolveUnits(r)
 	n := len(units)
 
-	// Precompute each voter group's party shares once instead of once per precinct.
 	groupShares := make([]map[string]float64, len(r.Groups))
 	for gi, g := range r.Groups {
 		groupShares[gi] = VoteShares(g, parties, temperature)
@@ -59,7 +58,7 @@ func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 		votes := make(map[string]int, len(parties))
 		eligibleVoters := 0
 
-		// Compute normalized demographic + swing weights so the county keeps its real electorate size.
+		// Normalize tilts and swing so each county keeps its Eurostat electorate size.
 		tiltedSum := 0.0
 		tilts := make([]float64, len(r.Groups))
 		for gi, g := range r.Groups {
@@ -74,7 +73,6 @@ func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 		if tiltedSum > 0 && totalPop > 0 {
 			norm = totalPop / tiltedSum
 		}
-		// Keep overall county turnout noise gentle (~3-4% stddev) even when party swings are larger.
 		turnoutNoise := 1.0
 		if swing > 0 {
 			turnoutNoise = math.Max(0.75, math.Min(1.25, 1.0+rng.NormFloat64()*math.Min(0.04, swing*0.25)))
@@ -134,12 +132,9 @@ type scheduledReport struct {
 	report PrecinctReport
 }
 
-// expandIntoWaves splits each precinct's full report into w ordered partial batches
-// whose votes sum exactly to the original precinct totals, with realistic wave-to-wave skew.
 func expandIntoWaves(full []PrecinctReport, w int, rng *rand.Rand) []scheduledReport {
 	out := make([]scheduledReport, 0, len(full)*w)
 	for _, rep := range full {
-		// Randomize wave split fractions that sum to 1.0.
 		fracs := make([]float64, w)
 		sumF := 0.0
 		for i := range w {
@@ -150,15 +145,14 @@ func expandIntoWaves(full []PrecinctReport, w int, rng *rand.Rand) []scheduledRe
 			fracs[i] /= sumF
 		}
 
-		// Per-party early-vs-late wave bias in sorted key order so RNG draws are 100% deterministic.
+		// Sort keys before drawing from rng so wave skews stay deterministic.
 		partySkew := make(map[string]float64, len(rep.Votes))
 		for _, pid := range slices.Sorted(maps.Keys(rep.Votes)) {
-			partySkew[pid] = (rng.Float64() - 0.5) * 0.35 // +/- 17.5% early/late shift
+			partySkew[pid] = (rng.Float64() - 0.5) * 0.35
 		}
 
 		emitted := make(map[string]int, len(rep.Votes))
 		cumPct := 0.0
-		// Spread waves across the night while strictly preserving Wave 1 < Wave 2 < ... < Wave W.
 		t := rng.Float64() * (0.55 / float64(w))
 		stepWindow := (1.0 - t) / float64(w)
 
@@ -170,7 +164,6 @@ func expandIntoWaves(full []PrecinctReport, w int, rng *rand.Rand) []scheduledRe
 			}
 
 			waveVotes := make(map[string]int, len(rep.Votes))
-			// Early waves skew one way (-1), late waves the opposite (+1), canceling out by final wave.
 			waveDir := -1.0 + 2.0*(float64(wi)/float64(max(1, w-1)))
 			for pid, totalV := range rep.Votes {
 				if isLast {
@@ -215,7 +208,6 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 	out := make(chan PrecinctReport, max(1, len(regions)*4))
 	var wg sync.WaitGroup
 
-	// Compute poll-closing time window across regions for realistic staggered European waves.
 	minClose, maxClose := math.Inf(1), math.Inf(-1)
 	for _, r := range regions {
 		if r.PollCloseHour > 0 {
@@ -237,7 +229,7 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 		go func() {
 			defer wg.Done()
 
-			// Wait for this Member State's polls to close (staggered across the first 30% of TargetDuration).
+			// Stagger poll-closing start across the first 30% of TargetDuration.
 			startOffset := time.Duration(0)
 			if cfg.TargetDuration > 0 && closeSpan > 0 && r.PollCloseHour > minClose {
 				frac := (r.PollCloseHour - minClose) / closeSpan
@@ -261,7 +253,6 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 			reports := SimulatePrecincts(r, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri))
 			rng := rand.New(rand.NewPCG(uint64(cfg.Seed), uint64(ri+1)))
 
-			// Multi-wave partial county reporting mode.
 			if cfg.Waves > 1 {
 				schedule := expandIntoWaves(reports, cfg.Waves, rng)
 				prevAt := 0.0
@@ -292,7 +283,6 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 				return
 			}
 
-			// Single-wave mode: randomize reporting order across counties.
 			if r.UseNUTS3 && len(reports) > 1 {
 				rng.Shuffle(len(reports), func(i, j int) {
 					reports[i], reports[j] = reports[j], reports[i]
@@ -304,14 +294,12 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 
 			stepDelay := cfg.BaseDelay
 			if regionDuration > 0 && len(reports) > 0 {
-				// Cap per-unit delay for tiny 1-2 county countries (e.g. LU, CY, MT)
-				// so jitter never stretches the whole broadcast past TargetDuration.
+				// Floor denominator at 3 so 1-2 county states (LU, CY, MT) don't overrun TargetDuration.
 				stepDelay = regionDuration / time.Duration(max(3, len(reports)))
 			}
 
 			for _, report := range reports {
 				if stepDelay > 0 {
-					// Randomize reporting speed between 0.5x and 1.5x stepDelay.
 					delay := time.Duration(float64(stepDelay) * (0.5 + rng.Float64()))
 					timer := time.NewTimer(delay)
 					select {
@@ -331,7 +319,6 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 		}()
 	}
 
-	// Close out once every region goroutine has finished.
 	go func() {
 		wg.Wait()
 		close(out)

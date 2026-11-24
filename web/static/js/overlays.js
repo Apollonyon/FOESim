@@ -70,7 +70,6 @@ export function computeCountyColor(state, votesMap, eligibleVoters, fallbackSeat
     const leadShare = ranked[0][1] / total;
     const runnerShare = ranked[1] ? ranked[1][1] / total : 0;
     const margin = leadShare - runnerShare;
-    // Soften color slightly while a county is still partially counted, sharpening at 100%.
     const completeness = 0.55 + 0.45 * Math.min(1, reportedPct || 1);
     const intensity = ((dark ? 0.48 : 0.42) + Math.min(0.54, margin * 2.5)) * completeness;
     return mixColor(neutral, hexToRgb(resolvePartyColor(state, leader)), intensity);

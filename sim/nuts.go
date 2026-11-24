@@ -42,12 +42,9 @@ func NUTS3Units(regionID string) []PrecinctUnit {
 	return slices.Clone(nuts3Data[strings.ToLower(regionID)])
 }
 
-// countyTilt returns a socioeconomic demographic multiplier for voter group g in
-// county u using Eurostat URBN_TYPE, country-relative GDP/capita (WealthZ), and age 65+ share (AgeZ).
 func countyTilt(g VoterGroup, u PrecinctUnit) float64 {
 	tilt := 1.0
 
-	// 1. Urban vs. Rural cosmopolitan affinity
 	var urbanBias float64
 	switch u.UrbanType {
 	case 1:
@@ -60,15 +57,11 @@ func countyTilt(g VoterGroup, u PrecinctUnit) float64 {
 		tilt *= math.Max(0.35, 1.0+urbanBias*affinity)
 	}
 
-	// 2. Wealth (GDP/capita): wealthier counties tilt toward pro-market/pro-EU groups;
-	// lower-GDP counties tilt toward redistribution/anti-establishment groups.
 	if u.WealthZ != 0 {
 		wealthAffinity := g.Ideal[AxisEcon]*0.65 + g.Ideal[AxisEU]*0.35
 		tilt *= math.Max(0.45, 1.0+0.18*u.WealthZ*wealthAffinity)
 	}
 
-	// 3. Age structure (65+ share): older counties tilt toward traditional/conservative groups;
-	// younger counties tilt toward progressive/green groups.
 	if u.AgeZ != 0 {
 		ageAffinity := g.Ideal[AxisSocial]*0.65 - g.Ideal[AxisEnv]*0.35
 		tilt *= math.Max(0.45, 1.0+0.18*u.AgeZ*ageAffinity)

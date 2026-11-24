@@ -1,0 +1,21 @@
+ParliamentSim
+Copyright (C) 2026 River
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License, version 3 (AGPL-3.0), as
+published by the Free Software Foundation. See the LICENSE file for full terms.
+
+Additional Terms under AGPL-3.0 Section 7:
+1. Attribution (Section 7(b)): Redistributed or publicly hosted copies (including
+   modified versions) must preserve this copyright notice and attribution to the
+   original author (River) and source repository.
+2. Trademarks & Branding (Section 7(e)): This license does not grant permission
+   to use the project name "ParliamentSim", its logos, or author identity to
+   endorse, brand, or imply official affiliation with modified versions or
+   third-party hosted instances. Modified public instances must clearly identify
+   themselves as independent forks.
+
+Third-Party Data Attribution:
+- Administrative boundaries: Eurostat GISCO NUTS 2021 (© EuroGeographics).
+- Sub-national socioeconomic statistics: Eurostat (demo_r_pjanaggr3,
+  nama_10r_3gdp, demo_r_pjanind3).
