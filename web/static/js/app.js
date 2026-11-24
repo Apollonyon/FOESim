@@ -383,6 +383,7 @@ function startStream() {
     if (state.source === es) {
       es.close();
       state.source = null;
+      setStatus('idle', 'DISCONNECTED');
     }
   };
 }

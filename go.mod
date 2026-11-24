@@ -1,3 +1,3 @@
 module parliamentsim
 
-go 1.26.10
+go 1.24

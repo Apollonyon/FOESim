@@ -233,7 +233,7 @@ export class InspectorUI {
           <strong>${item.regionId.toUpperCase()}</strong>
           <span>${item.label}</span>
         </span>
-        <span class="ticker-right">${item.leadShort} ${item.pct}%</span>
+        <span class="ticker-right">${item.leadShort} ${item.pct}</span>
       `;
       row.onclick = () => {
         this.cb.onFocusRegion(item.regionId);

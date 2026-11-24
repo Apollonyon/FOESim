@@ -1,19 +1,21 @@
 # ParliamentSim
 
-A live **European Parliament election simulator** written in Go (zero external dependencies) with an interactive **Eurostat NUTS-3** election-night web atlas powered by Server-Sent Events (SSE) and `//go:embed`.
+A European Parliament election simulator written in Go with no third-party dependencies, paired with an interactive Eurostat NUTS-3 election-night web map streamed over Server-Sent Events (SSE) and embedded via `//go:embed`.
 
-## Features
+## What It Simulates
 
-- **Full EU-27 Coverage (720 Seats):** All 27 EU Member States, 154 national parties rolling up into 9 European Parliament political groups, and **1,152 continental NUTS-3 counties**.
-- **Real Eurostat Socioeconomic Data:** Every NUTS-3 county uses official Eurostat 2023 population (`demo_r_pjanaggr3`), GDP per capita (`nama_10r_3gdp`), age 65+ share (`demo_r_pjanind3`), and urban/rural typology (`URBN_TYPE`).
-- **6-Axis Spatial Voting Model:** Numerically stable Softmax choice over weighted Euclidean distances across 6 policy axes (`Econ`, `Social`, `EU`, `Defense`, `Env`, `Migration`) and 6 standardized European voter blocs.
-- **National Electoral Laws:** Per-country seat quotas, thresholds, and allocation algorithms (`D'Hondt`, `Sainte-Laguë`, and `Hare Quota / Largest Remainder`).
-- **Live Election-Night Streaming:** Concurrent per-country goroutines with staggered CET poll-closing waves (`18:00 → 23:00`), deterministic multi-wave partial county reporting, live seat swings, and a real-time minimal-winning **Coalition Finder**.
-- **Zero-Build Web Atlas:** Native ES modules + SVG hemicycle + Lambert Azimuthal Equal-Area Europe map with 6 live overlays (`Winner`, `Group %`, `Turnout`, `Pro-EU`, `Econ`, `Migration`), Light/Dark theme toggle, and auto-switching EU Group / National Party colors on zoom.
+- **EU-27 (720 seats):** All 27 Member States, 154 national parties rolling up into 9 European Parliament political groups, across 1,152 continental NUTS-3 counties.
+- **Eurostat county data:** Official 2023 county population (`demo_r_pjanaggr3`), GDP per capita (`nama_10r_3gdp`), age 65+ share (`demo_r_pjanind3`), and urban/rural typology (`URBN_TYPE`).
+- **6-axis spatial voting:** Temperature-scaled Softmax over weighted Euclidean distance (`Econ`, `Social`, `EU`, `Defense`, `Env`, `Migration`) and 6 voter blocs per country.
+- **National allocation rules:** Per-country seat quotas, legal thresholds, and seat-allocation rules (`D'Hondt`, `Sainte-Laguë`, and `Hare Quota`; Ireland and Malta currently use Hare as a simplification until ranked-ballot STV is implemented).
+- **Live election-night SSE stream:** Concurrent per-country goroutines with staggered CET poll closing (`18:00 -> 23:00`), deterministic multi-wave partial county reporting, and a minimal-winning Coalition Finder.
+- **Embedded web atlas:** Plain HTML/CSS/JS modules, SVG hemicycle, Lambert Azimuthal Equal-Area Europe map, 6 data overlays, and Light/Dark themes.
+
+> **Note:** Seat swings (`+/-`) currently compare against a synthetic baseline run rather than official 2024 EP results (real 2024 baselines are planned next). Built as a hands-on Go learning project: the Go simulation and server were written step-by-step with AI coaching/review, while the frontend JS/CSS and Eurostat dataset scripts were AI-assisted.
 
 ## Quick Start
 
-Requires **Go 1.24+** (developed on Go 1.26).
+Requires **Go 1.24+**.
 
 ```bash
 # Run the EU-27 720-seat web dashboard (http://localhost:8080)
