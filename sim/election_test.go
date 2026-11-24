@@ -341,10 +341,108 @@ func TestLoadScenario(t *testing.T) {
 				},
 				wantErr: "invalid weight",
 			},
+			{
+				name: "NaN EU group position",
+				scenario: Scenario{
+					Name:    "nan group pos",
+					Groups:  []EUGroup{{ID: "epp", Position: PolicyVec{math.NaN()}}},
+					Parties: DefaultParties(),
+					Regions: []Region{{ID: "xx", Seats: 10, Groups: []VoterGroup{validGroup}}},
+				},
+				wantErr: "non-finite position",
+			},
+			{
+				name: "Inf EU group position",
+				scenario: Scenario{
+					Name:    "inf group pos",
+					Groups:  []EUGroup{{ID: "epp", Position: PolicyVec{0, math.Inf(1)}}},
+					Parties: DefaultParties(),
+					Regions: []Region{{ID: "xx", Seats: 10, Groups: []VoterGroup{validGroup}}},
+				},
+				wantErr: "non-finite position",
+			},
+			{
+				name: "NaN party appeal",
+				scenario: Scenario{
+					Name: "nan appeal",
+					Regions: []Region{{
+						ID:      "xx",
+						Seats:   10,
+						Groups:  []VoterGroup{validGroup},
+						Parties: []Party{{ID: "p1", Appeal: math.NaN()}},
+					}},
+				},
+				wantErr: "non-finite appeal",
+			},
+			{
+				name: "Inf party appeal",
+				scenario: Scenario{
+					Name: "inf appeal",
+					Regions: []Region{{
+						ID:      "xx",
+						Seats:   10,
+						Groups:  []VoterGroup{validGroup},
+						Parties: []Party{{ID: "p1", Appeal: math.Inf(-1)}},
+					}},
+				},
+				wantErr: "non-finite appeal",
+			},
+			{
+				name: "NaN party position",
+				scenario: Scenario{
+					Name: "nan party pos",
+					Regions: []Region{{
+						ID:      "xx",
+						Seats:   10,
+						Groups:  []VoterGroup{validGroup},
+						Parties: []Party{{ID: "p1", Position: PolicyVec{0, 0, math.NaN()}}},
+					}},
+				},
+				wantErr: "non-finite position",
+			},
+			{
+				name: "Inf party position",
+				scenario: Scenario{
+					Name: "inf party pos",
+					Regions: []Region{{
+						ID:      "xx",
+						Seats:   10,
+						Groups:  []VoterGroup{validGroup},
+						Parties: []Party{{ID: "p1", Position: PolicyVec{0, 0, math.Inf(1)}}},
+					}},
+				},
+				wantErr: "non-finite position",
+			},
+			{
+				name: "NaN voter group ideal",
+				scenario: Scenario{
+					Name:    "nan ideal",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:     "xx",
+						Seats:  10,
+						Groups: []VoterGroup{{ID: "g1", Population: 1000, Turnout: 0.5, Ideal: PolicyVec{math.NaN()}}},
+					}},
+				},
+				wantErr: "non-finite ideal",
+			},
+			{
+				name: "Inf voter group ideal",
+				scenario: Scenario{
+					Name:    "inf ideal",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:     "xx",
+						Seats:  10,
+						Groups: []VoterGroup{{ID: "g1", Population: 1000, Turnout: 0.5, Ideal: PolicyVec{0, math.Inf(-1)}}},
+					}},
+				},
+				wantErr: "non-finite ideal",
+			},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				err := tc.scenario.validate()
+				err := tc.scenario.Validate()
 				if err == nil {
 					t.Fatalf("expected validation error for %s, got nil", tc.name)
 				}

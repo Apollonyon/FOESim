@@ -26,7 +26,7 @@ func LoadScenario(path string) (Scenario, error) {
 	if err = json.Unmarshal(data, &s); err != nil {
 		return Scenario{}, err
 	}
-	if err = s.validate(); err != nil {
+	if err = s.Validate(); err != nil {
 		return Scenario{}, err
 	}
 	return s, nil
@@ -76,13 +76,17 @@ func (s Scenario) AggregateEUSeats(regionSeats map[string]map[string]int) map[st
 	return SumSeats(groupedByRegion)
 }
 
-func (s Scenario) validate() error {
+// Validating variants of Scenarios so no faulty scenarios can be loaded
+func (s Scenario) Validate() error {
 	if len(s.Regions) == 0 {
 		return fmt.Errorf("scenario %q has no regions", s.Name)
 	}
 
 	knownGroups := make(map[string]bool, len(s.Groups))
 	for _, g := range s.Groups {
+		if ax, bad := nonFiniteAxis(g.Position); bad {
+			return fmt.Errorf("scenario %q has an EU group with non-finite position %v on axis %d", s.Name, g.Position, ax)
+		}
 		if g.ID == "" {
 			return fmt.Errorf("scenario %q has an EU group with empty id", s.Name)
 		}
@@ -116,6 +120,12 @@ func (s Scenario) validate() error {
 		}
 		seenParties := make(map[string]bool, len(parties))
 		for _, p := range parties {
+			if isNonFinite(p.Appeal) {
+				return fmt.Errorf("region %q has a party with non-finite appeal %g", r.ID, p.Appeal)
+			}
+			if ax, bad := nonFiniteAxis(p.Position); bad {
+				return fmt.Errorf("region %q has a party with non-finite position %v on axis %d", r.ID, p.Position, ax)
+			}
 			if p.ID == "" {
 				return fmt.Errorf("region %q has a party with empty id", r.ID)
 			}
@@ -129,6 +139,9 @@ func (s Scenario) validate() error {
 		}
 
 		for _, vg := range r.Groups {
+			if ax, bad := nonFiniteAxis(vg.Ideal); bad {
+				return fmt.Errorf("region %q has a voter group %q with non-finite ideal %v on axis %d", r.ID, vg.ID, vg.Ideal, ax)
+			}
 			if vg.Population < 0 {
 				return fmt.Errorf("region %q has a voter group %q with negative population", r.ID, vg.ID)
 			}
@@ -164,4 +177,17 @@ func (s Scenario) validate() error {
 		}
 	}
 	return nil
+}
+
+func isNonFinite(v float64) bool {
+	return math.IsNaN(v) || math.IsInf(v, 0)
+}
+
+func nonFiniteAxis(v PolicyVec) (int, bool) {
+	for ax, val := range v {
+		if isNonFinite(val) {
+			return ax, true
+		}
+	}
+	return -1, false
 }
