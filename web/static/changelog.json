@@ -3,9 +3,11 @@
   "entries": [
     {
       "version": "0.1.0",
-      "date": "",
-      "title": "",
-      "notes": []
+      "date": "2026-11-26",
+      "title": "Initial release",
+      "notes": [
+        "Initial public release of FOES."
+      ]
     }
   ]
 }

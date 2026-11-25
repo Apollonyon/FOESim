@@ -22,10 +22,11 @@ export class ChangelogModal {
       if (!res.ok) return;
       const parsed = await res.json();
       if (!parsed || typeof parsed.version !== 'string' || !parsed.version.trim()) return;
+      const version = parsed.version.trim();
       this.data = parsed;
 
       if (versionBtnEl) {
-        versionBtnEl.textContent = `v${parsed.version.trim()}`;
+        versionBtnEl.textContent = `v${version}`;
         versionBtnEl.classList.remove('hidden');
       }
 
@@ -37,7 +38,9 @@ export class ChangelogModal {
           (typeof latest.title === 'string' && latest.title.trim() !== ''))
       );
       const seen = localStorage.getItem(SEEN_VERSION_KEY);
-      if (hasContent && seen !== parsed.version.trim()) {
+      if (!seen) {
+        localStorage.setItem(SEEN_VERSION_KEY, version);
+      } else if (hasContent && seen !== version) {
         this.open();
       }
     } catch {
