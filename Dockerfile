@@ -15,4 +15,4 @@ COPY scenarios/ /app/scenarios/
 USER appuser
 EXPOSE 8080
 ENTRYPOINT ["/app/parliamentsim"]
-CMD ["-addr", ":8080", "-trust-proxy"]
+CMD ["-addr", ":8080"]

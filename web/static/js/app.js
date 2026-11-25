@@ -29,6 +29,8 @@ const state = {
   appliedSeed: 42,
   temp: 0.45,
   swing: 0.15,
+  shiftParty: '',
+  shiftVal: 0,
   wavesOverride: 0,
   methodOverride: '',
   overlay: 'winner',
@@ -68,6 +70,9 @@ const forecastRunsSelect = document.getElementById('forecast-runs');
 const btnRunForecast = document.getElementById('btn-run-forecast');
 const inputSwing = document.getElementById('input-swing');
 const swingVal = document.getElementById('swing-val');
+const shiftPartySelect = document.getElementById('shift-party');
+const inputShift = document.getElementById('input-shift');
+const shiftValEl = document.getElementById('shift-val');
 const inputSeed = document.getElementById('input-seed');
 const inputTemp = document.getElementById('input-temp');
 const tempVal = document.getElementById('temp-val');
@@ -131,11 +136,30 @@ function applyScenarioMeta(meta, hasGroups) {
   document.getElementById('ov-eu-axis').textContent = meta.axis2_label || 'Pro-EU';
 }
 
+function syncShiftControls() {
+  if (shiftPartySelect) shiftPartySelect.value = state.shiftParty;
+  if (inputShift) {
+    inputShift.value = String(Math.min(0.40, Math.max(-0.40, state.shiftVal)));
+    inputShift.disabled = !state.shiftParty;
+  }
+  if (shiftValEl) {
+    const sign = state.shiftVal > 0 ? '+' : '';
+    shiftValEl.textContent = `${sign}${state.shiftVal.toFixed(2)}`;
+  }
+}
+
 function applyModifiersToHUD(modifiers) {
   if (!modifiers) return;
-  state.swing = Number.isFinite(modifiers.swing) ? Math.min(2, Math.max(0, modifiers.swing)) : 0.15;
+  const rawUnc = modifiers.uncertainty ?? modifiers.swing;
+  state.swing = Number.isFinite(rawUnc) ? Math.min(2, Math.max(0, rawUnc)) : 0.15;
   inputSwing.value = String(Math.min(0.60, Math.max(0, state.swing)));
   swingVal.textContent = state.swing.toFixed(2);
+  if ('shiftParty' in modifiers || 'shiftVal' in modifiers) {
+    state.shiftParty = typeof modifiers.shiftParty === 'string' ? modifiers.shiftParty : '';
+    state.shiftVal = Number.isFinite(modifiers.shiftVal) ? Math.min(2, Math.max(-2, modifiers.shiftVal)) : 0;
+    if (!state.shiftParty) state.shiftVal = 0;
+    syncShiftControls();
+  }
   state.wavesOverride = parseInt(modifiers.wavesOverride, 10) || 0;
   if (Number.isFinite(modifiers.temp) && modifiers.temp > 0) {
     state.temp = Math.min(5, Math.max(0.05, modifiers.temp));
@@ -402,6 +426,19 @@ async function loadScenario({
   }
   state.heatmapPartyId = state.orderedGroups[Math.floor(state.orderedGroups.length / 2)]?.id || groups[0]?.id || '';
   partySelect.value = state.heatmapPartyId;
+
+  if (shiftPartySelect) {
+    const prevShiftParty = state.shiftParty;
+    clearEl(shiftPartySelect);
+    shiftPartySelect.appendChild(el('option', { value: '', text: 'None' }));
+    for (const g of state.orderedGroups) {
+      shiftPartySelect.appendChild(el('option', { value: g.id, text: g.short_name }));
+    }
+    const hasMatch = state.orderedGroups.some((g) => g.id === prevShiftParty);
+    state.shiftParty = hasMatch ? prevShiftParty : '';
+    if (!hasMatch) state.shiftVal = 0;
+    syncShiftControls();
+  }
 
   for (const p of (loaded.parties || [])) state.partiesById[p.id] = p;
 
@@ -946,7 +983,7 @@ function renderBattlegrounds() {
   if (!top.length) {
     battlegroundsListEl.appendChild(el('div', {
       className: 'subtitle',
-      text: `All races lean safe (>=85%) at Swing ${state.swing.toFixed(2)}. Try raising Swing.`
+      text: `All races lean safe (>=85%) at Uncertainty ${state.swing.toFixed(2)}. Try raising Uncertainty.`
     }));
     return;
   }
@@ -1037,7 +1074,10 @@ async function runForecast(retried = false) {
     ? `&run=${encodeURIComponent(state.customRunId)}`
     : (state.scenarioId ? `&scenario=${encodeURIComponent(state.scenarioId)}` : '');
   const methodParam = state.methodOverride ? `&method=${encodeURIComponent(state.methodOverride)}` : '';
-  const url = `/api/forecast?runs=${state.forecastRuns}&seed=${seed}&temp=${temp}&swing=${swing}${targetParam}${methodParam}`;
+  const shiftParam = (state.shiftParty && state.shiftVal !== 0)
+    ? `&shift=${encodeURIComponent(state.shiftParty)}:${state.shiftVal}`
+    : '';
+  const url = `/api/forecast?runs=${state.forecastRuns}&seed=${seed}&temp=${temp}&uncertainty=${swing}${shiftParam}${targetParam}${methodParam}`;
 
   try {
     const res = await fetch(url, { signal: ctrl.signal });
@@ -1091,7 +1131,10 @@ function startStream(retried = false) {
     ? `&run=${encodeURIComponent(state.customRunId)}`
     : (state.scenarioId ? `&scenario=${encodeURIComponent(state.scenarioId)}` : '');
   const methodParam = state.methodOverride ? `&method=${encodeURIComponent(state.methodOverride)}` : '';
-  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&swing=${swing}${targetParam}${methodParam}`;
+  const shiftParam = (state.shiftParty && state.shiftVal !== 0)
+    ? `&shift=${encodeURIComponent(state.shiftParty)}:${state.shiftVal}`
+    : '';
+  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&uncertainty=${swing}${shiftParam}${targetParam}${methodParam}`;
 
   setStatus('live', 'EXIT POLLS');
   syncRunControls();
@@ -1152,6 +1195,9 @@ function openScenarioEditor() {
     state.scenario,
     {
       swing: state.swing,
+      uncertainty: state.swing,
+      shiftParty: state.shiftParty,
+      shiftVal: state.shiftVal,
       temp: state.temp,
       seed: Number.isNaN(parsedSeed) ? 42 : parsedSeed,
       wavesOverride: state.wavesOverride,
@@ -1174,6 +1220,25 @@ function wireEvents() {
     swingVal.textContent = state.swing.toFixed(2);
   });
   inputSwing.addEventListener('change', () => onSettingChanged());
+  if (shiftPartySelect && inputShift) {
+    shiftPartySelect.addEventListener('change', () => {
+      const hadShift = state.shiftVal !== 0;
+      state.shiftParty = shiftPartySelect.value;
+      if (!state.shiftParty) state.shiftVal = 0;
+      syncShiftControls();
+      if (state.shiftVal !== 0 || hadShift) onSettingChanged();
+    });
+    inputShift.addEventListener('input', () => {
+      state.shiftVal = parseFloat(inputShift.value) || 0;
+      if (shiftValEl) {
+        const sign = state.shiftVal > 0 ? '+' : '';
+        shiftValEl.textContent = `${sign}${state.shiftVal.toFixed(2)}`;
+      }
+    });
+    inputShift.addEventListener('change', () => {
+      if (state.shiftParty) onSettingChanged();
+    });
+  }
   btnRunForecast.addEventListener('click', () => runForecast());
   btnVersion.addEventListener('click', () => changelog?.open());
 

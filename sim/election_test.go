@@ -516,6 +516,43 @@ func TestLoadScenario(t *testing.T) {
 				},
 				wantErr: "poll_close_hour",
 			},
+			{
+				name: "excessive precincts rejected in Validate",
+				scenario: Scenario{
+					Name:    "too many precincts",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:        "xx",
+						Seats:     10,
+						Precincts: 1 << 30,
+						Groups:    []VoterGroup{validGroup},
+					}},
+				},
+				wantErr: "out of bounds",
+			},
+			{
+				name: "excessive seats rejected in Validate",
+				scenario: Scenario{
+					Name:    "too many seats",
+					Parties: DefaultParties(),
+					Regions: []Region{{
+						ID:     "xx",
+						Seats:  MaxScenarioTotalSeats + 1,
+						Groups: []VoterGroup{validGroup},
+					}},
+				},
+				wantErr: "must be between 1 and",
+			},
+			{
+				name: "excessive description rejected in Validate",
+				scenario: Scenario{
+					Name:    "long desc",
+					Meta:    ScenarioMeta{Description: strings.Repeat("x", MaxScenarioDescriptionBytes+1)},
+					Parties: DefaultParties(),
+					Regions: []Region{{ID: "xx", Seats: 10, Groups: []VoterGroup{validGroup}}},
+				},
+				wantErr: "description too long",
+			},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -624,6 +661,7 @@ func TestHierarchicalCorrelatedSwingsSpread(t *testing.T) {
 	}
 
 	const runs = 30
+	shockKeys := collectNationalShockKeys(s.Regions, s.Parties)
 	eppSeats := make([]float64, runs)
 	pfeSeats := make([]float64, runs)
 	for i := range runs {
@@ -632,11 +670,11 @@ func TestHierarchicalCorrelatedSwingsSpread(t *testing.T) {
 			Swing:       0.15,
 			Seed:        int64(100 + i),
 		}
-		euShift := euPolicyShock(cfg.Seed, cfg.Swing)
+		shock := computeNationalShock(cfg.Seed, cfg.Swing, shockKeys)
 		regionSeats := make(map[string]map[string]int, len(s.Regions))
 		for ri, reg := range s.Regions {
 			votes := make(map[string]int)
-			for _, rep := range simulatePrecincts(reg, s.Parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift) {
+			for _, rep := range simulatePrecincts(reg, s.Parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), shock, nil) {
 				for pid, v := range rep.Votes {
 					votes[pid] += v
 				}

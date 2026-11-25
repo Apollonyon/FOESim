@@ -1,137 +1,103 @@
 # FOES — Free Open Election Simulator
 
-**FOES** is a zero-dependency Go election-night simulator, scenario sandbox, and Monte Carlo forecaster paired with an interactive HTML5 Canvas (`Path2D`) county atlas streamed over Server-Sent Events (SSE) and embedded into a single static binary via `//go:embed`. *(The Go module and binary name remain `parliamentsim`.)*
+Interactive multi-country election-night simulator, scenario editor, and Monte Carlo sandbox written in zero-dependency Go (`//go:embed` + Server-Sent Events) with an HTML5 Canvas county atlas. *(The Go module and binary name remain `parliamentsim`.)*
 
 ---
 
-## Included Scenarios
+## Scenarios
 
-| ID | Election | Scale | Geography & Method |
-| :--- | :--- | :--- | :--- |
-| `eu27` *(default)* | European Parliament (27 Member States) | 720 seats, 154 parties → 9 political groups | 1,152 NUTS-3 counties, per-country PR (`Sainte-Laguë`, `D'Hondt`, `Hare`, `STV`), real 2024 baselines |
-| `usa2024` | 2024 U.S. Presidential Election | 538 EVs, 50 states + DC | 3,141 counties (`us-atlas` Albers USA), callout badges (`DC`, Small East Coast states, `ME-1/2`, `NE-1/2/3`), 270-to-win bar |
-| `eu_starter` | 3-Country Starter (DE, FR, IT) | 228 seats across 3 states | Synthetic precincts, quick local testing |
+| ID | Election | Scale | Calibrated to | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| `eu27` *(default)* | European Parliament (27 Member States) | 720 seats, 154 parties → 9 groups, 1,152 NUTS-3 counties | EP 2024 result + CHES-Europe (in-sample) | Per-country PR (`Sainte-Laguë`, `D'Hondt`, `Hare`, `STV approx`) |
+| `usa2024` | 2024 U.S. Presidential Election | 538 EVs, 50 states + DC, 3,141 counties | Certified 2024 county totals (in-sample) | `ME-1/2` & `NE-1/2/3` splits, callout badges, 270-to-win bar |
+| `eu_starter` | 3-Country Starter (DE, FR, IT) | 228 seats across 3 states | Synthetic fixture | Fast local testing; omits historical `prev_seats` deltas |
 
 ---
 
 ## Features
 
-- **Live Election Night Stream:** Independent per-connection SSE broadcasts (`/api/stream`) with Start / Pause / Resume / Replay / Reset playback, `1× / 2× / 5× / Instant` speeds, staggered poll-closing windows, Seed & Temperature controls, and live Coalition Finder.
-- **6 Data Overlays & Light/Dark Atlas:** Offscreen bitmap caching + `32×32` spatial grid hit-testing for `60fps` zoom/pan across 3,141 counties, switching cleanly across **Winner**, **Party/Group %**, **Turnout**, **Axis 2** (Pro-EU / Political spectrum), **Economic**, and **Migration** overlays.
-- **In-Browser Scenario & Modifier Editor (`E`):** Visually adjust party appeal, colors, policy coordinates, region seats, thresholds, counting rules, poll close hours, district seats, demographic tilts, voter group ideals/weights, turnout scaling, and stream modifiers (`POST /api/runs`).
-- **Stateless Link Sharing (`#share=`):** Share edited scenarios and modifiers via permanent compressed diff URLs (using native browser `CompressionStream`) with zero database required, plus full JSON download and import.
-- **Monte Carlo Forecast Mode:** Bounded worker pool simulating `100–500` correlated elections (`GET /api/forecast`) with a live **Swing** slider, win-probability map, `P10–P90` seat distribution histograms, win-odds bar, and a clickable **Closest Races** panel.
-- **Electoral System Lab:** Compare `Sainte-Laguë`, `D'Hondt`, `Hare-Niemeyer`, `FPTP`, Ranked-Ballot `STV` (Droop quota with spatial preference transfers), and parallel two-tier district allocation (`district_seats`).
+- **Live Election-Night Broadcast:** Independent per-connection SSE streams (`/api/stream`) with Start / Pause / Resume / Replay / Reset, `1× / 2× / 5× / Instant` speeds, staggered poll closing hours, directional party shift, seed/temperature controls, and Coalition Finder.
+- **6 Canvas Map Overlays & Light/Dark Atlas:** Offscreen bitmap caching and spatial-grid hit-testing across 3,141 counties with **Winner**, **Party/Group %**, **Turnout**, **Axis 2** (Pro-EU / Political spectrum), **Economic**, and **Migration** layers.
+- **In-Browser Scenario Editor (`E`):** Edit party appeal, colors, policy coordinates, region seats, thresholds, counting methods, poll close hours, district seats, demographic tilts, voter group ideals/weights, and simulation modifiers (`POST /api/runs`).
+- **Stateless `#share=` Links:** Share edited scenarios and modifiers via compressed URL diffs (`CompressionStream`), plus JSON export/import.
+- **Monte Carlo Simulation Mode:** Runs `100–500` correlated election draws (`GET /api/forecast`) with a **Uncertainty** volatility slider, directional **Shift** slider, win-probability map, `P10–P90` seat histograms, and **Closest Races**.
+- **Electoral System Lab:** Compare `Sainte-Laguë`, `D'Hondt`, `Hare-Niemeyer`, `FPTP`, and party-level `STV (approx)`.
+
+---
+
+## Model & Limitations
+
+FOES is an interactive **scenario simulator**, not a polling-based election forecaster:
+
+- **In-sample calibration:** `eu27` and `usa2024` reproduce 2024 results closely at `Uncertainty = 0` because their party appeals and regional tilts were calibrated to 2024 data in-sample. When `prev_seats` matches the 2024 target, live deltas measure divergence from that 2024 baseline.
+- **Uncertainty vs. directional Shift:** **Uncertainty** scales zero-mean hierarchical shocks (shared cross-region policy + national per-party shock plus regional/local noise), while **Shift** (`shift=id:val`) applies a directional national swing. Under winner-take-all (e.g. USA 2024), adding symmetric uncertainty pulls the average electoral-vote total back toward 270 even with zero bias because narrow swing-state wins have more EVs to lose than safe states can gain; the Forecast panel shows the deterministic `Base` alongside `P10 / Med / P90`.
+- **Party-level STV approximation:** `STV (approx)` operates on party vote totals with a Droop quota rather than individual ranked ballots — winning parties keep surplus minus one quota and eliminated parties transfer 100% of votes to the nearest remaining party in policy space with no vote exhaustion.
+- **Method override drops districts:** Switching the global **System** override sets `district_seats = 0`, removing two-tier splits (such as `ME-1/2` and `NE-1/2/3`) while active.
+- **Default seed (`42`):** Live streams use seed `42` by default for reproducible demos; use `↻` next to Seed to randomize.
 
 ---
 
 ## Quick Start
 
-Requires **Go 1.24+** (standard library only — zero third-party Go dependencies).
+Requires **Go 1.24+** (standard library only — zero third-party dependencies).
 
 ```bash
-# Start web dashboard loading all scenarios in ./scenarios (http://localhost:8080)
-go run .
-
-# Start with a specific default scenario selected
+go run .                              # web UI on http://localhost:8080 (default: eu27)
 go run . -scenario scenarios/usa2024.json
-
-# Run live election night in the terminal instead of starting the HTTP server
-go run . -cli
+go run . -cli                         # terminal broadcast mode
 ```
+
+<details>
+<summary>CLI Flags & HTTP API Reference</summary>
 
 ### CLI Flags
 
 | Flag | Default | Description |
 | :--- | :--- | :--- |
 | `-scenario` | `scenarios/eu27.json` | Path to default JSON scenario file |
-| `-scenarios-dir` | `scenarios` | Directory of `*.json` scenarios for the HUD switcher (empty disables directory scan) |
+| `-scenarios-dir` | `scenarios` | Directory of `*.json` scenarios for the HUD switcher (empty disables scan) |
 | `-addr` | `:8080` | HTTP listen address |
-| `-cli` | `false` | Stream live election night in the terminal instead of running the web server |
+| `-cli` | `false` | Stream live election night in the terminal |
 | `-max-streams` | `256` | Global concurrent SSE stream limit (`0` = unlimited) |
 | `-max-streams-per-ip` | `16` | Per-IP concurrent SSE/forecast limit (`0` = unlimited) |
-| `-trust-proxy` | `false` | Trust `CF-Connecting-IP`, `Fly-Client-IP`, and `X-Forwarded-For` behind a reverse proxy |
-| `-shutdown-timeout` | `30s` | Graceful drain timeout on `SIGINT`/`SIGTERM` so active streams finish cleanly |
+| `-trust-proxy` | `false` | Trust rightmost `X-Forwarded-For` hop behind Caddy/Nginx |
+| `-proxy-header` | `""` | Explicit trusted IP header mode: `xff`, `cf`, or `fly` (overrides `-trust-proxy`) |
+| `-shutdown-timeout` | `30s` | Graceful drain timeout on `SIGINT`/`SIGTERM` |
+
+### HTTP Endpoints
+
+| Endpoint | Description |
+| :--- | :--- |
+| `GET /api/scenarios` | Scenario catalog + `default_id` |
+| `GET /api/scenario[?scenario=id\|run=id]` | Scenario definition and resolved metadata |
+| `GET /api/stream[?scenario=id\|run=id&duration_ms=...&seed=...&temp=...&uncertainty=...&shift=...&waves=...&method=...]` | Independent SSE stream (`exit_poll`, `precinct`, `complete`; accepts legacy `swing=` alias) |
+| `GET /api/forecast[?scenario=id\|run=id&runs=200&seed=...&temp=...&uncertainty=...&shift=...&method=...]` | Monte Carlo `baseline`, `min/p10/p50/p90/max`, `bins`, and regional odds |
+| `POST /api/runs` | Validate and store an ephemeral custom scenario (max `2 MiB`, 15m TTL, per-IP rate-limited) |
+| `GET /healthz` | Liveness check (`200 ok`) |
+
+</details>
 
 ---
 
 ## Self-Hosting & Docker
 
-Static web assets (`web/static/`) are compiled directly into the binary via `//go:embed`, while `scenarios/*.json` are loaded from disk at startup.
+Static assets (`web/static/`) are embedded into the binary via `//go:embed`; `scenarios/*.json` are loaded from disk.
 
 ```bash
 docker build -t foes .
-docker run -p 8080:8080 foes
+docker run -d --name foes -p 127.0.0.1:8080:8080 foes
 ```
 
-The included [Dockerfile](Dockerfile) runs a non-root Alpine image exposing `:8080` with `-trust-proxy` enabled and a health check endpoint at `GET /healthz`. For zero-downtime rolling deploys behind Caddy/Nginx/Fly.io, point health checks at `/healthz` and allow `-shutdown-timeout` (default `30s`) for in-flight SSE broadcasts to finish.
-
----
-
-## HTTP API Overview
-
-| Endpoint | Description |
-| :--- | :--- |
-| `GET /api/scenarios` | Ordered scenario catalog + `default_id` for the UI switcher |
-| `GET /api/scenario[?scenario=id\|run=id]` | Scenario definition and `ScenarioMeta` defaults |
-| `GET /api/stream[?scenario=id\|run=id&duration_ms=...&seed=...&temp=...&swing=...&waves=...&method=...]` | Independent SSE stream emitting `exit_poll`, `precinct`, and `complete` events |
-| `GET /api/forecast[?scenario=id\|run=id&runs=200&seed=...&temp=...&swing=...&method=...]` | Monte Carlo percentiles (`min/p10/p50/p90/max`), `bins`, majority odds, and regional win probabilities |
-| `POST /api/runs` | Validate and store an ephemeral custom scenario (max `2 MiB`, 15m TTL, bounded DoS limits, per-IP rate-limited) |
-| `GET /healthz` | Liveness check (`200 ok`) |
-
----
-
-## Adding or Contributing Scenarios
-
-1. Use the in-browser **Scenario Editor** (`E`) and click **JSON → Download JSON**, or author a JSON file matching `sim.Scenario`.
-2. Place the `.json` file inside `scenarios/` (or submit a pull request). Note that `meta.regions_url` and `meta.units_url` must point to `/geo/*.json` assets embedded under `web/static/geo/`.
-3. Verify your scenario passes structural & numeric bounds checks (`Scenario.Validate()`):
-   ```bash
-   go vet ./... && go test -race -count=1 ./...
-   ```
+The [Dockerfile](Dockerfile) runs a non-root Alpine container with proxy header trust **disabled by default** so directly exposed instances cannot be spoofed. When running behind a reverse proxy (bind to `127.0.0.1` only), pass `-trust-proxy` (for Caddy/Nginx rightmost `X-Forwarded-For`) or `-proxy-header cf` / `-proxy-header fly`. Health checks can poll `GET /healthz`.
 
 ---
 
 ## Development & Tests
 
 ```bash
-# Run unit, HTTP, registry, forecast, and race-detector tests
-go test -race -count=1 -v ./...
-
-# Static checks
+gofmt -l .
 go vet ./...
-
-# Benchmarks
-go test -bench=. ./sim
-```
-
-### Project Layout
-
-```text
-main.go                  CLI flags, terminal streamer, graceful shutdown HTTP server
-Dockerfile               Multi-stage non-root Alpine runtime image
-scenarios/               Disk-loaded JSON scenarios (eu27.json, usa2024.json, eu_starter.json)
-sim/
-  policy.go              6-axis PolicyVec and weighted Euclidean distance
-  party.go               Party and EUGroup models
-  region.go              Region, VoterGroup, GeoPack selection, demographic tilts
-  vote.go                Softmax VoteShares, SimulateRegion, PartyBonus
-  seats.go               SeatAllocator interface, Sainte-Laguë, D'Hondt, Hare, FPTP, two-tier districts
-  stv.go                 Droop-quota Ranked-Ballot STV with preference transfers
-  state.go               Incremental ElectionState vote/seat/district/progress tracker
-  seed.go                Built-in test fixture parties and regions
-  geopack.go             Thread-safe lazy GeoPack registry (eu_nuts3, us_counties)
-  nuts.go                Embedded Eurostat NUTS-3 units & socioeconomic tilts
-  us_geopack.go          Embedded U.S. 3,141-county GeoPack registration
-  election.go            Hierarchical swings, PrepareElection, deterministic waves, SSE streaming
-  forecast.go            Bounded-worker Monte Carlo aggregator & seat histogram binning
-  coalition.go           Minimal-winning Coalition Finder ranked by policy spread
-  registry.go            Multi-scenario loader & ordered catalog registry
-  scenario.go            JSON loader, ScenarioMeta defaults, Validate(), seat aggregation
-web/
-  server.go              net/http server, //go:embed static assets, SSE/forecast/healthz handlers, CSP/gzip
-  runs.go                Bounded TTL custom runStore, DoS validation bounds, and per-IP rate limiter
-  static/                Zero-build HTML/CSS/ES modules, Scenario Editor, #share diff codec, Changelog UI, GeoJSON
+go test -race -count=1 ./...
 ```
 
 ---
@@ -146,4 +112,4 @@ web/
 
 ## License
 
-Licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for full terms, attribution requirements, and Additional Terms under Section 7.
+Licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for full terms and Additional Terms under Section 7. In plain terms, if you modify FOES and run it on a server for users to interact with over the network, you must make the corresponding source code of your modified version available under AGPL-3.0.

@@ -229,18 +229,24 @@ export class Hemicycle {
     }
     this.#renderChart(orderedGroups, euSeats, prevEUSeats, highlightGroupIds);
 
+    const hasPrev = Boolean(prevEUSeats && Object.keys(prevEUSeats).length > 0);
     this.ensureLedger(orderedGroups);
     for (const g of orderedGroups) {
       const cur = euSeats[g.id] || 0;
-      const prev = prevEUSeats[g.id] || 0;
-      const delta = cur - prev;
-      const deltaClass = delta > 0 ? 'delta-up' : delta < 0 ? 'delta-down' : 'delta-flat';
-      const deltaTxt = delta > 0 ? `+${delta}` : `${delta}`;
       const row = this.ledgerRows.get(g.id);
       if (row) {
         row.seatsEl.textContent = String(cur);
-        row.deltaEl.className = `ledger-delta ${deltaClass}`;
-        row.deltaEl.textContent = deltaTxt;
+        if (hasPrev) {
+          const prev = prevEUSeats[g.id] || 0;
+          const delta = cur - prev;
+          const deltaClass = delta > 0 ? 'delta-up' : delta < 0 ? 'delta-down' : 'delta-flat';
+          const deltaTxt = delta > 0 ? `+${delta}` : `${delta}`;
+          row.deltaEl.className = `ledger-delta ${deltaClass}`;
+          row.deltaEl.textContent = deltaTxt;
+        } else {
+          row.deltaEl.className = 'ledger-delta';
+          row.deltaEl.textContent = '';
+        }
       }
     }
   }
@@ -307,12 +313,17 @@ export class Hemicycle {
     const dist = forecast.groups[selectedGroup.id];
     const bins = dist.bins || [];
     const color = safeColor(selectedGroup.color);
+    const hasBase = forecast?.baseline && Object.prototype.hasOwnProperty.call(forecast.baseline, selectedGroup.id);
+    const baseText = hasBase ? `Base ${forecast.baseline[selectedGroup.id]} · ` : '';
 
-    const histHead = el('div', { className: 'forecast-hist-head' },
+    const histHead = el('div', {
+      className: 'forecast-hist-head',
+      title: 'Base = deterministic 0-uncertainty outcome. Symmetric uncertainty pulls winner-take-all means toward 50/50 when close states can flip.'
+    },
       el('span', { className: 'forecast-hist-title' },
         swatch(color),
         el('strong', { text: selectedGroup.short_name }),
-        ` P10 ${dist.p10} · Med ${dist.p50} · P90 ${dist.p90}`
+        ` ${baseText}P10 ${dist.p10} · Med ${dist.p50} · P90 ${dist.p90}`
       ),
       el('span', { className: 'forecast-hist-hint', text: 'Click row below' })
     );

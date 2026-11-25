@@ -161,10 +161,36 @@ func (s Scenario) AggregateEUSeats(regionSeats map[string]map[string]int) map[st
 	return SumSeats(groupedByRegion)
 }
 
+const (
+	MaxScenarioDescriptionBytes = 500
+	MaxScenarioRegions          = 100
+	MaxScenarioGroups           = 32
+	MaxScenarioParties          = 64
+	MaxScenarioPrevSeats        = 128
+	MaxScenarioTotalSeats       = 2000
+	MaxScenarioTotalPrecincts   = 5000
+	MaxRegionVoterGroups        = 32
+)
+
 // Validate checks structural and numeric invariants of s.
 func (s Scenario) Validate() error {
+	if len(s.Meta.Description) > MaxScenarioDescriptionBytes {
+		return fmt.Errorf("scenario %q description too long (%d > %d)", s.Name, len(s.Meta.Description), MaxScenarioDescriptionBytes)
+	}
 	if len(s.Regions) == 0 {
 		return fmt.Errorf("scenario %q has no regions", s.Name)
+	}
+	if len(s.Regions) > MaxScenarioRegions {
+		return fmt.Errorf("scenario %q has too many regions (%d > %d)", s.Name, len(s.Regions), MaxScenarioRegions)
+	}
+	if len(s.Groups) > MaxScenarioGroups {
+		return fmt.Errorf("scenario %q has too many groups (%d > %d)", s.Name, len(s.Groups), MaxScenarioGroups)
+	}
+	if len(s.Parties) > MaxScenarioParties {
+		return fmt.Errorf("scenario %q has too many top-level parties (%d > %d)", s.Name, len(s.Parties), MaxScenarioParties)
+	}
+	if len(s.PrevSeats) > MaxScenarioPrevSeats {
+		return fmt.Errorf("scenario %q has too many prev_seats entries (%d > %d)", s.Name, len(s.PrevSeats), MaxScenarioPrevSeats)
 	}
 	switch s.Meta.ChartType {
 	case "", "hemicycle", "bar":
@@ -200,6 +226,8 @@ func (s Scenario) Validate() error {
 	}
 
 	seenRegions := make(map[string]bool, len(s.Regions))
+	totalSeats := 0
+	totalPrecincts := 0
 	for _, r := range s.Regions {
 		if r.ID == "" {
 			return fmt.Errorf("scenario %q has a region with empty id", s.Name)
@@ -208,12 +236,30 @@ func (s Scenario) Validate() error {
 			return fmt.Errorf("scenario %q has duplicate region id %q", s.Name, r.ID)
 		}
 		seenRegions[r.ID] = true
-		if r.Seats <= 0 {
-			return fmt.Errorf("region %q in scenario %q has no seats", r.ID, s.Name)
+		if r.Seats <= 0 || r.Seats > MaxScenarioTotalSeats {
+			if r.Seats <= 0 {
+				return fmt.Errorf("region %q in scenario %q has no seats", r.ID, s.Name)
+			}
+			return fmt.Errorf("region %q in scenario %q seats (%d) must be between 1 and %d", r.ID, s.Name, r.Seats, MaxScenarioTotalSeats)
 		}
 		if len(r.Groups) == 0 {
 			return fmt.Errorf("region %q in scenario %q has no voter groups", r.ID, s.Name)
 		}
+		if len(r.Groups) > MaxRegionVoterGroups {
+			return fmt.Errorf("region %q in scenario %q has too many voter groups (%d > %d)", r.ID, s.Name, len(r.Groups), MaxRegionVoterGroups)
+		}
+		if len(r.Parties) > MaxScenarioParties {
+			return fmt.Errorf("region %q in scenario %q has too many parties (%d > %d)", r.ID, s.Name, len(r.Parties), MaxScenarioParties)
+		}
+		if r.Precincts < 0 || r.Precincts > MaxScenarioTotalPrecincts {
+			return fmt.Errorf("region %q in scenario %q precincts (%d) out of bounds", r.ID, s.Name, r.Precincts)
+		}
+		precincts := r.EffectivePrecinctCount()
+		if precincts < 0 || precincts > MaxScenarioTotalPrecincts {
+			return fmt.Errorf("region %q in scenario %q effective precincts (%d) out of bounds", r.ID, s.Name, precincts)
+		}
+		totalSeats += r.Seats
+		totalPrecincts += precincts
 		if r.Threshold < 0 || r.Threshold > 1 || math.IsNaN(r.Threshold) {
 			return fmt.Errorf("region %q in scenario %q has invalid threshold %g", r.ID, s.Name, r.Threshold)
 		}
@@ -308,6 +354,12 @@ func (s Scenario) Validate() error {
 		default:
 			return fmt.Errorf("region %q has unknown allocation method %q", r.ID, r.Method)
 		}
+	}
+	if totalSeats > MaxScenarioTotalSeats {
+		return fmt.Errorf("scenario %q total seats (%d) exceed limit of %d", s.Name, totalSeats, MaxScenarioTotalSeats)
+	}
+	if totalPrecincts > MaxScenarioTotalPrecincts {
+		return fmt.Errorf("scenario %q total effective precincts (%d) exceed limit of %d", s.Name, totalPrecincts, MaxScenarioTotalPrecincts)
 	}
 
 	for id, seats := range s.PrevSeats {

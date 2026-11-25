@@ -189,3 +189,94 @@ func TestRunForecastDistrictWinProb(t *testing.T) {
 		t.Fatalf("expected ME-1 and ME-2 probabilities in DistrictWinProb, got %+v", me.DistrictWinProb)
 	}
 }
+
+func TestUSA2024BaselineShiftAndCorrelation(t *testing.T) {
+	sc, err := LoadScenario("../scenarios/usa2024.json")
+	if err != nil {
+		t.Fatalf("LoadScenario(usa2024.json) failed: %v", err)
+	}
+
+	baseRes, err := RunForecast(context.Background(), sc, ForecastConfig{
+		Runs:        80,
+		Temperature: 0.45,
+		Swing:       0.15,
+		BaseSeed:    42,
+	})
+	if err != nil {
+		t.Fatalf("RunForecast(usa2024) failed: %v", err)
+	}
+	if baseRes.Baseline["rep"] != 312 || baseRes.Baseline["dem"] != 226 {
+		t.Fatalf("usa2024 deterministic Baseline = %v, want rep:312 dem:226", baseRes.Baseline)
+	}
+
+	demShiftRes, err := RunForecast(context.Background(), sc, ForecastConfig{
+		Runs:          80,
+		Temperature:   0.45,
+		Swing:         0.15,
+		NationalShift: map[string]float64{"dem": 0.15},
+		BaseSeed:      42,
+	})
+	if err != nil {
+		t.Fatalf("RunForecast(dem shift) failed: %v", err)
+	}
+	if demShiftRes.Groups["dem"].Mean <= baseRes.Groups["dem"].Mean+15 {
+		t.Errorf("DEM shift did not materially increase DEM mean EVs: base=%.1f shifted=%.1f",
+			baseRes.Groups["dem"].Mean, demShiftRes.Groups["dem"].Mean)
+	}
+	if demShiftRes.Baseline["dem"] <= 226 {
+		t.Errorf("DEM shift deterministic baseline = %d, want > 226", demShiftRes.Baseline["dem"])
+	}
+
+	repShiftRes, err := RunForecast(context.Background(), sc, ForecastConfig{
+		Runs:          80,
+		Temperature:   0.45,
+		Swing:         0.15,
+		NationalShift: map[string]float64{"rep": 0.15},
+		BaseSeed:      42,
+	})
+	if err != nil {
+		t.Fatalf("RunForecast(rep shift) failed: %v", err)
+	}
+	if repShiftRes.Groups["rep"].Mean <= baseRes.Groups["rep"].Mean+15 {
+		t.Errorf("REP shift did not materially increase REP mean EVs: base=%.1f shifted=%.1f",
+			baseRes.Groups["rep"].Mean, repShiftRes.Groups["rep"].Mean)
+	}
+
+	// Verify shared national shock creates cross-state correlation above independent state variance.
+	const runs = 120
+	repTotal := make([]float64, runs)
+	sumIndepVar := 0.0
+	for _, r := range sc.Regions {
+		if r.DistrictSeats > 0 {
+			continue
+		}
+		p := baseRes.Regions[r.ID].WinProb["rep"]
+		sumIndepVar += float64(r.Seats*r.Seats) * p * (1 - p)
+	}
+	shockKeys := collectNationalShockKeys(sc.Regions, sc.Parties)
+	preRegions := buildPrecomputedRegions(sc)
+	for i := range runs {
+		runSeed := int64(42 + i*forecastSeedStride)
+		shock := computeNationalShock(runSeed, 0.15, shockKeys)
+		regSeats := make(map[string]map[string]int, len(preRegions))
+		for ri, pre := range preRegions {
+			_, seats, _ := simulateRegionForecastRun(pre, 0.45, 0.15, runSeed+int64(ri), shock, nil)
+			regSeats[pre.region.ID] = seats
+		}
+		repTotal[i] = float64(sc.AggregateEUSeats(regSeats)["rep"])
+	}
+	var mean, totalVar float64
+	for _, v := range repTotal {
+		mean += v
+	}
+	mean /= runs
+	for _, v := range repTotal {
+		d := v - mean
+		totalVar += d * d
+	}
+	totalVar /= runs
+	if sumIndepVar > 0 && totalVar/sumIndepVar < 1.5 {
+		t.Errorf("expected positive cross-state correlation (totalVar=%.1f, indepVar=%.1f, ratio=%.2f)",
+			totalVar, sumIndepVar, totalVar/sumIndepVar)
+	}
+}

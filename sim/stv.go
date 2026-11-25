@@ -2,6 +2,11 @@ package sim
 
 import "math"
 
+// allocateSTV implements a party-level Droop-quota STV approximation operating
+// on party vote totals (without individual ranked ballots). Elected parties
+// subtract one quota and keep their surplus; when no party reaches quota, the
+// lowest-vote remaining party is eliminated and 100% of its votes transfer to
+// the nearest remaining party in policy space (no ballot exhaustion).
 func allocateSTV(votes map[string]int, totalSeats int, parties []Party) map[string]int {
 	if totalSeats <= 0 || len(votes) == 0 {
 		return map[string]int{}

@@ -3,8 +3,6 @@ package web
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -118,54 +116,6 @@ func (rs *runStore) Get(id string) (sim.Scenario, bool) {
 		return sim.Scenario{}, false
 	}
 	return entry.scenario, true
-}
-
-func validateCustomRunLimits(sc sim.Scenario) error {
-	if len(sc.Meta.Description) > 500 {
-		return fmt.Errorf("scenario description too long (%d > 500)", len(sc.Meta.Description))
-	}
-	if len(sc.Regions) > 100 {
-		return fmt.Errorf("too many regions (%d > 100)", len(sc.Regions))
-	}
-	if len(sc.Groups) > 32 {
-		return fmt.Errorf("too many groups (%d > 32)", len(sc.Groups))
-	}
-	if len(sc.Parties) > 64 {
-		return fmt.Errorf("too many top-level parties (%d > 64)", len(sc.Parties))
-	}
-	if len(sc.PrevSeats) > 128 {
-		return fmt.Errorf("too many prev_seats entries (%d > 128)", len(sc.PrevSeats))
-	}
-
-	totalSeats := 0
-	totalPrecincts := 0
-	for _, r := range sc.Regions {
-		if r.Seats <= 0 || r.Seats > 2000 {
-			return fmt.Errorf("region %q seats (%d) must be between 1 and 2000", r.ID, r.Seats)
-		}
-		if len(r.Groups) > 32 {
-			return fmt.Errorf("region %q has too many voter groups (%d > 32)", r.ID, len(r.Groups))
-		}
-		if len(r.Parties) > 64 {
-			return fmt.Errorf("region %q has too many parties (%d > 64)", r.ID, len(r.Parties))
-		}
-		precincts := r.EffectivePrecinctCount()
-		if precincts < 0 || precincts > 5000 {
-			return fmt.Errorf("region %q effective precincts (%d) out of bounds", r.ID, precincts)
-		}
-		totalSeats += r.Seats
-		totalPrecincts += precincts
-	}
-	if totalSeats > 2000 {
-		return fmt.Errorf("total seats (%d) exceed limit of 2000", totalSeats)
-	}
-	if totalPrecincts > 5000 {
-		return fmt.Errorf("total effective precincts (%d) exceed limit of 5000", totalPrecincts)
-	}
-	if len(sc.Regions) == 0 {
-		return errors.New("scenario must contain at least one region")
-	}
-	return nil
 }
 
 type rateWindow struct {

@@ -173,6 +173,16 @@ func filterEligible(votes map[string]int, threshold float64) (map[string]int, in
 			eligibleVotes += v
 		}
 	}
+	// If every party with votes fell below the threshold, fall back to all parties
+	// so seats do not silently vanish.
+	if len(eligible) == 0 {
+		for id, v := range votes {
+			if v > 0 {
+				eligible[id] = v
+			}
+		}
+		return eligible, totalVotes
+	}
 	return eligible, eligibleVotes
 }
 func allocateHighestAverages(votes map[string]int, totalSeats int, threshold float64, divisor func(seats int) float64) map[string]int {

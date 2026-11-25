@@ -31,7 +31,7 @@ type Region struct {
 	Parties       []Party                       `json:"parties,omitempty"`
 	UseNUTS3      bool                          `json:"use_nuts3,omitempty"`
 	GeoPack       string                        `json:"geo_pack,omitempty"`
-	DistrictSeats int                           `json:"district_seats,omitempty"` // seats awarded per DistrictID (parallel two-tier when > 0)
+	DistrictSeats int                           `json:"district_seats,omitempty"`  // seats awarded per DistrictID (parallel two-tier when > 0)
 	PollCloseHour float64                       `json:"poll_close_hour,omitempty"` // closing hour in scenario clock (e.g. 18.0 to 25.0)
 }
 

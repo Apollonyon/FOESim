@@ -78,12 +78,28 @@ func TestAllocateSeats(t *testing.T) {
 			want:       map[string]int{},
 		},
 		{
-			name:       "all parties below threshold returns empty map",
+			name:       "all parties below threshold falls back to all voted parties (hare)",
 			votes:      map[string]int{"a": 50, "b": 50},
 			totalSeats: 5,
 			method:     MethodHare,
 			threshold:  0.60,
-			want:       map[string]int{},
+			want:       map[string]int{"a": 3, "b": 2},
+		},
+		{
+			name:       "all parties below threshold falls back to all voted parties (dhondt)",
+			votes:      map[string]int{"a": 50, "b": 50},
+			totalSeats: 5,
+			method:     MethodDHondt,
+			threshold:  0.60,
+			want:       map[string]int{"a": 3, "b": 2},
+		},
+		{
+			name:       "all parties below threshold falls back to all voted parties (sainte-lague)",
+			votes:      map[string]int{"a": 50, "b": 50},
+			totalSeats: 5,
+			method:     MethodSainteLague,
+			threshold:  0.60,
+			want:       map[string]int{"a": 3, "b": 2},
 		},
 	}
 
@@ -172,6 +188,27 @@ func TestAllocateFPTPAndSTV(t *testing.T) {
 		// Pass nil parties to also verify stvAllocator resolves r.EffectiveParties(parties).
 		got := AllocateSeats(votes, r, nil)
 		want := map[string]int{"left_main": 3, "right": 2}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("stv multi-step elimination transfers across four parties", func(t *testing.T) {
+		// 4 seats, 1000 votes -> Droop quota = floor(1000/5)+1 = 201.
+		// Initial quotas: d=2 (rem 48), a=1 (rem 149), b=0 (90), c=0 (110).
+		// Elimination 1: lowest is d (rem 48) -> transfers 48 to nearest b (rem 138).
+		// Elimination 2: lowest is c (110) -> transfers 110 to nearest b (248 >= 201 -> b wins 4th seat).
+		parties := []Party{
+			{ID: "a", Position: PolicyVec{-0.8}},
+			{ID: "b", Position: PolicyVec{-0.2}},
+			{ID: "c", Position: PolicyVec{-0.4}},
+			{ID: "d", Position: PolicyVec{0.9}},
+		}
+		r := Region{Seats: 4, Method: MethodSTV, Parties: parties}
+		votes := map[string]int{"a": 350, "b": 90, "c": 110, "d": 450}
+
+		got := AllocateSeats(votes, r, nil)
+		want := map[string]int{"a": 1, "b": 1, "d": 2}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("got %v, want %v", got, want)
 		}

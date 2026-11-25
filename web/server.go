@@ -50,7 +50,7 @@ type Server struct {
 	streamSem       chan struct{}
 	forecastSem     chan struct{}
 	maxStreamsPerIP int
-	trustProxy      bool
+	proxyHeader     string
 	ipMu            sync.Mutex
 	ipStreams       map[string]int
 }
@@ -96,10 +96,27 @@ func (s *Server) SetMaxStreamsPerIP(n int) {
 	s.maxStreamsPerIP = n
 }
 
-// SetTrustProxy controls whether CF-Connecting-IP, Fly-Client-IP, and X-Forwarded-For
-// headers are used to identify client IPs behind a trusted reverse proxy.
+// SetTrustProxy controls whether the rightmost X-Forwarded-For hop is used to
+// identify client IPs behind a trusted reverse proxy (e.g. Caddy or Nginx).
+// Must be called before serving requests.
 func (s *Server) SetTrustProxy(trust bool) {
-	s.trustProxy = trust
+	if trust {
+		s.proxyHeader = "xff"
+		return
+	}
+	s.proxyHeader = ""
+}
+
+// SetProxyHeader selects which reverse-proxy client IP header to trust:
+// "xff" (rightmost X-Forwarded-For), "cf" (CF-Connecting-IP), "fly" (Fly-Client-IP),
+// or "" / "off" to disable proxy header trust. Must be called before serving requests.
+func (s *Server) SetProxyHeader(mode string) {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "xff", "cf", "fly":
+		s.proxyHeader = strings.ToLower(strings.TrimSpace(mode))
+	default:
+		s.proxyHeader = ""
+	}
 }
 
 // SetMaxRunsPerMin overrides the per-IP custom scenario creation limit per minute.
@@ -252,15 +269,24 @@ func parseCandidateIP(raw string) string {
 }
 
 func (s *Server) clientIP(r *http.Request) string {
-	if s.trustProxy {
-		for _, hdr := range []string{"CF-Connecting-IP", "Fly-Client-IP"} {
-			if ip := parseCandidateIP(r.Header.Get(hdr)); ip != "" {
-				return ip
-			}
+	switch s.proxyHeader {
+	case "cf":
+		if ip := parseCandidateIP(r.Header.Get("CF-Connecting-IP")); ip != "" {
+			return ip
 		}
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			first, _, _ := strings.Cut(xff, ",")
-			if ip := parseCandidateIP(first); ip != "" {
+	case "fly":
+		if ip := parseCandidateIP(r.Header.Get("Fly-Client-IP")); ip != "" {
+			return ip
+		}
+	case "xff":
+		if vals := r.Header.Values("X-Forwarded-For"); len(vals) > 0 {
+			// Take the rightmost XFF entry added by the immediate trusted proxy.
+			lastHeader := vals[len(vals)-1]
+			last := lastHeader
+			if idx := strings.LastIndexByte(lastHeader, ','); idx >= 0 {
+				last = lastHeader[idx+1:]
+			}
+			if ip := parseCandidateIP(last); ip != "" {
 				return ip
 			}
 		}
@@ -387,10 +413,6 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := validateCustomRunLimits(sc); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	if err := sc.Validate(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -473,10 +495,11 @@ func (s *Server) handleForecast(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	res, err := sim.RunForecast(ctx, sc, sim.ForecastConfig{
-		Runs:        runs,
-		Temperature: streamCfg.Temperature,
-		Swing:       streamCfg.Swing,
-		BaseSeed:    streamCfg.Seed,
+		Runs:          runs,
+		Temperature:   streamCfg.Temperature,
+		Swing:         streamCfg.Swing,
+		NationalShift: streamCfg.NationalShift,
+		BaseSeed:      streamCfg.Seed,
 	})
 	if err != nil {
 		if r.Context().Err() != nil {
@@ -499,7 +522,7 @@ type exitPollPayload struct {
 	RegionSeats     map[string]map[string]int    `json:"region_seats"`
 	DistrictWinners map[string]map[string]string `json:"district_winners,omitempty"`
 	EUSeats         map[string]int               `json:"eu_seats"`
-	PrevEUSeats     map[string]int               `json:"prev_eu_seats"`
+	PrevEUSeats     map[string]int               `json:"prev_eu_seats,omitempty"`
 	Coalitions      []sim.Coalition              `json:"coalitions"`
 	TotalPrecincts  int                          `json:"total_precincts"`
 }
@@ -570,12 +593,6 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	var prevEUSeats map[string]int
 	if len(scenario.PrevSeats) > 0 {
 		prevEUSeats = maps.Clone(scenario.PrevSeats)
-	} else {
-		prevRegionSeats := make(map[string]map[string]int, len(scenario.Regions))
-		for ri, reg := range scenario.Regions {
-			prevRegionSeats[reg.ID] = noisyRegionSeats(reg, scenario.Parties, cfg.Temperature*1.15, 0.20, 1001+int64(ri))
-		}
-		prevEUSeats = scenario.AggregateEUSeats(prevRegionSeats)
 	}
 	state.SeedSeats(exitRegionSeats)
 	state.SeedDistrictWinners(exitDistrictWinners)
@@ -663,8 +680,15 @@ func (s *Server) parseElectionConfig(r *http.Request) sim.ElectionConfig {
 	if v, err := strconv.ParseFloat(q.Get("temp"), 64); err == nil && v > 0 && !math.IsNaN(v) && !math.IsInf(v, 0) {
 		cfg.Temperature = max(minTemperature, min(v, maxTemperature))
 	}
-	if v, err := strconv.ParseFloat(q.Get("swing"), 64); err == nil && v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) {
+	rawUnc := q.Get("uncertainty")
+	if rawUnc == "" {
+		rawUnc = q.Get("swing")
+	}
+	if v, err := strconv.ParseFloat(rawUnc, 64); err == nil && v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) {
 		cfg.Swing = min(v, maxSwing)
+	}
+	if rawShift := strings.TrimSpace(q.Get("shift")); rawShift != "" {
+		cfg.NationalShift = parseNationalShift(rawShift)
 	}
 	if v, err := strconv.ParseInt(q.Get("seed"), 10, 64); err == nil {
 		cfg.Seed = v
@@ -682,6 +706,34 @@ func (s *Server) parseElectionConfig(r *http.Request) sim.ElectionConfig {
 	return cfg
 }
 
+func parseNationalShift(raw string) map[string]float64 {
+	parts := strings.Split(raw, ",")
+	if len(parts) > 32 {
+		parts = parts[:32]
+	}
+	var out map[string]float64
+	for _, part := range parts {
+		key, valStr, ok := strings.Cut(part, ":")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		v, err := strconv.ParseFloat(strings.TrimSpace(valStr), 64)
+		if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+			continue
+		}
+		v = max(-2.0, min(v, 2.0))
+		if out == nil {
+			out = make(map[string]float64)
+		}
+		out[key] = v
+	}
+	return out
+}
+
 func writeSSE(w http.ResponseWriter, flusher http.Flusher, event string, payload any) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -692,28 +744,4 @@ func writeSSE(w http.ResponseWriter, flusher http.Flusher, event string, payload
 	}
 	flusher.Flush()
 	return nil
-}
-
-func noisyRegionSeats(reg sim.Region, parties []sim.Party, temp, swing float64, seed int64) map[string]int {
-	reports := sim.SimulatePrecincts(reg, parties, temp, swing, seed)
-	votes := make(map[string]int)
-	var districtVotes map[string]map[string]int
-	if reg.DistrictSeats > 0 {
-		districtVotes = make(map[string]map[string]int)
-	}
-	for _, rep := range reports {
-		for pid, v := range rep.Votes {
-			votes[pid] += v
-		}
-		if reg.DistrictSeats > 0 && rep.DistrictID != "" {
-			if districtVotes[rep.DistrictID] == nil {
-				districtVotes[rep.DistrictID] = make(map[string]int, len(rep.Votes))
-			}
-			for pid, v := range rep.Votes {
-				districtVotes[rep.DistrictID][pid] += v
-			}
-		}
-	}
-	seats, _ := sim.AllocateRegionSeats(votes, districtVotes, reg, reg.EffectiveParties(parties))
-	return seats
 }

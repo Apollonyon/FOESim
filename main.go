@@ -26,7 +26,8 @@ func main() {
 	cliMode := flag.Bool("cli", false, "run live election night in the terminal instead of starting the web server")
 	maxStreams := flag.Int("max-streams", 256, "maximum concurrent SSE election streams (0 = unlimited)")
 	maxStreamsPerIP := flag.Int("max-streams-per-ip", 16, "maximum concurrent SSE streams per client IP (0 = unlimited; set 0 behind a reverse proxy)")
-	trustProxy := flag.Bool("trust-proxy", false, "trust CF-Connecting-IP / Fly-Client-IP / X-Forwarded-For headers for client IP limits")
+	trustProxy := flag.Bool("trust-proxy", false, "trust rightmost X-Forwarded-For hop for client IP limits behind Caddy/Nginx")
+	proxyHeader := flag.String("proxy-header", "", "trusted client IP proxy header mode: xff, cf, or fly (overrides -trust-proxy)")
 	shutdownTimeout := flag.Duration("shutdown-timeout", 30*time.Second, "graceful drain timeout on SIGINT/SIGTERM")
 	flag.Parse()
 
@@ -51,7 +52,11 @@ func main() {
 	srv := web.NewServerWithRegistry(reg)
 	srv.SetMaxStreams(*maxStreams)
 	srv.SetMaxStreamsPerIP(*maxStreamsPerIP)
-	srv.SetTrustProxy(*trustProxy)
+	if *proxyHeader != "" {
+		srv.SetProxyHeader(*proxyHeader)
+	} else {
+		srv.SetTrustProxy(*trustProxy)
+	}
 	httpSrv := &http.Server{
 		Addr:              *addr,
 		Handler:           srv.Handler(),

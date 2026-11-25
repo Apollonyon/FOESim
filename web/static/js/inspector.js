@@ -7,7 +7,7 @@ const METHOD_LABELS = {
   sainte_lague: 'SAINTE-LAGUË',
   dhondt: "D'HONDT",
   hare: 'HARE',
-  stv: 'STV',
+  stv: 'STV (APPROX)',
   fptp: 'FPTP'
 };
 

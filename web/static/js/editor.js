@@ -8,7 +8,7 @@ const METHOD_OPTIONS = [
   { value: 'dhondt', label: "D'Hondt" },
   { value: 'hare', label: 'Hare-Niemeyer' },
   { value: 'fptp', label: 'First Past the Post (FPTP)' },
-  { value: 'stv', label: 'Single Transferable Vote (STV)' }
+  { value: 'stv', label: 'Single Transferable Vote (STV approx)' }
 ];
 
 const GEOPACK_OPTIONS = [
@@ -34,6 +34,9 @@ const BASE_AXIS_LABELS = ['Economic', 'Social', 'EU / Axis 2', 'Defense', 'Envir
 
 const DEFAULT_MODIFIERS = {
   swing: 0.15,
+  uncertainty: 0.15,
+  shiftParty: '',
+  shiftVal: 0,
   temp: 0.45,
   seed: 42,
   wavesOverride: 0,
@@ -203,7 +206,14 @@ export class ScenarioEditor {
   open(baseScenario, currentScenario = null, modifiers = null, opts = {}) {
     this.baseScenario = structuredClone(baseScenario || currentScenario);
     this.baseScenarioId = opts.baseScenarioId || '';
-    const mergedMods = { ...DEFAULT_MODIFIERS, ...(modifiers || {}) };
+    const rawMod = modifiers || {};
+    const uncVal = rawMod.uncertainty ?? rawMod.swing ?? DEFAULT_MODIFIERS.swing;
+    const mergedMods = {
+      ...DEFAULT_MODIFIERS,
+      ...rawMod,
+      swing: uncVal,
+      uncertainty: uncVal
+    };
     this.baseModifiers = { ...mergedMods };
     this.modifiers = { ...mergedMods };
     this.#loadDraftFrom(currentScenario || this.baseScenario);
@@ -420,7 +430,7 @@ export class ScenarioEditor {
       ['Regions', regions.length],
       ['Seats', totalSeats],
       ['Parties', partySet.size],
-      ['Swing', this.modifiers.swing.toFixed(2)],
+      ['Uncertainty', this.modifiers.swing.toFixed(2)],
       ['Temp', this.modifiers.temp.toFixed(2)],
       ['Seed', this.modifiers.seed]
     ];
@@ -536,22 +546,49 @@ export class ScenarioEditor {
       })
     );
 
+    const shiftChoices = [{ value: '', label: 'None' }];
+    const shiftList = this.draft?.groups?.length ? this.draft.groups : (this.draft?.parties || []);
+    for (const item of shiftList) {
+      shiftChoices.push({ value: item.id, label: `${item.short_name || item.id} — ${item.name || item.id}` });
+    }
+    const shiftSliderWrap = makeSliderNumRow({
+      label: 'Shift Amount',
+      help: 'Directional national appeal shift applied to the selected party/group across all regions (even at Uncertainty 0).',
+      min: -0.40,
+      max: 0.40,
+      step: 0.02,
+      decimals: 2,
+      value: this.modifiers.shiftVal || 0,
+      ariaLabel: 'National party shift magnitude',
+      onChange: (val) => {
+        this.modifiers.shiftVal = val;
+      }
+    });
+
     const modSec = el('section', { className: 'editor-section' },
       el('div', { className: 'editor-section-title', text: 'Simulation Modifiers' }),
       makeSliderNumRow({
-        label: 'Swing Volatility',
-        help: 'How unpredictable election night is. 0 repeats the baseline; 0.15 is typical polling error; 0.40+ gives big surprises.',
+        label: 'Uncertainty (Volatility)',
+        help: 'Random election-night polling uncertainty. 0 repeats the calibrated baseline; 0.15 is typical polling error. Note: symmetric noise pulls winner-take-all means toward 50/50.',
         min: 0,
         max: 2,
         step: 0.01,
         decimals: 2,
         value: this.modifiers.swing,
-        ariaLabel: 'Swing volatility',
+        ariaLabel: 'Uncertainty volatility',
         onChange: (val) => {
           this.modifiers.swing = val;
+          this.modifiers.uncertainty = val;
           this.#updateStatsBar();
         }
       }),
+      el('label', { className: 'editor-field' },
+        el('span', { text: 'National Party Shift Target' }),
+        makeSelect(shiftChoices, this.modifiers.shiftParty || '', 'National party shift target', (v) => {
+          this.modifiers.shiftParty = v;
+        })
+      ),
+      shiftSliderWrap,
       makeSliderNumRow({
         label: 'Voter Temp',
         help: 'How strictly voters stick to their closest party. Low (0.20) = disciplined partisan voting; high (1.0+) = lots of cross-party split.',
@@ -584,7 +621,7 @@ export class ScenarioEditor {
           makeSelect(METHOD_OPTIONS, this.modifiers.methodOverride || '', 'Global electoral system override', (v) => {
             this.modifiers.methodOverride = v;
           }),
-          el('span', { className: 'editor-help', text: 'Force every region onto one counting rule.' })
+          el('span', { className: 'editor-help', text: 'Force every region onto one counting rule (drops two-tier district splits).' })
         )
       )
     );

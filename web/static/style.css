@@ -462,6 +462,11 @@ select option {
   accent-color: var(--ink-bg);
 }
 
+.mini-field input[type="range"]:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .mini-field output {
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   font-size: 11px;

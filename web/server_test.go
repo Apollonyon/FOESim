@@ -825,28 +825,85 @@ func TestServerTrustProxyClientIP(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.RemoteAddr = "10.0.0.5:43210"
-	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.0.0.5")
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 198.51.100.4")
 	req.Header.Set("Fly-Client-IP", "198.51.100.7")
-
-	if got := srv.clientIP(req); got != "10.0.0.5" {
-		t.Fatalf("clientIP with trustProxy=false = %q, want 10.0.0.5", got)
-	}
-
-	srv.SetTrustProxy(true)
-	if got := srv.clientIP(req); got != "198.51.100.7" {
-		t.Fatalf("clientIP with Fly-Client-IP = %q, want 198.51.100.7", got)
-	}
-
 	req.Header.Set("CF-Connecting-IP", "2001:db8::1")
-	if got := srv.clientIP(req); got != "2001:db8::1" {
-		t.Fatalf("clientIP with CF-Connecting-IP = %q, want 2001:db8::1", got)
+
+	if got := srv.clientIP(req); got != "10.0.0.5" {
+		t.Fatalf("clientIP with proxy trust disabled = %q, want 10.0.0.5", got)
 	}
 
-	req.Header.Del("CF-Connecting-IP")
-	req.Header.Del("Fly-Client-IP")
-	req.Header.Set("X-Forwarded-For", "not-an-ip, 10.0.0.5")
+	// Default -trust-proxy ("xff" mode) trusts only rightmost XFF hop and ignores spoofed CF/Fly headers.
+	srv.SetTrustProxy(true)
+	if got := srv.clientIP(req); got != "198.51.100.4" {
+		t.Fatalf("clientIP with SetTrustProxy(true) = %q, want rightmost XFF 198.51.100.4", got)
+	}
+
+	reqMulti := httptest.NewRequest(http.MethodGet, "/", nil)
+	reqMulti.RemoteAddr = "10.0.0.5:43210"
+	reqMulti.Header.Add("X-Forwarded-For", "203.0.113.9")
+	reqMulti.Header.Add("X-Forwarded-For", "198.51.100.1, 192.0.2.55")
+	if got := srv.clientIP(reqMulti); got != "192.0.2.55" {
+		t.Fatalf("clientIP across multiple XFF headers = %q, want 192.0.2.55", got)
+	}
+
+	reqBad := httptest.NewRequest(http.MethodGet, "/", nil)
+	reqBad.RemoteAddr = "10.0.0.5:43210"
+	reqBad.Header.Set("X-Forwarded-For", "203.0.113.9, not-an-ip")
+	if got := srv.clientIP(reqBad); got != "10.0.0.5" {
+		t.Fatalf("clientIP with malformed rightmost XFF = %q, want fallback 10.0.0.5", got)
+	}
+
+	srv.SetProxyHeader("fly")
+	if got := srv.clientIP(req); got != "198.51.100.7" {
+		t.Fatalf("clientIP with proxyHeader=fly = %q, want 198.51.100.7", got)
+	}
+
+	srv.SetProxyHeader("cf")
+	if got := srv.clientIP(req); got != "2001:db8::1" {
+		t.Fatalf("clientIP with proxyHeader=cf = %q, want 2001:db8::1", got)
+	}
+
+	srv.SetProxyHeader("off")
 	if got := srv.clientIP(req); got != "10.0.0.5" {
-		t.Fatalf("clientIP with malformed XFF = %q, want fallback 10.0.0.5", got)
+		t.Fatalf("clientIP with proxyHeader=off = %q, want 10.0.0.5", got)
+	}
+}
+
+func TestServerUncertaintyShiftAndOmittedPrevSeats(t *testing.T) {
+	sc := sim.Scenario{
+		Name:    "No Prev Seats",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}
+	srv := NewServer(sc)
+
+	cfgReq := httptest.NewRequest(http.MethodGet, "/api/stream?uncertainty=0.25&shift=dem:0.15,bad,x:NaN,rep:9.0", nil)
+	cfg := srv.parseElectionConfig(cfgReq)
+	if cfg.Swing != 0.25 {
+		t.Errorf("Uncertainty parse = %v, want 0.25", cfg.Swing)
+	}
+	if cfg.NationalShift["dem"] != 0.15 || cfg.NationalShift["rep"] != 2.0 {
+		t.Errorf("NationalShift parse/clamp = %v, want dem:0.15 rep:2.0", cfg.NationalShift)
+	}
+	if _, hasX := cfg.NationalShift["x"]; hasX {
+		t.Errorf("expected NaN shift entry to be skipped: %v", cfg.NationalShift)
+	}
+
+	stReq := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=0&uncertainty=0", nil)
+	stRec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(stRec, stReq)
+	if stRec.Code != http.StatusOK {
+		t.Fatalf("stream status = %d, want 200", stRec.Code)
+	}
+	for _, block := range strings.Split(stRec.Body.String(), "\n\n") {
+		if !strings.HasPrefix(block, "event: exit_poll\n") {
+			continue
+		}
+		if strings.Contains(block, "prev_eu_seats") {
+			t.Errorf("expected prev_eu_seats to be omitted when Scenario.PrevSeats is empty: %s", block)
+		}
+		break
 	}
 }
 

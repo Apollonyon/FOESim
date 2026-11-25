@@ -19,11 +19,12 @@ const (
 
 // ForecastConfig controls a bounded-worker Monte Carlo election forecast.
 type ForecastConfig struct {
-	Runs        int
-	Temperature float64
-	Swing       float64
-	BaseSeed    int64
-	Workers     int
+	Runs          int
+	Temperature   float64
+	Swing         float64
+	NationalShift map[string]float64
+	BaseSeed      int64
+	Workers       int
 }
 
 // SeatBin counts how many simulation runs landed inside [Start, End] seats.
@@ -61,6 +62,7 @@ type ForecastResult struct {
 	TotalSeats int                         `json:"total_seats"`
 	Majority   int                         `json:"majority"`
 	TieProb    float64                     `json:"tie_prob,omitempty"`
+	Baseline   map[string]int              `json:"baseline,omitempty"`
 	Groups     map[string]SeatDistribution `json:"groups"`
 	Regions    map[string]RegionForecast   `json:"regions"`
 	DurationMs int64                       `json:"duration_ms"`
@@ -164,22 +166,22 @@ func simulateRegionForecastRun(
 	temperature float64,
 	swing float64,
 	seed int64,
-	euShift PolicyVec,
+	shock nationalRunShock,
+	nationalShift map[string]float64,
 ) (votes map[string]int, seats map[string]int, districtWinners map[string]string) {
 	r := pre.region
-	parties := pre.partiesWithBonus
+	parties := applyNationalAppealShifts(pre.partiesWithBonus, shock, nationalShift, swing)
 	units := pre.units
 	rng := rand.New(rand.NewPCG(uint64(seed), 0))
 
 	var countryShift PolicyVec
 	countryTurnoutNoise := 0.0
 	if swing > 0 {
-		parties = slices.Clone(parties)
 		policySigma := swing * 0.50
 		for ax := range countryShift {
 			countryShift[ax] = rng.NormFloat64() * policySigma
 		}
-		appealSigma := swing * 0.65
+		appealSigma := swing * 0.45
 		for i := range parties {
 			parties[i].Appeal += rng.NormFloat64() * appealSigma
 		}
@@ -190,7 +192,7 @@ func simulateRegionForecastRun(
 	for gi, g := range r.Groups {
 		if swing > 0 {
 			for ax := range g.Ideal {
-				g.Ideal[ax] = math.Max(-1.0, math.Min(1.0, g.Ideal[ax]+euShift[ax]+countryShift[ax]))
+				g.Ideal[ax] = math.Max(-1.0, math.Min(1.0, g.Ideal[ax]+shock.policyShift[ax]+countryShift[ax]))
 			}
 		}
 		groupShares[gi] = VoteShares(g, parties, temperature)
@@ -331,6 +333,15 @@ func RunForecast(ctx context.Context, sc Scenario, cfg ForecastConfig) (Forecast
 
 	start := time.Now()
 	preRegions := buildPrecomputedRegions(sc)
+	shockKeys := collectNationalShockKeys(sc.Regions, sc.Parties)
+
+	baseRegSeats := make(map[string]map[string]int, len(preRegions))
+	for ri, pre := range preRegions {
+		_, seats, _ := simulateRegionForecastRun(pre, cfg.Temperature, 0, cfg.BaseSeed+int64(ri), nationalRunShock{}, cfg.NationalShift)
+		baseRegSeats[pre.region.ID] = seats
+	}
+	baseline := sc.AggregateEUSeats(baseRegSeats)
+
 	outcomes := make([]singleRunOutcome, cfg.Runs)
 
 	var nextRun atomic.Int64
@@ -348,7 +359,7 @@ func RunForecast(ctx context.Context, sc Scenario, cfg ForecastConfig) (Forecast
 					return
 				}
 				runSeed := cfg.BaseSeed + int64(idx)*forecastSeedStride
-				euShift := euPolicyShock(runSeed, cfg.Swing)
+				shock := computeNationalShock(runSeed, cfg.Swing, shockKeys)
 
 				regSeatsMap := make(map[string]map[string]int, len(preRegions))
 				regSeatsSlice := make([]map[string]int, len(preRegions))
@@ -359,7 +370,7 @@ func RunForecast(ctx context.Context, sc Scenario, cfg ForecastConfig) (Forecast
 					if ctx.Err() != nil {
 						return
 					}
-					votes, seats, distW := simulateRegionForecastRun(pre, cfg.Temperature, cfg.Swing, runSeed+int64(ri), euShift)
+					votes, seats, distW := simulateRegionForecastRun(pre, cfg.Temperature, cfg.Swing, runSeed+int64(ri), shock, cfg.NationalShift)
 					regSeatsMap[pre.region.ID] = seats
 					regSeatsSlice[ri] = seats
 					regWinnersSlice[ri] = winningParties(votes, seats, pre.effectiveParties)
@@ -543,6 +554,7 @@ func RunForecast(ctx context.Context, sc Scenario, cfg ForecastConfig) (Forecast
 		TotalSeats: totalSeats,
 		Majority:   majority,
 		TieProb:    roundFloat4(float64(tieRuns) / runsF),
+		Baseline:   baseline,
 		Groups:     groupsOut,
 		Regions:    regionsOut,
 		DurationMs: time.Since(start).Milliseconds(),

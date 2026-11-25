@@ -53,8 +53,9 @@
         <button id="btn-reset" class="btn btn-icon" title="Reset election" aria-label="Reset election"
           disabled>↺</button>
         <div id="forecast-controls" class="forecast-controls hidden">
-          <label class="mini-field" title="Polling uncertainty / election-night volatility">
-            <span>Swing</span>
+          <label class="mini-field"
+            title="Random election-night polling uncertainty (0 = deterministic calibrated baseline)">
+            <span>Uncertainty</span>
             <input id="input-swing" type="range" min="0" max="0.60" step="0.05" value="0.15" />
             <output id="swing-val">0.15</output>
           </label>
@@ -67,6 +68,16 @@
             </select>
           </label>
           <button id="btn-run-forecast" class="btn btn-ink">↻ Re-run</button>
+        </div>
+        <div class="mini-field"
+          title="Directional national appeal shift applied to the selected party/group across all regions">
+          <span>Shift</span>
+          <select id="shift-party" aria-label="Party or group to shift">
+            <option value="">None</option>
+          </select>
+          <input id="input-shift" type="range" min="-0.40" max="0.40" step="0.02" value="0"
+            aria-label="National appeal shift magnitude" disabled />
+          <output id="shift-val">0.00</output>
         </div>
         <button id="btn-editor" class="btn btn-accent" title="Open Scenario Editor (E)">✎ Scenario Editor</button>
         <div id="speed-group" class="segmented" role="group" aria-label="Broadcast speed">
@@ -88,14 +99,15 @@
           <output id="temp-val">0.45</output>
         </label>
 
-        <label class="mini-field" title="Override seat allocation rule across all regions">
+        <label class="mini-field"
+          title="Override seat allocation rule across all regions (drops two-tier district splits; STV is a party-level approximation)">
           <span>System</span>
           <select id="method-select" aria-label="Electoral system override">
             <option value="">Native</option>
             <option value="sainte_lague">Sainte-Laguë</option>
             <option value="dhondt">D'Hondt</option>
             <option value="hare">Hare</option>
-            <option value="stv">STV</option>
+            <option value="stv">STV (approx)</option>
             <option value="fptp">FPTP</option>
           </select>
         </label>
