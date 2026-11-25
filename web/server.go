@@ -15,6 +15,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"runtime"
 	"slices"
 	"strconv"
@@ -45,9 +46,11 @@ type Server struct {
 	scenario        sim.Scenario
 	registry        *sim.ScenarioRegistry
 	runs            *runStore
+	runsLimiter     *ipRateLimiter
 	streamSem       chan struct{}
 	forecastSem     chan struct{}
 	maxStreamsPerIP int
+	trustProxy      bool
 	ipMu            sync.Mutex
 	ipStreams       map[string]int
 }
@@ -57,6 +60,7 @@ func NewServer(scenario sim.Scenario) *Server {
 	return &Server{
 		scenario:        scenario,
 		runs:            newRunStore(defaultRunMaxEntries, defaultRunTTL),
+		runsLimiter:     newIPRateLimiter(defaultMaxRunsPerMin, time.Minute),
 		streamSem:       make(chan struct{}, defaultMaxStreams),
 		forecastSem:     make(chan struct{}, min(max(2, runtime.NumCPU()), 8)),
 		maxStreamsPerIP: defaultMaxStreamsPerIP,
@@ -92,10 +96,27 @@ func (s *Server) SetMaxStreamsPerIP(n int) {
 	s.maxStreamsPerIP = n
 }
 
+// SetTrustProxy controls whether CF-Connecting-IP, Fly-Client-IP, and X-Forwarded-For
+// headers are used to identify client IPs behind a trusted reverse proxy.
+func (s *Server) SetTrustProxy(trust bool) {
+	s.trustProxy = trust
+}
+
+// SetMaxRunsPerMin overrides the per-IP custom scenario creation limit per minute.
+// Values <= 0 disable rate limiting. Must be called before serving requests.
+func (s *Server) SetMaxRunsPerMin(n int) {
+	if n <= 0 {
+		s.runsLimiter = nil
+		return
+	}
+	s.runsLimiter = newIPRateLimiter(n, time.Minute)
+}
+
 // Handler returns the HTTP router for the dashboard and API routes.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.Handle("GET /api/scenarios", gzipMiddleware(http.HandlerFunc(s.handleScenarios)))
 	mux.Handle("GET /api/scenario", gzipMiddleware(http.HandlerFunc(s.handleScenario)))
 	mux.Handle("GET /api/forecast", gzipMiddleware(http.HandlerFunc(s.handleForecast)))
@@ -215,12 +236,46 @@ func gzipMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func clientIP(r *http.Request) string {
+func parseCandidateIP(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(s); err == nil {
+		s = host
+	}
+	addr, err := netip.ParseAddr(s)
+	if err != nil || !addr.IsValid() {
+		return ""
+	}
+	return addr.Unmap().String()
+}
+
+func (s *Server) clientIP(r *http.Request) string {
+	if s.trustProxy {
+		for _, hdr := range []string{"CF-Connecting-IP", "Fly-Client-IP"} {
+			if ip := parseCandidateIP(r.Header.Get(hdr)); ip != "" {
+				return ip
+			}
+		}
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			first, _, _ := strings.Cut(xff, ",")
+			if ip := parseCandidateIP(first); ip != "" {
+				return ip
+			}
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte("ok\n"))
 }
 
 func (s *Server) acquireIPSlot(ip string) bool {
@@ -298,6 +353,11 @@ func (s *Server) resolveScenarioForRequest(r *http.Request) (sim.Scenario, bool,
 func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	if s.runs == nil {
 		http.Error(w, "custom runs disabled", http.StatusServiceUnavailable)
+		return
+	}
+	if s.runsLimiter != nil && !s.runsLimiter.Allow(s.clientIP(r)) {
+		w.Header().Set("Retry-After", "10")
+		http.Error(w, "too many custom scenarios created; try again shortly", http.StatusTooManyRequests)
 		return
 	}
 
@@ -381,7 +441,7 @@ func (s *Server) handleForecast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := clientIP(r)
+	ip := s.clientIP(r)
 	if !s.acquireIPSlot(ip) {
 		w.Header().Set("Retry-After", "3")
 		http.Error(w, "too many concurrent requests from this address", http.StatusTooManyRequests)
@@ -472,7 +532,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := clientIP(r)
+	ip := s.clientIP(r)
 	if !s.acquireIPSlot(ip) {
 		w.Header().Set("Retry-After", "5")
 		http.Error(w, "too many concurrent streams from this address", http.StatusTooManyRequests)

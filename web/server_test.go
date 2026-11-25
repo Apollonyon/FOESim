@@ -798,3 +798,87 @@ func TestServerForecastEndpoint(t *testing.T) {
 		t.Errorf("forecastSem leaked after 404: len=%d", len(srv.forecastSem))
 	}
 }
+
+func TestServerHealthz(t *testing.T) {
+	handler := NewServer(sim.Scenario{
+		Name:    "Healthz Test",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}).Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Body.String() != "ok\n" {
+		t.Fatalf("/healthz = (%d, %q), want (200, ok)", rec.Code, rec.Body.String())
+	}
+	if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("/healthz Cache-Control = %q, want no-store", cc)
+	}
+}
+
+func TestServerTrustProxyClientIP(t *testing.T) {
+	srv := NewServer(sim.Scenario{
+		Name:    "Proxy IP Test",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.5:43210"
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.0.0.5")
+	req.Header.Set("Fly-Client-IP", "198.51.100.7")
+
+	if got := srv.clientIP(req); got != "10.0.0.5" {
+		t.Fatalf("clientIP with trustProxy=false = %q, want 10.0.0.5", got)
+	}
+
+	srv.SetTrustProxy(true)
+	if got := srv.clientIP(req); got != "198.51.100.7" {
+		t.Fatalf("clientIP with Fly-Client-IP = %q, want 198.51.100.7", got)
+	}
+
+	req.Header.Set("CF-Connecting-IP", "2001:db8::1")
+	if got := srv.clientIP(req); got != "2001:db8::1" {
+		t.Fatalf("clientIP with CF-Connecting-IP = %q, want 2001:db8::1", got)
+	}
+
+	req.Header.Del("CF-Connecting-IP")
+	req.Header.Del("Fly-Client-IP")
+	req.Header.Set("X-Forwarded-For", "not-an-ip, 10.0.0.5")
+	if got := srv.clientIP(req); got != "10.0.0.5" {
+		t.Fatalf("clientIP with malformed XFF = %q, want fallback 10.0.0.5", got)
+	}
+}
+
+func TestServerCustomRunsRateLimit(t *testing.T) {
+	base := sim.Scenario{
+		Name:    "Rate Limit Test",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}
+	srv := NewServer(base)
+	srv.SetMaxRunsPerMin(2)
+	handler := srv.Handler()
+	body, _ := json.Marshal(base)
+
+	postFrom := func(addr string) int {
+		req := httptest.NewRequest(http.MethodPost, "/api/runs", bytes.NewReader(body))
+		req.RemoteAddr = addr
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	if code := postFrom("192.0.2.10:1111"); code != http.StatusCreated {
+		t.Fatalf("1st POST = %d, want 201", code)
+	}
+	if code := postFrom("192.0.2.10:2222"); code != http.StatusCreated {
+		t.Fatalf("2nd POST = %d, want 201", code)
+	}
+	if code := postFrom("192.0.2.10:3333"); code != http.StatusTooManyRequests {
+		t.Fatalf("3rd POST from same IP = %d, want 429", code)
+	}
+	if code := postFrom("192.0.2.11:4444"); code != http.StatusCreated {
+		t.Fatalf("POST from different IP = %d, want 201", code)
+	}
+}

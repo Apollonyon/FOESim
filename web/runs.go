@@ -12,9 +12,11 @@ import (
 )
 
 const (
-	defaultRunMaxEntries = 256
-	defaultRunTTL        = 15 * time.Minute
-	maxCustomRunBodySize = 2 << 20 // 2 MiB
+	defaultRunMaxEntries      = 256
+	defaultRunTTL             = 15 * time.Minute
+	maxCustomRunBodySize      = 2 << 20 // 2 MiB
+	defaultMaxRunsPerMin      = 30
+	defaultRateLimiterMaxKeys = 4096
 )
 
 type runEntry struct {
@@ -161,4 +163,77 @@ func validateCustomRunLimits(sc sim.Scenario) error {
 		return errors.New("scenario must contain at least one region")
 	}
 	return nil
+}
+
+type rateWindow struct {
+	count   int
+	resetAt time.Time
+}
+
+type ipRateLimiter struct {
+	mu      sync.Mutex
+	entries map[string]rateWindow
+	limit   int
+	window  time.Duration
+	maxKeys int
+	now     func() time.Time
+}
+
+func newIPRateLimiter(limit int, window time.Duration) *ipRateLimiter {
+	if window <= 0 {
+		window = time.Minute
+	}
+	return &ipRateLimiter{
+		entries: make(map[string]rateWindow),
+		limit:   limit,
+		window:  window,
+		maxKeys: defaultRateLimiterMaxKeys,
+		now:     time.Now,
+	}
+}
+
+func (rl *ipRateLimiter) Allow(key string) bool {
+	if rl == nil || rl.limit <= 0 || key == "" {
+		return true
+	}
+	now := rl.now()
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	entry, ok := rl.entries[key]
+	if ok && now.Before(entry.resetAt) {
+		entry.count++
+		rl.entries[key] = entry
+		return entry.count <= rl.limit
+	}
+
+	if !ok && len(rl.entries) >= rl.maxKeys {
+		for k, e := range rl.entries {
+			if !now.Before(e.resetAt) {
+				delete(rl.entries, k)
+			}
+		}
+		if len(rl.entries) >= rl.maxKeys {
+			var earliestKey string
+			var earliestReset time.Time
+			first := true
+			for k, e := range rl.entries {
+				if first || e.resetAt.Before(earliestReset) {
+					earliestKey = k
+					earliestReset = e.resetAt
+					first = false
+				}
+			}
+			if !first {
+				delete(rl.entries, earliestKey)
+			}
+		}
+	}
+
+	rl.entries[key] = rateWindow{
+		count:   1,
+		resetAt: now.Add(rl.window),
+	}
+	return true
 }

@@ -26,6 +26,8 @@ func main() {
 	cliMode := flag.Bool("cli", false, "run live election night in the terminal instead of starting the web server")
 	maxStreams := flag.Int("max-streams", 256, "maximum concurrent SSE election streams (0 = unlimited)")
 	maxStreamsPerIP := flag.Int("max-streams-per-ip", 16, "maximum concurrent SSE streams per client IP (0 = unlimited; set 0 behind a reverse proxy)")
+	trustProxy := flag.Bool("trust-proxy", false, "trust CF-Connecting-IP / Fly-Client-IP / X-Forwarded-For headers for client IP limits")
+	shutdownTimeout := flag.Duration("shutdown-timeout", 30*time.Second, "graceful drain timeout on SIGINT/SIGTERM")
 	flag.Parse()
 
 	scenario, err := sim.LoadScenario(*scenarioPath)
@@ -49,14 +51,12 @@ func main() {
 	srv := web.NewServerWithRegistry(reg)
 	srv.SetMaxStreams(*maxStreams)
 	srv.SetMaxStreamsPerIP(*maxStreamsPerIP)
+	srv.SetTrustProxy(*trustProxy)
 	httpSrv := &http.Server{
 		Addr:              *addr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
-		BaseContext: func(net.Listener) context.Context {
-			return ctx
-		},
 	}
 
 	ln, err := net.Listen("tcp", *addr)
@@ -66,7 +66,7 @@ func main() {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("ParliamentSim dashboard listening on http://%s (%d scenarios, default=%s)",
+		log.Printf("FOES dashboard listening on http://%s (%d scenarios, default=%s)",
 			displayAddr(ln.Addr().String()), len(reg.List()), reg.DefaultID())
 		if err := httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
@@ -81,7 +81,7 @@ func main() {
 		}
 	case <-ctx.Done():
 		log.Println("Shutting down server...")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), *shutdownTimeout)
 		defer cancel()
 		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 			log.Printf("graceful shutdown error: %v", err)

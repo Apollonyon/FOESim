@@ -73,7 +73,7 @@ export class ChangelogModal {
     },
       el('div', { className: 'editor-header' },
         el('div', { className: 'changelog-title-row' },
-          el('div', { className: 'hud-kicker', id: 'changelog-title', text: "WHAT'S NEW IN PARLIAMENTSIM" }),
+          el('div', { className: 'hud-kicker', id: 'changelog-title', text: "WHAT'S NEW IN FOES" }),
           this.titleVersionEl
         ),
         el('button', {

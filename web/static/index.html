@@ -4,7 +4,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ParliamentSim</title>
+  <title>FOES — Free Open Election Simulator</title>
+  <meta name="description"
+    content="FOES (Free Open Election Simulator) is an interactive election-night simulator, scenario editor, and Monte Carlo forecast atlas for EU-27, USA 2024, and custom electoral systems." />
+  <meta property="og:title" content="FOES - Free Open Election Simulator" />
+  <meta property="og:description"
+    content="FOES (Free Open Election Simulator) is an interactive election-night simulator, scenario editor, and Monte Carlo forecast atlas for EU-27, USA 2024, and custom electoral systems." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -18,9 +25,9 @@
     <header class="hud hud-top-left">
       <div class="brand-row">
         <div class="brand">
-          <span id="brand-mark" class="brand-mark">PS</span>
+          <span id="brand-mark" class="brand-mark">FO</span>
           <div>
-            <h1>ParliamentSim</h1>
+            <h1 title="Free Open Election Simulator">FOES</h1>
             <div id="scenario-subtitle" class="subtitle">Loading election atlas…</div>
             <select id="scenario-select" class="scenario-select hidden" aria-label="Select election scenario"></select>
             <div id="scenario-note" class="scenario-note hidden"></div>
@@ -39,10 +46,12 @@
       <div class="controls-row">
         <div id="mode-switch" class="segmented" role="group" aria-label="Simulation mode">
           <button class="mode-btn active" data-mode="live">Live</button>
-          <button class="mode-btn" data-mode="forecast" title="Simulate N election nights for win odds and seat percentiles">Forecast</button>
+          <button class="mode-btn" data-mode="forecast"
+            title="Simulate N election nights for win odds and seat percentiles">Forecast</button>
         </div>
         <button id="btn-run" class="btn btn-ink">▶ Start</button>
-        <button id="btn-reset" class="btn btn-icon" title="Reset election" aria-label="Reset election" disabled>↺</button>
+        <button id="btn-reset" class="btn btn-icon" title="Reset election" aria-label="Reset election"
+          disabled>↺</button>
         <div id="forecast-controls" class="forecast-controls hidden">
           <label class="mini-field" title="Polling uncertainty / election-night volatility">
             <span>Swing</span>
@@ -170,15 +179,16 @@
       <div class="hud-header">
         <div>
           <span id="hud-kicker" class="hud-kicker">PARLIAMENT</span>
-          <div class="hud-sub"><span id="hemicycle-total" class="mono">0</span> <span id="seat-unit-label">seats</span> · majority <span
-              id="hemicycle-maj" class="mono">0</span></div>
+          <div class="hud-sub"><span id="hemicycle-total" class="mono">0</span> <span id="seat-unit-label">seats</span>
+            · majority <span id="hemicycle-maj" class="mono">0</span></div>
         </div>
         <div class="hemi-head-actions">
           <div id="hemi-tabs-wrap" class="segmented" role="group" aria-label="Parliament panel view">
             <button class="htab-btn active" data-htab="seats">Seats</button>
             <button class="htab-btn" data-htab="coalitions">Coalitions</button>
           </div>
-          <button id="btn-toggle-hemi" class="icon-btn" title="Collapse/Expand" aria-expanded="true" aria-label="Toggle parliament panel">▾</button>
+          <button id="btn-toggle-hemi" class="icon-btn" title="Collapse/Expand" aria-expanded="true"
+            aria-label="Toggle parliament panel">▾</button>
         </div>
       </div>
       <div id="hemicycle-body" class="hemicycle-body">

@@ -117,9 +117,9 @@ function applyScenarioMeta(meta, hasGroups) {
     .filter(Boolean)
     .slice(0, 2)
     .map((w) => w[0].toUpperCase())
-    .join('') || 'PS';
+    .join('') || 'FO';
 
-  document.title = `ParliamentSim — ${title}`;
+  document.title = `FOES — ${title}`;
   document.getElementById('brand-mark').textContent = initials;
   document.getElementById('hud-kicker').textContent = title.toUpperCase();
   document.getElementById('seat-unit-label').textContent = meta.seat_label || 'seats';
@@ -987,7 +987,28 @@ function renderBattlegrounds() {
   }
 }
 
-async function runForecast() {
+async function rehydrateCustomRun() {
+  if (!state.customRunId || !state.scenario) return false;
+  try {
+    const res = await fetch('/api/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state.scenario)
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data?.run_id) return false;
+    state.customRunId = data.run_id;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('run', data.run_id);
+    window.history.replaceState(null, '', nextUrl);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function runForecast(retried = false) {
   if (!state.scenario) return;
   const reqSeq = scenarioLoadSeq;
   if (forecastAbortCtrl) forecastAbortCtrl.abort();
@@ -1020,6 +1041,12 @@ async function runForecast() {
 
   try {
     const res = await fetch(url, { signal: ctrl.signal });
+    if (res.status === 404 && state.customRunId && retried !== true) {
+      const recovered = await rehydrateCustomRun();
+      if (recovered && reqSeq === scenarioLoadSeq && state.viewMode === 'forecast') {
+        return runForecast(true);
+      }
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const fc = await res.json();
     if (reqSeq !== scenarioLoadSeq || state.viewMode !== 'forecast' || forecastAbortCtrl !== ctrl) return;
@@ -1038,7 +1065,7 @@ async function runForecast() {
   }
 }
 
-function startStream() {
+function startStream(retried = false) {
   if (state.source) {
     state.source.close();
     state.source = null;
@@ -1089,17 +1116,30 @@ function startStream() {
     enqueueOrApply('complete', null);
   });
 
-  es.onerror = () => {
-    if (state.source === es) {
-      es.close();
-      state.source = null;
-      if (state.runPhase === 'running' && queueHead >= eventQueue.length) {
-        state.runPhase = 'ready';
-        setStatus('idle', 'DISCONNECTED');
-        syncRunControls();
-      } else if (state.runPhase !== 'done') {
-        streamErrorWhilePaused = true;
+  es.onerror = async () => {
+    if (state.source !== es) return;
+    es.close();
+    state.source = null;
+    if (
+      state.customRunId &&
+      retried !== true &&
+      state.runPhase === 'running' &&
+      state.reportedPrecincts === 0 &&
+      Object.keys(state.euSeats).length === 0
+    ) {
+      const seq = scenarioLoadSeq;
+      const recovered = await rehydrateCustomRun();
+      if (recovered && seq === scenarioLoadSeq && state.viewMode === 'live' && state.runPhase === 'running') {
+        startStream(true);
+        return;
       }
+    }
+    if (state.runPhase === 'running' && queueHead >= eventQueue.length) {
+      state.runPhase = 'ready';
+      setStatus('idle', 'DISCONNECTED');
+      syncRunControls();
+    } else if (state.runPhase !== 'done') {
+      streamErrorWhilePaused = true;
     }
   };
 }
@@ -1134,7 +1174,7 @@ function wireEvents() {
     swingVal.textContent = state.swing.toFixed(2);
   });
   inputSwing.addEventListener('change', () => onSettingChanged());
-  btnRunForecast.addEventListener('click', runForecast);
+  btnRunForecast.addEventListener('click', () => runForecast());
   btnVersion.addEventListener('click', () => changelog?.open());
 
   btnRun.addEventListener('click', toggleRunPause);

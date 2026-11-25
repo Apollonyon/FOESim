@@ -1,0 +1,7 @@
+.git
+.gitignore
+.env*
+scripts/
+*.md
+!LICENSE
+!NOTICE

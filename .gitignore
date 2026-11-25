@@ -16,3 +16,7 @@
 # Local data prep scripts
 calibrate_eu27.py
 /scripts
+
+# Local assistant & planning notes
+AGENTS.md
+PROGRESS.md
