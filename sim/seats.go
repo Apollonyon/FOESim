@@ -10,6 +10,7 @@ const (
 	MethodDHondt      AllocationMethod = "dhondt"
 	MethodHare        AllocationMethod = "hare"
 	MethodFPTP        AllocationMethod = "fptp"
+	MethodSTV         AllocationMethod = "stv"
 )
 
 type SeatAllocator interface {
@@ -42,6 +43,13 @@ type fptpAllocator struct{}
 func (fptpAllocator) Allocate(votes map[string]int, r Region, _ []Party) map[string]int {
 	return allocateFPTP(votes, r.Seats)
 }
+
+type stvAllocator struct{}
+
+func (stvAllocator) Allocate(votes map[string]int, r Region, parties []Party) map[string]int {
+	return allocateSTV(votes, r.Seats, r.EffectiveParties(parties))
+}
+
 func NewAllocator(method AllocationMethod) SeatAllocator {
 	switch method {
 	case MethodDHondt:
@@ -50,18 +58,17 @@ func NewAllocator(method AllocationMethod) SeatAllocator {
 		return hareAllocator{}
 	case MethodFPTP:
 		return fptpAllocator{}
+	case MethodSTV:
+		return stvAllocator{}
 	default:
 		return sainteLagueAllocator{}
 	}
 }
 
-// AllocateSeats distributes totalSeats among parties according to method,
-// excluding parties whose vote share is below threshold (in [0, 1]).
 func AllocateSeats(votes map[string]int, r Region, parties []Party) map[string]int {
 	return NewAllocator(r.Method).Allocate(votes, r, parties)
 }
 
-// filterEligible filters out parties that don't meet the threshold
 func filterEligible(votes map[string]int, threshold float64) (map[string]int, int) {
 	totalVotes := 0
 	for _, v := range votes {
@@ -84,8 +91,6 @@ func filterEligible(votes map[string]int, threshold float64) (map[string]int, in
 	}
 	return eligible, eligibleVotes
 }
-
-// allocateHighestAverages allocates seats using the highest averages method
 func allocateHighestAverages(votes map[string]int, totalSeats int, threshold float64, divisor func(seats int) float64) map[string]int {
 	if totalSeats <= 0 || len(votes) == 0 {
 		return map[string]int{}
@@ -111,7 +116,6 @@ func allocateHighestAverages(votes map[string]int, totalSeats int, threshold flo
 	return seats
 }
 
-// allocateHare allocates seats using the Hare quota method
 func allocateHare(votes map[string]int, totalSeats int, threshold float64) map[string]int {
 	if totalSeats <= 0 || len(votes) == 0 {
 		return map[string]int{}

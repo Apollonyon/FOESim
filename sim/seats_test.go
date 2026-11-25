@@ -135,3 +135,45 @@ func TestRollupGroupSeats(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
+
+func TestAllocateFPTPAndSTV(t *testing.T) {
+	t.Run("fptp gives all seats to plurality winner regardless of threshold", func(t *testing.T) {
+		r := Region{Seats: 12, Method: MethodFPTP, Threshold: 0.50}
+		got := AllocateSeats(map[string]int{"a": 35, "b": 40, "c": 25}, r, nil)
+		want := map[string]int{"b": 12}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("fptp alphabetical tie-break and zero votes", func(t *testing.T) {
+		r := Region{Seats: 5, Method: MethodFPTP}
+		if got := AllocateSeats(map[string]int{"b": 100, "a": 100}, r, nil); !reflect.DeepEqual(got, map[string]int{"a": 5}) {
+			t.Errorf("tie-break got %v, want a:5", got)
+		}
+		if got := AllocateSeats(map[string]int{"a": 0, "b": 0}, r, nil); len(got) != 0 {
+			t.Errorf("zero votes got %v, want empty", got)
+		}
+	})
+
+	t.Run("stv transfers eliminated party votes to ideologically nearest party", func(t *testing.T) {
+		// 5 seats, 1000 votes -> Droop quota = floor(1000/6)+1 = 167.
+		// Initial quotas: left_main=2 (rem 116), right=2 (rem 116), left_small=0 (rem 100).
+		// left_small is eliminated and transfers 100 votes to left_main (closer in PolicyVec),
+		// pushing left_main to 216 >= 167 to win the 5th seat.
+		parties := []Party{
+			{ID: "left_main", Position: PolicyVec{-0.6, -0.6, 0.5, 0.0, 0.6, -0.5}},
+			{ID: "left_small", Position: PolicyVec{-0.7, -0.7, 0.6, 0.0, 0.8, -0.6}},
+			{ID: "right", Position: PolicyVec{0.7, 0.7, -0.5, 0.5, -0.6, 0.8}},
+		}
+		r := Region{Seats: 5, Method: MethodSTV, Parties: parties}
+		votes := map[string]int{"left_main": 450, "right": 450, "left_small": 100}
+
+		// Pass nil parties to also verify stvAllocator resolves r.EffectiveParties(parties).
+		got := AllocateSeats(votes, r, nil)
+		want := map[string]int{"left_main": 3, "right": 2}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+}

@@ -93,6 +93,9 @@ func (e *ElectionState) Apply(rep PrecinctReport) bool {
 
 func (e *ElectionState) SeedSeats(regionSeats map[string]map[string]int) {
 	for rid, seats := range regionSeats {
+		if _, ok := e.regionByID[rid]; !ok {
+			continue
+		}
 		e.updateRegionSeats(rid, maps.Clone(seats))
 	}
 	e.coalitions = FindCoalitions(e.euSeats, e.euGroups, 5)

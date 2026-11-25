@@ -131,7 +131,10 @@ func FindCoalitions(euSeats map[string]int, groups []EUGroup, maxResults int) []
 		if c := cmp.Compare(len(a.GroupIDs), len(b.GroupIDs)); c != 0 {
 			return c
 		}
-		return cmp.Compare(b.Seats, a.Seats)
+		if c := cmp.Compare(b.Seats, a.Seats); c != 0 {
+			return c
+		}
+		return slices.Compare(a.GroupIDs, b.GroupIDs)
 	})
 
 	if maxResults > 0 && len(results) > maxResults {

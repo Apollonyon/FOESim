@@ -50,10 +50,15 @@ func main() {
 		},
 	}
 
+	ln, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("ParliamentSim dashboard listening on http://localhost%s", *addr)
-		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Printf("ParliamentSim dashboard listening on http://%s", displayAddr(ln.Addr().String()))
+		if err := httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 		close(errCh)
@@ -106,7 +111,11 @@ func runCLI(scenario sim.Scenario) {
 
 	fmt.Println("\n=== Final Results by Region ===")
 	for _, r := range regions {
-		fmt.Printf("\n--- %s (%s) ---\n", r.Name, r.Method)
+		method := r.Method
+		if method == "" {
+			method = sim.MethodSainteLague
+		}
+		fmt.Printf("\n--- %s (%s) ---\n", r.Name, method)
 		seats := state.RegionSeats(r.ID)
 		votes := state.RegionVotes(r.ID)
 		for _, p := range r.EffectiveParties(parties) {
@@ -119,4 +128,15 @@ func runCLI(scenario sim.Scenario) {
 	for _, g := range euGroups {
 		fmt.Printf("  %-8s %3d seats\n", g.ShortName, totalSeats[g.ID])
 	}
+}
+
+func displayAddr(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	if host == "" || host == "::" || host == "0.0.0.0" {
+		host = "localhost"
+	}
+	return net.JoinHostPort(host, port)
 }

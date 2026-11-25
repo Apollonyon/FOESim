@@ -2,6 +2,13 @@
 import { sumVotes, rankParties } from './overlays.js';
 
 const URBAN_LABELS = { 1: 'Urban', 2: 'Intermediate', 3: 'Rural' };
+const METHOD_LABELS = {
+  sainte_lague: 'SAINTE-LAGUË',
+  dhondt: "D'HONDT",
+  hare: 'HARE',
+  stv: 'STV',
+  fptp: 'FPTP'
+};
 
 function formatCompact(n) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -101,7 +108,13 @@ export class InspectorUI {
     const regPct = Math.min(100, Math.round((pctSum / Math.max(1, totalCount)) * 100));
     const total = sumVotes(votes);
 
-    kickerEl.textContent = `MEMBER STATE · ${reg.method.toUpperCase()} (${(reg.threshold * 100).toFixed(0)}%)`;
+    const activeMethod = this.state.methodOverride || reg.method || 'sainte_lague';
+    const usesThreshold = activeMethod !== 'fptp' && activeMethod !== 'stv';
+    const methodLabel = METHOD_LABELS[activeMethod] || activeMethod.replace('_', ' ').toUpperCase();
+    const thrLabel = Number((reg.threshold * 100).toFixed(1));
+    kickerEl.textContent = usesThreshold
+      ? `MEMBER STATE · ${methodLabel} (${thrLabel}%)`
+      : `MEMBER STATE · ${methodLabel}`;
     titleEl.textContent = reg.name;
 
     actionsEl.innerHTML = `<button class="btn" id="btn-zoom-country">Focus ${reg.name}</button>`;
@@ -114,7 +127,7 @@ export class InspectorUI {
     `;
 
     if (total > 0) {
-      this.renderBars(barsEl, votes, seats, reg.threshold);
+      this.renderBars(barsEl, votes, seats, usesThreshold ? reg.threshold : 0);
     } else {
       this.renderExitBars(barsEl, seats, reg.seats);
     }
@@ -197,8 +210,15 @@ export class InspectorUI {
   }
 
   moveTooltip(e) {
-    this.tooltip.style.left = `${e.clientX + 14}px`;
-    this.tooltip.style.top = `${e.clientY + 14}px`;
+    const pad = 12;
+    const tipW = this.tooltip.offsetWidth || 200;
+    const tipH = this.tooltip.offsetHeight || 52;
+    let x = e.clientX + 14;
+    let y = e.clientY + 14;
+    if (x + tipW + pad > window.innerWidth) x = Math.max(pad, e.clientX - tipW - 14);
+    if (y + tipH + pad > window.innerHeight) y = Math.max(pad, e.clientY - tipH - 14);
+    this.tooltip.style.left = `${x}px`;
+    this.tooltip.style.top = `${y}px`;
   }
 
   hideTooltip() {

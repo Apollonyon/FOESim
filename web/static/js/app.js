@@ -13,6 +13,7 @@ const state = {
 
   source: null,
   durationMs: 45000,
+  methodOverride: '',
   overlay: 'winner',
   colorMode: 'auto',
   heatmapPartyId: '',
@@ -43,6 +44,7 @@ const btnRun = document.getElementById('btn-run');
 const inputSeed = document.getElementById('input-seed');
 const inputTemp = document.getElementById('input-temp');
 const tempVal = document.getElementById('temp-val');
+const methodSelect = document.getElementById('method-select');
 const progressFill = document.getElementById('progress-fill');
 const progressLabel = document.getElementById('progress-label');
 const partyPickerWrap = document.getElementById('party-picker-wrap');
@@ -277,6 +279,8 @@ function resetStreamState() {
     if (sub) sub.textContent = `0%`;
   }
   updateProgress();
+  scheduleHemicycleRender();
+  inspector.render();
 }
 
 function startStream() {
@@ -291,7 +295,8 @@ function startStream() {
   const parsedTemp = parseFloat(inputTemp.value);
   const temp = Number.isNaN(parsedTemp) || parsedTemp <= 0 ? 0.45 : parsedTemp;
   const waves = state.durationMs > 0 ? 3 : 1;
-  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&swing=0.15`;
+  const methodParam = state.methodOverride ? `&method=${encodeURIComponent(state.methodOverride)}` : '';
+  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&swing=0.15${methodParam}`;
 
   setStatus('live', 'EXIT POLLS');
   btnRun.textContent = 'Restart';
@@ -300,6 +305,7 @@ function startStream() {
   state.source = es;
 
   es.addEventListener('exit_poll', (ev) => {
+    if (state.source !== es) return;
     const data = JSON.parse(ev.data);
     state.prevEUSeats = data.prev_eu_seats || {};
     state.euSeats = data.eu_seats || {};
@@ -314,6 +320,7 @@ function startStream() {
   });
 
   es.addEventListener('precinct', (ev) => {
+    if (state.source !== es) return;
     const data = JSON.parse(ev.data);
     const rep = data.report;
 
@@ -372,6 +379,7 @@ function startStream() {
   });
 
   es.addEventListener('complete', () => {
+    if (state.source !== es) return;
     es.close();
     state.source = null;
     setStatus('done', 'FINAL');
@@ -426,6 +434,11 @@ function wireEvents() {
 
   inputTemp.addEventListener('input', () => {
     tempVal.textContent = parseFloat(inputTemp.value).toFixed(2);
+  });
+
+  methodSelect.addEventListener('change', () => {
+    state.methodOverride = methodSelect.value;
+    startStream();
   });
 
   document.getElementById('focus-pills').addEventListener('click', (e) => {

@@ -329,7 +329,7 @@ func expandIntoWaves(full []PrecinctReport, w int, rng *rand.Rand) []scheduledRe
 		emitted := make(map[string]int, len(rep.Votes))
 		cumPct := 0.0
 		t := rng.Float64() * (0.55 / float64(w))
-		stepWindow := (1.0 - t) / float64(w)
+		stepWindow := (1.0 - t) / float64(max(1, w-1))
 
 		for wi := range w {
 			isLast := wi == w-1

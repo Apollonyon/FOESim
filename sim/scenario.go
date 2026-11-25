@@ -125,11 +125,6 @@ func (s Scenario) Validate() error {
 		if r.PollCloseHour < 0 || r.PollCloseHour > 24 || isNonFinite(r.PollCloseHour) {
 			return fmt.Errorf("region %q in scenario %q has invalid poll_close_hour %g", r.ID, s.Name, r.PollCloseHour)
 		}
-		for pid, bonus := range r.PartyBonus {
-			if isNonFinite(bonus) {
-				return fmt.Errorf("region %q party_bonus[%q] has non-finite value %g", r.ID, pid, bonus)
-			}
-		}
 		parties := r.EffectiveParties(s.Parties)
 		if len(parties) == 0 {
 			return fmt.Errorf("region %q in scenario %q has no parties", r.ID, s.Name)
@@ -152,6 +147,14 @@ func (s Scenario) Validate() error {
 			allPartyIDs[p.ID] = true
 			if s.UsesNationalParties() && p.GroupID != "" && !knownGroups[p.GroupID] {
 				return fmt.Errorf("party %q in region %q references unknown EU group %q", p.ID, r.ID, p.GroupID)
+			}
+		}
+		for pid, bonus := range r.PartyBonus {
+			if !seenParties[pid] {
+				return fmt.Errorf("region %q party_bonus references unknown party %q", r.ID, pid)
+			}
+			if isNonFinite(bonus) {
+				return fmt.Errorf("region %q party_bonus[%q] has non-finite value %g", r.ID, pid, bonus)
 			}
 		}
 
@@ -183,7 +186,7 @@ func (s Scenario) Validate() error {
 					if !knownVoterGroups[vgID] {
 						return fmt.Errorf("region %q district_tilts[%q] references unknown voter group %q", r.ID, districtID, vgID)
 					}
-					if mult < 0 || isNonFinite(mult) {
+					if mult <= 0 || isNonFinite(mult) {
 						return fmt.Errorf("region %q district_tilts[%q][%q] has invalid multiplier %g", r.ID, districtID, vgID, mult)
 					}
 				}
@@ -191,7 +194,7 @@ func (s Scenario) Validate() error {
 		}
 
 		switch r.Method {
-		case "", MethodSainteLague, MethodDHondt, MethodHare, MethodFPTP:
+		case "", MethodSainteLague, MethodDHondt, MethodHare, MethodFPTP, MethodSTV:
 		default:
 			return fmt.Errorf("region %q has unknown allocation method %q", r.ID, r.Method)
 		}

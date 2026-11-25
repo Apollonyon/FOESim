@@ -246,7 +246,7 @@ func TestServerStreamConcurrencyCap(t *testing.T) {
 		Regions: sim.DefaultRegions(),
 	}
 	srv := NewServer(scenario)
-	srv.streamSem = make(chan struct{}, 1)
+	srv.SetMaxStreams(1)
 	handler := srv.Handler()
 
 	// Occupy the only stream slot to simulate an active SSE client.
@@ -312,5 +312,55 @@ func TestServerEU27RealPrevSeatsBaseline(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected exit_poll event in stream")
+	}
+}
+
+func TestServerMethodOverrideDoesNotMutateScenario(t *testing.T) {
+	scenario := sim.Scenario{
+		Name:    "Override Test",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}
+	origMethod := scenario.Regions[0].Method
+	handler := NewServer(scenario).Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=0&swing=0&seed=42&method=fptp", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	// Under FPTP, every region's exit_poll seats should go to a single winning party.
+	foundExit := false
+	for _, block := range strings.Split(rec.Body.String(), "\n\n") {
+		if !strings.HasPrefix(block, "event: exit_poll\n") {
+			continue
+		}
+		foundExit = true
+		dataLine := strings.TrimPrefix(strings.Split(block, "\n")[1], "data: ")
+		var payload exitPollPayload
+		if err := json.Unmarshal([]byte(dataLine), &payload); err != nil {
+			t.Fatalf("decode exit_poll: %v", err)
+		}
+		for _, r := range scenario.Regions {
+			seats := payload.RegionSeats[r.ID]
+			if len(seats) != 1 {
+				t.Errorf("FPTP region %s gave seats to %d parties (%v), want 1", r.ID, len(seats), seats)
+			}
+			for _, count := range seats {
+				if count != r.Seats {
+					t.Errorf("FPTP region %s winner got %d seats, want all %d", r.ID, count, r.Seats)
+				}
+			}
+		}
+		break
+	}
+	if !foundExit {
+		t.Fatal("expected exit_poll event")
+	}
+	if scenario.Regions[0].Method != origMethod {
+		t.Errorf("method override mutated server scenario: got %q, want %q", scenario.Regions[0].Method, origMethod)
 	}
 }

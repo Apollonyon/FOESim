@@ -7,11 +7,11 @@ A European Parliament election simulator written in Go with no third-party depen
 - **EU-27 (720 seats):** All 27 Member States, 154 national parties rolling up into 9 European Parliament political groups, across 1,152 continental NUTS-3 counties.
 - **Eurostat county data:** Official 2023 county population (`demo_r_pjanaggr3`), GDP per capita (`nama_10r_3gdp`), age 65+ share (`demo_r_pjanind3`), and urban/rural typology (`URBN_TYPE`).
 - **6-axis spatial voting:** Temperature-scaled Softmax over weighted Euclidean distance (`Econ`, `Social`, `EU`, `Defense`, `Env`, `Migration`) and 6 voter blocs per country.
-- **National allocation rules:** Per-country seat quotas, legal thresholds, and seat-allocation rules (`D'Hondt`, `Sainte-Laguë`, and `Hare Quota`; Ireland and Malta currently use Hare as a simplification until ranked-ballot STV is implemented).
-- **Live election-night SSE stream:** Concurrent per-country goroutines with staggered CET poll closing (`18:00 -> 23:00`), deterministic multi-wave partial county reporting, and a minimal-winning Coalition Finder.
+- **National allocation rules & live "What-If" swapper:** Pluggable `SeatAllocator` supporting `Sainte-Laguë`, `D'Hondt`, `Hare Quota`, ranked-ballot `STV` (Ireland & Malta via `PolicyVec` preference transfers), and `FPTP` (Winner-Take-All), with a live **System** switcher in the web UI.
+- **Live election-night SSE stream:** Concurrent per-country goroutines with staggered CET poll closing (`18:00 -> 23:00`), hierarchical correlated swings, deterministic multi-wave partial county reporting, and a minimal-winning Coalition Finder.
 - **Embedded web atlas:** Plain HTML/CSS/JS modules, SVG hemicycle, Lambert Azimuthal Equal-Area Europe map, 6 data overlays, and Light/Dark themes.
 
-> **Note:** Seat swings (`+/-`) currently compare against a synthetic baseline run rather than official 2024 EP results (real 2024 baselines are planned next). Built as a hands-on Go learning project: the Go simulation and server were written step-by-step with AI coaching/review, while the frontend JS/CSS and Eurostat dataset scripts were AI-assisted.
+> **Note:** `scenarios/eu27.json` compares seat swings (`+/-`) against official June 2024 EP results (`prev_seats`, 720 seats), falling back to a synthetic baseline for scenarios without `prev_seats`. Built as a hands-on Go learning project: core Go domain logic and algorithms are written with AI coaching/review, while frontend JS/CSS, dataset scripts, and boilerplate scaffolding are AI-assisted.
 
 ## Quick Start
 
@@ -27,8 +27,8 @@ go run . -scenario scenarios/eu_starter.json
 # Run live election night in the terminal instead of starting HTTP server
 go run . -cli
 
-# Custom listen address
-go run . -addr :9090
+# Custom listen address and concurrent SSE stream cap (default 256)
+go run . -addr 127.0.0.1:9090 -max-streams 128
 ```
 
 ## Tests & Benchmarks
@@ -51,11 +51,14 @@ sim/
   party.go               National Party and EUGroup types
   region.go              Region, VoterGroup, and hierarchical NUTS-1/2/3 tilts
   vote.go                Softmax VoteShares, SimulateRegion, and PartyBonus
-  seats.go               D'Hondt, Sainte-Laguë, Hare Quota, SumSeats, RollupGroupSeats
+  seats.go               SeatAllocator interface, D'Hondt, Sainte-Laguë, Hare, FPTP, RollupGroupSeats
+  stv.go                 Droop-quota Ranked-Ballot STV with PolicyVec preference transfers
+  state.go               Incremental ElectionState vote/seat/progress tracker
+  seed.go                Built-in test fixture parties and regions
   nuts.go                Embedded Eurostat NUTS-3 metadata & socioeconomic tilts
-  election.go            Precinct simulation, deterministic partial waves, concurrent streaming
+  election.go            Hierarchical swings, PrepareElection, deterministic waves, SSE streaming
   coalition.go           Minimal-winning Coalition Finder ranked by PolicyVec spread
-  scenario.go            JSON scenario loader, validator, and EU seat aggregation
+  scenario.go            JSON scenario loader, Validate(), and EU seat aggregation
 web/
   server.go              net/http server, //go:embed static assets, and SSE /api/stream
   static/                Zero-build HTML, Light/Dark CSS, ES modules, and Eurostat SVG GeoJSON

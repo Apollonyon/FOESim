@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"maps"
 	"math"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -115,23 +117,24 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := s.parseElectionConfig(r)
+	scenario := s.scenarioForMethod(parseMethodOverride(r.URL.Query().Get("method")))
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	state := sim.NewElectionState(s.scenario)
-	prepared := sim.PrepareElection(s.scenario.Regions, s.scenario.Parties, cfg)
+	state := sim.NewElectionState(scenario)
+	prepared := sim.PrepareElection(scenario.Regions, scenario.Parties, cfg)
 	exitRegionSeats := prepared.ExitPollSeats()
 	var prevEUSeats map[string]int
-	if len(s.scenario.PrevSeats) > 0 {
-		prevEUSeats = maps.Clone(s.scenario.PrevSeats)
+	if len(scenario.PrevSeats) > 0 {
+		prevEUSeats = maps.Clone(scenario.PrevSeats)
 	} else {
-		prevRegionSeats := make(map[string]map[string]int, len(s.scenario.Regions))
-		for ri, reg := range s.scenario.Regions {
-			prevRegionSeats[reg.ID] = noisyRegionSeats(reg, s.scenario.Parties, cfg.Temperature*1.15, 0.20, 1001+int64(ri))
+		prevRegionSeats := make(map[string]map[string]int, len(scenario.Regions))
+		for ri, reg := range scenario.Regions {
+			prevRegionSeats[reg.ID] = noisyRegionSeats(reg, scenario.Parties, cfg.Temperature*1.15, 0.20, 1001+int64(ri))
 		}
-		prevEUSeats = s.scenario.AggregateEUSeats(prevRegionSeats)
+		prevEUSeats = scenario.AggregateEUSeats(prevRegionSeats)
 	}
 	state.SeedSeats(exitRegionSeats)
 	_, totalPrecincts, _ := state.Progress()
@@ -146,7 +149,10 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reports := prepared.Stream(r.Context())
+	streamCtx, cancel := context.WithTimeout(r.Context(), maxTargetDuration+5*time.Second)
+	defer cancel()
+
+	reports := prepared.Stream(streamCtx)
 
 	for rep := range reports {
 		euChanged := state.Apply(rep)
@@ -170,13 +176,34 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Only emit complete if the client did not cancel early.
-	if r.Context().Err() == nil {
+	// Only emit complete if the client did not cancel or hit the stream timeout.
+	if streamCtx.Err() == nil {
 		completed, total, _ := state.Progress()
 		_ = writeSSE(w, flusher, "complete", map[string]int{
 			"reported_precincts": completed,
 			"total_precincts":    total,
 		})
+	}
+}
+
+func (s *Server) scenarioForMethod(override sim.AllocationMethod) sim.Scenario {
+	if override == "" {
+		return s.scenario
+	}
+	sc := s.scenario
+	sc.Regions = slices.Clone(s.scenario.Regions)
+	for i := range sc.Regions {
+		sc.Regions[i].Method = override
+	}
+	return sc
+}
+
+func parseMethodOverride(raw string) sim.AllocationMethod {
+	switch sim.AllocationMethod(raw) {
+	case sim.MethodSainteLague, sim.MethodDHondt, sim.MethodHare, sim.MethodFPTP, sim.MethodSTV:
+		return sim.AllocationMethod(raw)
+	default:
+		return ""
 	}
 }
 

@@ -12,8 +12,8 @@ func VoteShares(group VoterGroup, parties []Party, temperature float64) map[stri
 	if len(parties) == 0 {
 		return map[string]float64{}
 	}
-	if temperature <= 0 {
-		temperature = 1.0 // Preventing Division by Zero or neg. values
+	if temperature <= 0 || math.IsNaN(temperature) || math.IsInf(temperature, 0) {
+		temperature = 1.0 // Preventing Division by Zero or neg./non-finite values
 	}
 	scores := make([]float64, len(parties))
 	maxScore := math.Inf(-1)

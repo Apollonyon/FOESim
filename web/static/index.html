@@ -61,6 +61,18 @@
           <input id="input-temp" type="range" min="0.25" max="1.50" step="0.05" value="0.45" />
           <output id="temp-val">0.45</output>
         </label>
+
+        <label class="mini-field" title="Override seat allocation rule across all regions">
+          <span>System</span>
+          <select id="method-select" aria-label="Electoral system override">
+            <option value="">Native</option>
+            <option value="sainte_lague">Sainte-Laguë</option>
+            <option value="dhondt">D'Hondt</option>
+            <option value="hare">Hare</option>
+            <option value="stv">STV</option>
+            <option value="fptp">FPTP</option>
+          </select>
+        </label>
       </div>
 
       <div class="nav-row">

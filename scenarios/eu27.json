@@ -4850,7 +4850,7 @@
       "id": "ie",
       "name": "Ireland",
       "seats": 14,
-      "method": "hare",
+      "method": "stv",
       "threshold": 0,
       "poll_close_hour": 22,
       "groups": [
@@ -6642,7 +6642,7 @@
       "id": "mt",
       "name": "Malta",
       "seats": 6,
-      "method": "hare",
+      "method": "stv",
       "threshold": 0,
       "poll_close_hour": 22,
       "groups": [
