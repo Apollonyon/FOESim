@@ -1,7 +1,8 @@
-// Inspector drawer, hover tooltip, and live reporting ticker.
+// Inspector drawer, hover tooltip, and live reporting ticker (XSS-safe DOM).
+import { clearEl, el, safeColor, swatch } from './dom.js';
 import { sumVotes, rankParties } from './overlays.js';
 
-const URBAN_LABELS = { 1: 'Urban', 2: 'Intermediate', 3: 'Rural' };
+const URBAN_LABELS = { 1: 'Urban', 2: 'Suburban', 3: 'Rural' };
 const METHOD_LABELS = {
   sainte_lague: 'SAINTE-LAGUË',
   dhondt: "D'HONDT",
@@ -16,6 +17,15 @@ function formatCompact(n) {
   return `${n}`;
 }
 
+function statBox(label, value) {
+  return el(
+    'div',
+    { className: 'stat-box' },
+    el('div', { className: 'stat-label', text: label }),
+    el('div', { className: 'stat-value', text: value })
+  );
+}
+
 export class InspectorUI {
   constructor(state, callbacks) {
     this.state = state;
@@ -27,23 +37,13 @@ export class InspectorUI {
 
   select(type, id) {
     this.state.selection = { type, id };
-    document.querySelectorAll('.nuts3-cell.selected').forEach((el) => el.classList.remove('selected'));
-    document.querySelectorAll('.sim-country-border.selected').forEach((el) => el.classList.remove('selected'));
-
-    if (type === 'precinct') {
-      document.getElementById(`precinct-${id}`)?.classList.add('selected');
-      const geo = this.state.precinctGeo[id];
-      if (geo) document.getElementById(`border-${geo.regionId}`)?.classList.add('selected');
-    } else if (type === 'country') {
-      document.getElementById(`border-${id}`)?.classList.add('selected');
-    }
+    this.cb.onSelectionChange?.();
     this.render();
   }
 
   clear() {
     this.state.selection = null;
-    document.querySelectorAll('.nuts3-cell.selected').forEach((el) => el.classList.remove('selected'));
-    document.querySelectorAll('.sim-country-border.selected').forEach((el) => el.classList.remove('selected'));
+    this.cb.onSelectionChange?.();
     this.drawer.classList.add('hidden');
   }
 
@@ -51,11 +51,20 @@ export class InspectorUI {
     if (!this.state.selection) return;
     this.drawer.classList.remove('hidden');
 
+    const meta = this.state.scenario?.meta || {};
+    const regionLabel = (meta.region_label || 'Member State').toUpperCase();
+    const unitLabel = meta.unit_label || 'County';
+    const seatLabel = meta.seat_label || 'seats';
+
     const kickerEl = document.getElementById('inspector-kicker');
     const titleEl = document.getElementById('inspector-title');
     const statsEl = document.getElementById('inspector-stats');
     const actionsEl = document.getElementById('inspector-actions');
     const barsEl = document.getElementById('inspector-bars');
+
+    clearEl(statsEl);
+    clearEl(actionsEl);
+    clearEl(barsEl);
 
     if (this.state.selection.type === 'precinct') {
       const pid = this.state.selection.id;
@@ -63,21 +72,27 @@ export class InspectorUI {
       if (!geo) return;
       const reg = this.state.regionsById[geo.regionId];
       const rep = this.state.precincts[pid];
-      const urbanTag = URBAN_LABELS[geo.urbanType] || 'District';
+      const urbanTag = URBAN_LABELS[geo.urbanType] || unitLabel;
+      const distPart = geo.districtId ? ` · ${geo.districtId}` : '';
 
-      kickerEl.textContent = `${reg.name.toUpperCase()} · ${pid} · ${urbanTag.toUpperCase()}`;
+      kickerEl.textContent = `${reg.name.toUpperCase()}${distPart} · ${urbanTag.toUpperCase()}`;
       titleEl.textContent = geo.label;
 
-      actionsEl.innerHTML = `<button class="btn" id="btn-inspect-country">View ${reg.name} Totals</button>`;
-      document.getElementById('btn-inspect-country').onclick = () => this.select('country', reg.id);
+      actionsEl.appendChild(
+        el('button', {
+          className: 'btn',
+          text: `View ${reg.name} Totals`,
+          onClick: () => this.select('country', reg.id)
+        })
+      );
 
       if (!rep) {
-        statsEl.innerHTML = `
-          <div class="stat-box"><div class="stat-label">Status</div><div class="stat-value">Counting</div></div>
-          <div class="stat-box"><div class="stat-label">NUTS-3</div><div class="stat-value">${pid}</div></div>
-          <div class="stat-box"><div class="stat-label">Type</div><div class="stat-value">${urbanTag}</div></div>
-        `;
-        barsEl.innerHTML = `<div class="subtitle">Awaiting ballot count from ${geo.label}…</div>`;
+        statsEl.append(
+          statBox('Status', 'Counting'),
+          statBox(unitLabel, pid),
+          statBox('Type', urbanTag)
+        );
+        barsEl.appendChild(el('div', { className: 'subtitle', text: `Awaiting ballot count from ${geo.label}…` }));
         return;
       }
 
@@ -88,18 +103,19 @@ export class InspectorUI {
       const ranked = rankParties(rep.votes);
       const margin = ranked.length >= 2 && total > 0 ? ((ranked[0][1] - ranked[1][1]) / total) * 100 : 0;
 
-      statsEl.innerHTML = `
-        <div class="stat-box"><div class="stat-label">${repPct < 100 ? `Counted (${repPct}%)` : 'Votes'}</div><div class="stat-value">${formatCompact(total)}</div></div>
-        <div class="stat-box"><div class="stat-label">Turnout</div><div class="stat-value">${turnout.toFixed(1)}%</div></div>
-        <div class="stat-box"><div class="stat-label">Margin</div><div class="stat-value">+${margin.toFixed(1)}%</div></div>
-      `;
+      statsEl.append(
+        statBox(repPct < 100 ? `Counted (${repPct}%)` : 'Votes', formatCompact(total)),
+        statBox('Turnout', `${turnout.toFixed(1)}%`),
+        statBox('Margin', `+${margin.toFixed(1)}%`)
+      );
       this.renderBars(barsEl, rep.votes, null, reg.threshold);
       return;
     }
 
-    // Member State view
+    // Region view
     const rid = this.state.selection.id;
     const reg = this.state.regionsById[rid];
+    if (!reg) return;
     const votes = this.state.regionVotes[rid] || {};
     const seats = this.state.regionSeats[rid] || {};
     const repCount = this.state.regionReportedCount[rid] || 0;
@@ -112,31 +128,55 @@ export class InspectorUI {
     const usesThreshold = activeMethod !== 'fptp' && activeMethod !== 'stv';
     const methodLabel = METHOD_LABELS[activeMethod] || activeMethod.replace('_', ' ').toUpperCase();
     const thrLabel = Number((reg.threshold * 100).toFixed(1));
-    kickerEl.textContent = usesThreshold
-      ? `MEMBER STATE · ${methodLabel} (${thrLabel}%)`
-      : `MEMBER STATE · ${methodLabel}`;
+    const splitTag = (!this.state.methodOverride && reg.district_seats > 0) ? ' + DISTRICTS' : '';
+    kickerEl.textContent = usesThreshold && reg.threshold > 0
+      ? `${regionLabel} · ${methodLabel} (${thrLabel}%)`
+      : `${regionLabel} · ${methodLabel}${splitTag}`;
     titleEl.textContent = reg.name;
 
-    actionsEl.innerHTML = `<button class="btn" id="btn-zoom-country">Focus ${reg.name}</button>`;
-    document.getElementById('btn-zoom-country').onclick = () => this.cb.onFocusRegion(rid);
+    actionsEl.appendChild(
+      el('button', {
+        className: 'btn',
+        text: `Focus ${reg.name}`,
+        onClick: () => this.cb.onFocusRegion(rid)
+      })
+    );
 
-    statsEl.innerHTML = `
-      <div class="stat-box"><div class="stat-label">Seats</div><div class="stat-value">${reg.seats}</div></div>
-      <div class="stat-box"><div class="stat-label">Counted</div><div class="stat-value">${regPct}% (${repCount}/${totalCount})</div></div>
-      <div class="stat-box"><div class="stat-label">Votes</div><div class="stat-value">${total > 0 ? formatCompact(total) : 'Exit Poll'}</div></div>
-    `;
+    const seatHeading = seatLabel.charAt(0).toUpperCase() + seatLabel.slice(1);
+    statsEl.append(
+      statBox(seatHeading, reg.seats),
+      statBox('Counted', `${regPct}% (${repCount}/${totalCount})`),
+      statBox('Votes', total > 0 ? formatCompact(total) : 'Exit Poll')
+    );
+
+    const dw = this.state.districtWinners?.[rid];
+    if (dw && Object.keys(dw).length > 0 && !this.state.methodOverride) {
+      const strip = el('div', { className: 'district-badges' });
+      for (const did of Object.keys(dw).sort()) {
+        const winner = this.state.partiesById[dw[did]];
+        strip.appendChild(
+          el(
+            'span',
+            { className: 'district-badge' },
+            swatch(winner?.color),
+            el('strong', { text: did }),
+            ` ${winner ? winner.short_name : '—'}`
+          )
+        );
+      }
+      barsEl.appendChild(strip);
+    }
 
     if (total > 0) {
       this.renderBars(barsEl, votes, seats, usesThreshold ? reg.threshold : 0);
     } else {
-      this.renderExitBars(barsEl, seats, reg.seats);
+      this.renderExitBars(barsEl, seats, reg.seats, seatLabel);
     }
   }
 
   renderBars(container, votesMap, seatsMap, threshold) {
     const total = sumVotes(votesMap);
     const ranked = rankParties(votesMap);
-    container.innerHTML = '';
 
     for (const [pid, v] of ranked) {
       const p = this.state.partiesById[pid];
@@ -145,39 +185,57 @@ export class InspectorUI {
       const pct = share * 100;
       const seats = seatsMap ? seatsMap[pid] || 0 : null;
       const belowThr = seatsMap && threshold > 0 && share < threshold;
-      const groupObj = p.group_id ? this.state.groupsById[p.group_id] : (this.state.scenario?.groups?.length ? this.state.groupsById.ni : null);
-      const tagHtml = groupObj ? `<span class="group-tag">${groupObj.short_name}</span>` : '';
+      const groupObj = p.group_id
+        ? this.state.groupsById[p.group_id]
+        : (this.state.scenario?.groups?.length ? this.state.groupsById.ni : null);
+      const col = safeColor(p.color);
 
-      const row = document.createElement('div');
-      row.className = 'bar-row';
-      row.style.opacity = belowThr ? '0.42' : '1';
-      row.innerHTML = `
-        <div class="bar-meta">
-          <span class="bar-party"><span class="swatch" style="background:${p.color}"></span>${p.short_name} ${tagHtml}</span>
-          <span class="mono">${pct.toFixed(1)}%${seats !== null ? ` · <strong>${seats}</strong>` : ''}</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, pct * 2).toFixed(1)}%;background:${p.color}"></div></div>
-      `;
+      const partySpan = el('span', { className: 'bar-party' }, swatch(col), p.short_name);
+      if (groupObj) {
+        partySpan.appendChild(document.createTextNode(' '));
+        partySpan.appendChild(el('span', { className: 'group-tag', text: groupObj.short_name }));
+      }
+
+      const numSpan = el('span', { className: 'mono' }, `${pct.toFixed(1)}%`);
+      if (seats !== null) {
+        numSpan.appendChild(document.createTextNode(' · '));
+        numSpan.appendChild(el('strong', { text: seats }));
+      }
+
+      const row = el(
+        'div',
+        { className: 'bar-row', style: { opacity: belowThr ? '0.42' : '1' } },
+        el('div', { className: 'bar-meta' }, partySpan, numSpan),
+        el('div', { className: 'bar-track' }, el('div', {
+          className: 'bar-fill',
+          style: { width: `${Math.min(100, pct).toFixed(1)}%`, background: col }
+        }))
+      );
       container.appendChild(row);
     }
   }
 
-  renderExitBars(container, seatsMap, totalSeats) {
+  renderExitBars(container, seatsMap, totalSeats, seatLabel = 'seats') {
     const ranked = rankParties(seatsMap);
-    container.innerHTML = '';
     for (const [pid, s] of ranked) {
       const p = this.state.partiesById[pid];
       if (!p) continue;
       const pct = totalSeats > 0 ? (s / totalSeats) * 100 : 0;
-      const row = document.createElement('div');
-      row.className = 'bar-row';
-      row.innerHTML = `
-        <div class="bar-meta">
-          <span class="bar-party"><span class="swatch" style="background:${p.color}"></span>${p.short_name}</span>
-          <span class="mono"><strong>${s}</strong> seats (Exit)</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, pct * 2).toFixed(1)}%;background:${p.color}"></div></div>
-      `;
+      const col = safeColor(p.color);
+      const row = el(
+        'div',
+        { className: 'bar-row' },
+        el(
+          'div',
+          { className: 'bar-meta' },
+          el('span', { className: 'bar-party' }, swatch(col), p.short_name),
+          el('span', { className: 'mono' }, el('strong', { text: s }), ` ${seatLabel} (Exit)`)
+        ),
+        el('div', { className: 'bar-track' }, el('div', {
+          className: 'bar-fill',
+          style: { width: `${Math.min(100, pct).toFixed(1)}%`, background: col }
+        }))
+      );
       container.appendChild(row);
     }
   }
@@ -185,10 +243,11 @@ export class InspectorUI {
   showTooltip(e, regionId, precinctId) {
     const geo = this.state.precinctGeo[precinctId];
     const reg = this.state.regionsById[regionId];
+    if (!geo || !reg) return;
     const rep = this.state.precincts[precinctId];
     const urbanTag = URBAN_LABELS[geo.urbanType] || '';
 
-    let sub = `${urbanTag} · Counting…`;
+    let sub = `${urbanTag}${geo.districtId ? ` · ${geo.districtId}` : ''} · Counting…`;
     if (rep) {
       const total = sumVotes(rep.votes);
       const repPct = Math.round((rep.reported_pct || 1) * 100);
@@ -201,24 +260,65 @@ export class InspectorUI {
       sub = `${lead ? lead.short_name : '—'} ${leadPct}% · Turnout ${turnout}%${pctTag}`;
     }
 
-    this.tooltip.innerHTML = `
-      <div class="tooltip-title">${geo.label} (${reg.id.toUpperCase()})</div>
-      <div class="tooltip-sub">${sub}</div>
-    `;
+    clearEl(this.tooltip);
+    this.tooltip.append(
+      el('div', { className: 'tooltip-title', text: `${geo.label} (${reg.id.toUpperCase()})` }),
+      el('div', { className: 'tooltip-sub', text: sub })
+    );
     this.tooltip.classList.remove('hidden');
+    this.tipW = this.tooltip.offsetWidth || 200;
+    this.tipH = this.tooltip.offsetHeight || 52;
+    this.moveTooltip(e);
+  }
+
+  showCalloutTooltip(e, spec) {
+    const reg = this.state.regionsById[spec.region_id];
+    if (!reg) return;
+    const seatLabel = this.state.scenario?.meta?.seat_label || 'seats';
+    let title = `${reg.name} (${reg.seats} ${seatLabel})`;
+    let sub = 'Exit poll / counting…';
+
+    if (spec.district_id && !this.state.methodOverride) {
+      const winnerId = this.state.districtWinners?.[spec.region_id]?.[spec.district_id];
+      const winner = winnerId ? this.state.partiesById[winnerId] : null;
+      title = `${spec.label} · ${reg.name} (${reg.district_seats || 1} ${seatLabel})`;
+      sub = winner ? `Leading: ${winner.short_name} (${winner.name})` : 'Counting…';
+    } else {
+      const votes = this.state.regionVotes[spec.region_id];
+      const total = sumVotes(votes);
+      const pct = this.state.regionPct?.[spec.region_id] ?? 0;
+      if (total > 0) {
+        const ranked = rankParties(votes);
+        const lead = ranked.length ? this.state.partiesById[ranked[0][0]] : null;
+        const leadPct = ranked.length ? ((ranked[0][1] / total) * 100).toFixed(1) : '0.0';
+        sub = `${lead ? lead.short_name : '—'} ${leadPct}% · ${pct}% counted`;
+      } else {
+        const rankedSeats = rankParties(this.state.regionSeats[spec.region_id]);
+        const lead = rankedSeats.length ? this.state.partiesById[rankedSeats[0][0]] : null;
+        if (lead) sub = `Exit Poll: ${lead.short_name} · ${pct}% counted`;
+      }
+    }
+
+    clearEl(this.tooltip);
+    this.tooltip.append(
+      el('div', { className: 'tooltip-title', text: title }),
+      el('div', { className: 'tooltip-sub', text: sub })
+    );
+    this.tooltip.classList.remove('hidden');
+    this.tipW = this.tooltip.offsetWidth || 200;
+    this.tipH = this.tooltip.offsetHeight || 52;
     this.moveTooltip(e);
   }
 
   moveTooltip(e) {
     const pad = 12;
-    const tipW = this.tooltip.offsetWidth || 200;
-    const tipH = this.tooltip.offsetHeight || 52;
+    const tipW = this.tipW || 200;
+    const tipH = this.tipH || 52;
     let x = e.clientX + 14;
     let y = e.clientY + 14;
     if (x + tipW + pad > window.innerWidth) x = Math.max(pad, e.clientX - tipW - 14);
     if (y + tipH + pad > window.innerHeight) y = Math.max(pad, e.clientY - tipH - 14);
-    this.tooltip.style.left = `${x}px`;
-    this.tooltip.style.top = `${y}px`;
+    this.tooltip.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`;
   }
 
   hideTooltip() {
@@ -243,22 +343,27 @@ export class InspectorUI {
     });
     if (this.state.ticker.length > 3) this.state.ticker.pop();
 
-    this.tickerEl.innerHTML = '';
+    clearEl(this.tickerEl);
     for (const item of this.state.ticker) {
-      const row = document.createElement('div');
-      row.className = 'ticker-row';
-      row.innerHTML = `
-        <span class="ticker-left">
-          <span class="swatch" style="background:${item.leadColor}"></span>
-          <strong>${item.regionId.toUpperCase()}</strong>
-          <span>${item.label}</span>
-        </span>
-        <span class="ticker-right">${item.leadShort} ${item.pct}</span>
-      `;
-      row.onclick = () => {
-        this.cb.onFocusRegion(item.regionId);
-        this.select('precinct', item.precinctId);
-      };
+      const row = el(
+        'button',
+        {
+          type: 'button',
+          className: 'ticker-row',
+          onClick: () => {
+            this.cb.onFocusRegion(item.regionId);
+            this.select('precinct', item.precinctId);
+          }
+        },
+        el(
+          'span',
+          { className: 'ticker-left' },
+          swatch(item.leadColor),
+          el('strong', { text: item.regionId.toUpperCase() }),
+          el('span', { text: item.label })
+        ),
+        el('span', { className: 'ticker-right', text: `${item.leadShort} ${item.pct}` })
+      );
       this.tickerEl.appendChild(row);
     }
   }

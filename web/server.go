@@ -1,30 +1,38 @@
 package web
 
 import (
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"maps"
 	"math"
+	"net"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"parliamentsim/sim"
 )
 
 const (
-	defaultMaxStreams   = 256
-	maxTargetDuration   = 5 * time.Minute
-	maxTargetDurationMs = int(maxTargetDuration / time.Millisecond)
-	maxBaseDelay        = 2 * time.Second
-	maxBaseDelayMs      = int(maxBaseDelay / time.Millisecond)
-	minTemperature      = 0.05
-	maxTemperature      = 10.0
-	maxSwing            = 2.0
+	defaultMaxStreams      = 256
+	defaultMaxStreamsPerIP = 16
+	maxTargetDuration      = 5 * time.Minute
+	maxTargetDurationMs    = int(maxTargetDuration / time.Millisecond)
+	maxBaseDelay           = 2 * time.Second
+	maxBaseDelayMs         = int(maxBaseDelay / time.Millisecond)
+	minTemperature         = 0.05
+	maxTemperature         = 10.0
+	maxSwing               = 2.0
 )
 
 //go:embed static
@@ -32,15 +40,20 @@ var staticFiles embed.FS
 
 // Server serves the ParliamentSim web dashboard and JSON/SSE API endpoints.
 type Server struct {
-	scenario  sim.Scenario
-	streamSem chan struct{}
+	scenario        sim.Scenario
+	streamSem       chan struct{}
+	maxStreamsPerIP int
+	ipMu            sync.Mutex
+	ipStreams       map[string]int
 }
 
 // NewServer creates a Server configured with the given election scenario.
 func NewServer(scenario sim.Scenario) *Server {
 	return &Server{
-		scenario:  scenario,
-		streamSem: make(chan struct{}, defaultMaxStreams),
+		scenario:        scenario,
+		streamSem:       make(chan struct{}, defaultMaxStreams),
+		maxStreamsPerIP: defaultMaxStreamsPerIP,
+		ipStreams:       make(map[string]int),
 	}
 }
 
@@ -54,39 +67,187 @@ func (s *Server) SetMaxStreams(n int) {
 	s.streamSem = make(chan struct{}, n)
 }
 
+// SetMaxStreamsPerIP overrides the maximum concurrent SSE streams allowed per client IP.
+// Values <= 0 disable the per-IP cap. Must be called before serving requests.
+func (s *Server) SetMaxStreamsPerIP(n int) {
+	s.maxStreamsPerIP = n
+}
+
 // Handler returns the HTTP router for the dashboard and API routes.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /api/scenario", s.handleScenario)
+	mux.Handle("GET /api/scenario", gzipMiddleware(http.HandlerFunc(s.handleScenario)))
 	mux.HandleFunc("GET /api/stream", s.handleStream)
 
 	sub, err := fs.Sub(staticFiles, "static")
 	if err != nil {
 		panic(err)
 	}
-	mux.Handle("GET /", http.FileServerFS(sub))
+	etags := buildStaticETags(sub)
+	fileSrv := http.FileServerFS(sub)
+	mux.Handle("GET /", gzipMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		cleanPath := strings.TrimPrefix(p, "/")
+		if cleanPath == "" {
+			cleanPath = "index.html"
+		}
+		if etag, ok := etags[cleanPath]; ok {
+			w.Header().Set("ETag", etag)
+			if r.Header.Get("If-None-Match") == etag {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
+		if strings.HasPrefix(p, "/geo/") || strings.HasPrefix(p, "/js/") || strings.HasSuffix(p, ".css") {
+			w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+		fileSrv.ServeHTTP(w, r)
+	})))
 
-	return mux
+	return securityHeadersMiddleware(mux)
+}
+
+func buildStaticETags(fsys fs.FS) map[string]string {
+	tags := make(map[string]string)
+	_ = fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		b, err := fs.ReadFile(fsys, path)
+		if err != nil {
+			return nil
+		}
+		sum := sha256.Sum256(b)
+		tags[path] = `"` + hex.EncodeToString(sum[:8]) + `"`
+		return nil
+	})
+	return tags
+}
+
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'")
+		next.ServeHTTP(w, r)
+	})
+}
+
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	gz        *gzip.Writer
+	wroteBody bool
+	noBody    bool
+}
+
+func (w *gzipResponseWriter) WriteHeader(code int) {
+	if code == http.StatusNotModified || code == http.StatusNoContent {
+		w.noBody = true
+		w.Header().Del("Content-Encoding")
+	} else {
+		w.Header().Del("Content-Length")
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *gzipResponseWriter) Write(p []byte) (int, error) {
+	if w.noBody {
+		return 0, nil
+	}
+	w.Header().Del("Content-Length")
+	w.wroteBody = true
+	return w.gz.Write(p)
+}
+
+var gzipPool = sync.Pool{
+	New: func() any {
+		gz, _ := gzip.NewWriterLevel(io.Discard, gzip.DefaultCompression)
+		return gz
+	},
+}
+
+func gzipMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Add("Vary", "Accept-Encoding")
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzipPool.Get().(*gzip.Writer)
+		gz.Reset(w)
+		grw := &gzipResponseWriter{ResponseWriter: w, gz: gz}
+		defer func() {
+			if grw.wroteBody {
+				_ = gz.Close()
+			}
+			gz.Reset(io.Discard)
+			gzipPool.Put(gz)
+		}()
+		next.ServeHTTP(grw, r)
+	})
+}
+
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func (s *Server) acquireIPSlot(ip string) bool {
+	if s.maxStreamsPerIP <= 0 || ip == "" {
+		return true
+	}
+	s.ipMu.Lock()
+	defer s.ipMu.Unlock()
+	if s.ipStreams[ip] >= s.maxStreamsPerIP {
+		return false
+	}
+	s.ipStreams[ip]++
+	return true
+}
+
+func (s *Server) releaseIPSlot(ip string) {
+	if s.maxStreamsPerIP <= 0 || ip == "" {
+		return
+	}
+	s.ipMu.Lock()
+	defer s.ipMu.Unlock()
+	if s.ipStreams[ip] <= 1 {
+		delete(s.ipStreams, ip)
+	} else {
+		s.ipStreams[ip]--
+	}
 }
 
 func (s *Server) handleScenario(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(s.scenario)
+	out := s.scenario
+	out.Meta = s.scenario.EffectiveMeta()
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 type exitPollPayload struct {
-	RegionSeats    map[string]map[string]int `json:"region_seats"`
-	EUSeats        map[string]int            `json:"eu_seats"`
-	PrevEUSeats    map[string]int            `json:"prev_eu_seats"`
-	Coalitions     []sim.Coalition           `json:"coalitions"`
-	TotalPrecincts int                       `json:"total_precincts"`
+	RegionSeats     map[string]map[string]int    `json:"region_seats"`
+	DistrictWinners map[string]map[string]string `json:"district_winners,omitempty"`
+	EUSeats         map[string]int               `json:"eu_seats"`
+	PrevEUSeats     map[string]int               `json:"prev_eu_seats"`
+	Coalitions      []sim.Coalition              `json:"coalitions"`
+	TotalPrecincts  int                          `json:"total_precincts"`
 }
 
 type precinctPayload struct {
 	Report            sim.PrecinctReport `json:"report"`
 	RegionVotes       map[string]int     `json:"region_votes"`
 	RegionSeats       map[string]int     `json:"region_seats"`
+	DistrictWinners   map[string]string  `json:"district_winners,omitempty"`
 	EUSeats           *map[string]int    `json:"eu_seats,omitempty"`
 	Coalitions        []sim.Coalition    `json:"coalitions,omitempty"`
 	ReportedPrecincts int                `json:"reported_precincts"`
@@ -100,6 +261,14 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
+
+	ip := clientIP(r)
+	if !s.acquireIPSlot(ip) {
+		w.Header().Set("Retry-After", "5")
+		http.Error(w, "too many concurrent streams from this address", http.StatusTooManyRequests)
+		return
+	}
+	defer s.releaseIPSlot(ip)
 
 	if s.streamSem != nil {
 		select {
@@ -126,6 +295,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	state := sim.NewElectionState(scenario)
 	prepared := sim.PrepareElection(scenario.Regions, scenario.Parties, cfg)
 	exitRegionSeats := prepared.ExitPollSeats()
+	exitDistrictWinners := prepared.ExitPollDistrictWinners()
 	var prevEUSeats map[string]int
 	if len(scenario.PrevSeats) > 0 {
 		prevEUSeats = maps.Clone(scenario.PrevSeats)
@@ -137,14 +307,16 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		prevEUSeats = scenario.AggregateEUSeats(prevRegionSeats)
 	}
 	state.SeedSeats(exitRegionSeats)
+	state.SeedDistrictWinners(exitDistrictWinners)
 	_, totalPrecincts, _ := state.Progress()
 
 	if err := writeSSE(w, flusher, "exit_poll", exitPollPayload{
-		RegionSeats:    exitRegionSeats,
-		EUSeats:        state.EUSeats(),
-		PrevEUSeats:    prevEUSeats,
-		Coalitions:     state.Coalitions(),
-		TotalPrecincts: totalPrecincts,
+		RegionSeats:     exitRegionSeats,
+		DistrictWinners: exitDistrictWinners,
+		EUSeats:         state.EUSeats(),
+		PrevEUSeats:     prevEUSeats,
+		Coalitions:      state.Coalitions(),
+		TotalPrecincts:  totalPrecincts,
 	}); err != nil {
 		return
 	}
@@ -162,6 +334,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 			Report:            rep,
 			RegionVotes:       state.RegionVotes(rep.RegionID),
 			RegionSeats:       state.RegionSeats(rep.RegionID),
+			DistrictWinners:   state.DistrictWinners(rep.RegionID),
 			ReportedPrecincts: completed,
 			TotalPrecincts:    total,
 			CountedPct:        countedPct,
@@ -194,6 +367,7 @@ func (s *Server) scenarioForMethod(override sim.AllocationMethod) sim.Scenario {
 	sc.Regions = slices.Clone(s.scenario.Regions)
 	for i := range sc.Regions {
 		sc.Regions[i].Method = override
+		sc.Regions[i].DistrictSeats = 0
 	}
 	return sc
 }
@@ -224,7 +398,7 @@ func (s *Server) parseElectionConfig(r *http.Request) sim.ElectionConfig {
 	if v, err := strconv.ParseInt(q.Get("seed"), 10, 64); err == nil {
 		cfg.Seed = v
 	}
-	if v, err := strconv.Atoi(q.Get("waves")); err == nil && v >= 1 && v <= 6 {
+	if v, err := strconv.Atoi(q.Get("waves")); err == nil && v >= 1 && v <= 4 {
 		cfg.Waves = v
 	}
 	if v, err := strconv.Atoi(q.Get("duration_ms")); err == nil && v >= 0 {
@@ -252,10 +426,23 @@ func writeSSE(w http.ResponseWriter, flusher http.Flusher, event string, payload
 func noisyRegionSeats(reg sim.Region, parties []sim.Party, temp, swing float64, seed int64) map[string]int {
 	reports := sim.SimulatePrecincts(reg, parties, temp, swing, seed)
 	votes := make(map[string]int)
+	var districtVotes map[string]map[string]int
+	if reg.DistrictSeats > 0 {
+		districtVotes = make(map[string]map[string]int)
+	}
 	for _, rep := range reports {
 		for pid, v := range rep.Votes {
 			votes[pid] += v
 		}
+		if reg.DistrictSeats > 0 && rep.DistrictID != "" {
+			if districtVotes[rep.DistrictID] == nil {
+				districtVotes[rep.DistrictID] = make(map[string]int, len(rep.Votes))
+			}
+			for pid, v := range rep.Votes {
+				districtVotes[rep.DistrictID][pid] += v
+			}
+		}
 	}
-	return sim.AllocateSeats(votes, reg, reg.EffectiveParties(parties))
+	seats, _ := sim.AllocateRegionSeats(votes, districtVotes, reg, reg.EffectiveParties(parties))
+	return seats
 }

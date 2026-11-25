@@ -1,4 +1,5 @@
 // Overlay color calculations, Light/Dark neutral blending, and dynamic legends.
+import { clearEl, el, safeColor } from './dom.js';
 
 export function sumVotes(votesMap) {
   let total = 0;
@@ -10,8 +11,23 @@ export function rankParties(votesMap) {
   return Object.entries(votesMap || {}).sort((a, b) => b[1] - a[1]);
 }
 
-function hexToRgb(hex) {
-  const h = (hex || '#64748b').replace('#', '');
+function hexToRgb(color) {
+  const c = safeColor(color, '#64748b');
+  if (c.startsWith('rgb(')) {
+    const m = c.match(/\d+/g);
+    if (m && m.length >= 3) {
+      return [parseInt(m[0], 10), parseInt(m[1], 10), parseInt(m[2], 10)];
+    }
+    return [100, 116, 139];
+  }
+  const h = c.replace('#', '');
+  if (h.length === 3) {
+    return [
+      parseInt(h[0] + h[0], 16),
+      parseInt(h[1] + h[1], 16),
+      parseInt(h[2] + h[2], 16)
+    ];
+  }
   return [
     parseInt(h.slice(0, 2), 16),
     parseInt(h.slice(2, 4), 16),
@@ -27,14 +43,15 @@ function mixColor(c1, c2, t) {
   return `rgb(${r},${g},${b})`;
 }
 
-function isDark() {
+function isDark(state) {
+  if (state && typeof state.isDark === 'boolean') return state.isDark;
   return document.documentElement.dataset.theme === 'dark';
 }
 
 export function resolvePartyColor(state, party) {
   if (!party) return '#64748b';
   const hasGroups = state.scenario?.groups?.length > 0;
-  if (!hasGroups) return party.color;
+  if (!hasGroups) return safeColor(party.color);
 
   const useGroup =
     state.colorMode === 'group' ||
@@ -42,13 +59,13 @@ export function resolvePartyColor(state, party) {
 
   if (useGroup) {
     const gid = party.group_id || 'ni';
-    return state.groupsById[gid]?.color || party.color;
+    return safeColor(state.groupsById[gid]?.color || party.color);
   }
-  return party.color;
+  return safeColor(party.color);
 }
 
 export function computeCountyColor(state, votesMap, eligibleVoters, fallbackSeats, reportedPct = 1) {
-  const dark = isDark();
+  const dark = isDark(state);
   const neutral = dark ? [33, 43, 54] : [223, 228, 232];
   const centerNeutral = dark ? [52, 63, 76] : [238, 241, 244];
   const total = sumVotes(votesMap);
@@ -84,7 +101,7 @@ export function computeCountyColor(state, votesMap, eligibleVoters, fallbackSeat
       if (pid === state.heatmapPartyId || gid === state.heatmapPartyId) groupVotes += v;
     }
     const share = groupVotes / total;
-    const intensity = Math.min(1, share / 0.42);
+    const intensity = Math.min(1, share / 0.65);
     return mixColor(neutral, hexToRgb(target?.color || '#1e88e5'), 0.08 + intensity * 0.90);
   }
 
@@ -116,7 +133,6 @@ export function computeCountyColor(state, votesMap, eligibleVoters, fallbackSeat
         ? mixColor(centerNeutral, [30, 64, 175], norm)
         : mixColor(centerNeutral, [220, 38, 38], -norm);
     }
-    // mig_axis: -1 open (teal) <-> +1 strict (purple/crimson)
     return norm >= 0
       ? mixColor(centerNeutral, [153, 27, 27], norm)
       : mixColor(centerNeutral, [13, 148, 136], -norm);
@@ -125,45 +141,46 @@ export function computeCountyColor(state, votesMap, eligibleVoters, fallbackSeat
   return dark ? '#212b36' : '#dfe4e8';
 }
 
-export function renderLegend(state, legendEl, partyPickerWrap, colorModeRow) {
-  partyPickerWrap.classList.toggle('hidden', state.overlay !== 'party');
-  colorModeRow.classList.toggle('hidden', state.overlay !== 'winner' || !(state.scenario?.groups?.length));
+function appendLegendBar(legendEl, gradient, labels) {
+  legendEl.appendChild(el('div', { className: 'legend-bar', style: { background: gradient } }));
+  legendEl.appendChild(el('div', { className: 'legend-labels' }, ...labels.map((txt) => el('span', { text: txt }))));
+}
 
-  const dark = isDark();
+export function renderLegend(state, legendEl, partyPickerWrap, colorModeRow) {
+  const hasGroups = Boolean(state.scenario?.groups?.length);
+  partyPickerWrap.classList.toggle('hidden', state.overlay !== 'party');
+  colorModeRow.classList.toggle('hidden', state.overlay !== 'winner' || !hasGroups);
+
+  const dark = isDark(state);
   const baseHex = dark ? '#212b36' : '#dfe4e8';
   const midHex = dark ? '#343f4c' : '#eef1f4';
 
+  clearEl(legendEl);
+
   if (state.overlay === 'winner') {
-    const modeNote = state.colorMode === 'auto'
-      ? (state.zoomedIn ? 'National Parties' : 'EU Groups')
-      : (state.colorMode === 'group' ? 'EU Groups' : 'National Parties');
-    legendEl.innerHTML = `<div class="legend-labels"><span>${modeNote}</span><span>Vivid = Bigger Margin</span></div>`;
+    const modeNote = !hasGroups
+      ? 'Leading Party'
+      : state.colorMode === 'auto'
+        ? (state.zoomedIn ? 'National Parties' : 'Political Groups')
+        : (state.colorMode === 'group' ? 'Political Groups' : 'National Parties');
+    legendEl.appendChild(
+      el('div', { className: 'legend-labels' }, el('span', { text: modeNote }), el('span', { text: 'Vivid = Bigger Margin' }))
+    );
   } else if (state.overlay === 'party') {
     const p = state.groupsById[state.heatmapPartyId] || state.partiesById[state.heatmapPartyId];
-    legendEl.innerHTML = `
-      <div class="legend-bar" style="background:linear-gradient(90deg, ${baseHex}, ${p?.color || '#1e88e5'})"></div>
-      <div class="legend-labels"><span>0%</span><span>20%</span><span>40%+</span></div>
-    `;
+    appendLegendBar(legendEl, `linear-gradient(90deg, ${baseHex}, ${safeColor(p?.color, '#1e88e5')})`, ['0%', '30%', '65%+']);
   } else if (state.overlay === 'turnout') {
     const hi = dark ? '#14b8a6' : '#0d7a72';
-    legendEl.innerHTML = `
-      <div class="legend-bar" style="background:linear-gradient(90deg, ${baseHex}, ${hi})"></div>
-      <div class="legend-labels"><span>35%</span><span>58%</span><span>80%+</span></div>
-    `;
+    appendLegendBar(legendEl, `linear-gradient(90deg, ${baseHex}, ${hi})`, ['35%', '58%', '80%+']);
   } else if (state.overlay === 'eu_axis') {
-    legendEl.innerHTML = `
-      <div class="legend-bar" style="background:linear-gradient(90deg, #d97706, ${midHex}, #1d4ed8)"></div>
-      <div class="legend-labels"><span>Eurosceptic</span><span>Neutral</span><span>Pro-EU</span></div>
-    `;
+    const metaPoles = state.scenario?.meta?.axis2_poles;
+    const poles = (Array.isArray(metaPoles) && metaPoles.length === 3 && metaPoles[0])
+      ? metaPoles
+      : ['Eurosceptic', 'Neutral', 'Pro-EU'];
+    appendLegendBar(legendEl, `linear-gradient(90deg, #d97706, ${midHex}, #1d4ed8)`, poles);
   } else if (state.overlay === 'econ_axis') {
-    legendEl.innerHTML = `
-      <div class="legend-bar" style="background:linear-gradient(90deg, #dc2626, ${midHex}, #1e40af)"></div>
-      <div class="legend-labels"><span>Econ Left</span><span>Center</span><span>Econ Right</span></div>
-    `;
+    appendLegendBar(legendEl, `linear-gradient(90deg, #dc2626, ${midHex}, #1e40af)`, ['Econ Left', 'Center', 'Econ Right']);
   } else if (state.overlay === 'mig_axis') {
-    legendEl.innerHTML = `
-      <div class="legend-bar" style="background:linear-gradient(90deg, #0d9488, ${midHex}, #991b1b)"></div>
-      <div class="legend-labels"><span>Open</span><span>Balanced</span><span>Strict Borders</span></div>
-    `;
+    appendLegendBar(legendEl, `linear-gradient(90deg, #0d9488, ${midHex}, #991b1b)`, ['Open', 'Balanced', 'Strict Borders']);
   }
 }

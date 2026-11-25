@@ -1,6 +1,10 @@
 package sim
 
-import "math"
+import (
+	"maps"
+	"math"
+	"slices"
+)
 
 // VoterGroup is a demographic slice of a region's electorate with shared
 // policy preferences, issue weights, and turnout rate.
@@ -26,7 +30,9 @@ type Region struct {
 	DistrictTilts map[string]map[string]float64 `json:"district_tilts,omitempty"`
 	Parties       []Party                       `json:"parties,omitempty"`
 	UseNUTS3      bool                          `json:"use_nuts3,omitempty"`
-	PollCloseHour float64                       `json:"poll_close_hour,omitempty"` // local CET closing hour (e.g. 18.0 to 23.0)
+	GeoPack       string                        `json:"geo_pack,omitempty"`
+	DistrictSeats int                           `json:"district_seats,omitempty"` // seats awarded per DistrictID (parallel two-tier when > 0)
+	PollCloseHour float64                       `json:"poll_close_hour,omitempty"` // closing hour in scenario clock (e.g. 18.0 to 25.0)
 }
 
 // ExpectedVoters returns the rounded number of voters expected to turn out.
@@ -51,10 +57,45 @@ func (r Region) EffectiveParties(fallback []Party) []Party {
 	return fallback
 }
 
+// EffectiveGeoPack returns the GeoPack name for r.
+// Explicit r.GeoPack takes precedence; legacy r.UseNUTS3 maps to GeoPackEU.
+func (r Region) EffectiveGeoPack() string {
+	if r.GeoPack != "" {
+		return r.GeoPack
+	}
+	if r.UseNUTS3 {
+		return GeoPackEU
+	}
+	return ""
+}
+
+// DistrictIDs returns the sorted unique non-empty DistrictIDs belonging to r's
+// GeoPack units, or nil if r does not use a GeoPack or has no district IDs.
+func (r Region) DistrictIDs() []string {
+	pack := r.EffectiveGeoPack()
+	if pack == "" {
+		return nil
+	}
+	units := GeoPackUnits(pack, r.ID)
+	if len(units) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	for _, u := range units {
+		if u.DistrictID != "" {
+			seen[u.DistrictID] = struct{}{}
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	return slices.Sorted(maps.Keys(seen))
+}
+
 // EffectivePrecinctCount returns the number of reporting units simulated for r.
 func (r Region) EffectivePrecinctCount() int {
-	if r.UseNUTS3 {
-		if units := NUTS3Units(r.ID); len(units) > 0 {
+	if pack := r.EffectiveGeoPack(); pack != "" {
+		if units := GeoPackUnits(pack, r.ID); len(units) > 0 {
 			return len(units)
 		}
 	}

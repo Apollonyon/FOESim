@@ -48,10 +48,11 @@ func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 // PreparedElection holds concurrently simulated region reports and correlated
 // exit-poll projections ready to stream without recomputing precinct votes.
 type PreparedElection struct {
-	regions   []Region
-	cfg       ElectionConfig
-	perRegion [][]PrecinctReport
-	exitSeats map[string]map[string]int
+	regions             []Region
+	cfg                 ElectionConfig
+	perRegion           [][]PrecinctReport
+	exitSeats           map[string]map[string]int
+	exitDistrictWinners map[string]map[string]string
 }
 
 // PrepareElection simulates all regions concurrently once and derives correlated
@@ -66,6 +67,7 @@ func PrepareElection(regions []Region, parties []Party, cfg ElectionConfig) *Pre
 
 	perRegion := make([][]PrecinctReport, len(regions))
 	exitByIdx := make([]map[string]int, len(regions))
+	exitWinnersByIdx := make([]map[string]string, len(regions))
 	var wg sync.WaitGroup
 
 	for ri, reg := range regions {
@@ -74,21 +76,26 @@ func PrepareElection(regions []Region, parties []Party, cfg ElectionConfig) *Pre
 			defer wg.Done()
 			reports := simulatePrecincts(reg, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift)
 			perRegion[ri] = reports
-			exitByIdx[ri] = computeExitPollRegionSeats(reg, reports, cfg.Seed, ri, pollSigma, parties)
+			exitByIdx[ri], exitWinnersByIdx[ri] = computeExitPollRegionSeats(reg, reports, cfg.Seed, ri, pollSigma, parties)
 		}()
 	}
 	wg.Wait()
 
 	exitSeats := make(map[string]map[string]int, len(regions))
+	exitDistrictWinners := make(map[string]map[string]string)
 	for ri, reg := range regions {
 		exitSeats[reg.ID] = exitByIdx[ri]
+		if len(exitWinnersByIdx[ri]) > 0 {
+			exitDistrictWinners[reg.ID] = exitWinnersByIdx[ri]
+		}
 	}
 
 	return &PreparedElection{
-		regions:   slices.Clone(regions),
-		cfg:       cfg,
-		perRegion: perRegion,
-		exitSeats: exitSeats,
+		regions:             slices.Clone(regions),
+		cfg:                 cfg,
+		perRegion:           perRegion,
+		exitSeats:           exitSeats,
+		exitDistrictWinners: exitDistrictWinners,
 	}
 }
 
@@ -97,6 +104,19 @@ func (p *PreparedElection) ExitPollSeats() map[string]map[string]int {
 	out := make(map[string]map[string]int, len(p.exitSeats))
 	for rid, seats := range p.exitSeats {
 		out[rid] = maps.Clone(seats)
+	}
+	return out
+}
+
+// ExitPollDistrictWinners returns a copy of the precomputed exit-poll district
+// winners for two-tier regions (regionID -> districtID -> partyID).
+func (p *PreparedElection) ExitPollDistrictWinners() map[string]map[string]string {
+	if len(p.exitDistrictWinners) == 0 {
+		return nil
+	}
+	out := make(map[string]map[string]string, len(p.exitDistrictWinners))
+	for rid, dw := range p.exitDistrictWinners {
+		out[rid] = maps.Clone(dw)
 	}
 	return out
 }
@@ -136,21 +156,40 @@ func ExitPollSeats(regions []Region, parties []Party, cfg ElectionConfig) map[st
 	return PrepareElection(regions, parties, cfg).ExitPollSeats()
 }
 
-func computeExitPollRegionSeats(reg Region, reports []PrecinctReport, seed int64, ri int, pollSigma float64, parties []Party) map[string]int {
+func computeExitPollRegionSeats(reg Region, reports []PrecinctReport, seed int64, ri int, pollSigma float64, parties []Party) (map[string]int, map[string]string) {
 	votes := make(map[string]int)
+	var districtVotes map[string]map[string]int
+	if reg.DistrictSeats > 0 {
+		districtVotes = make(map[string]map[string]int)
+	}
 	for _, rep := range reports {
 		for pid, v := range rep.Votes {
 			votes[pid] += v
 		}
+		if reg.DistrictSeats > 0 && rep.DistrictID != "" {
+			if districtVotes[rep.DistrictID] == nil {
+				districtVotes[rep.DistrictID] = make(map[string]int, len(rep.Votes))
+			}
+			for pid, v := range rep.Votes {
+				districtVotes[rep.DistrictID][pid] += v
+			}
+		}
 	}
 	if pollSigma > 0 {
 		rng := rand.New(rand.NewPCG(uint64(seed)^0x51a7, uint64(ri+1)))
+		mults := make(map[string]float64, len(votes))
 		for _, pid := range slices.Sorted(maps.Keys(votes)) {
 			mult := math.Max(0.5, 1.0+rng.NormFloat64()*pollSigma)
+			mults[pid] = mult
 			votes[pid] = int(math.Round(float64(votes[pid]) * mult))
 		}
+		for _, dv := range districtVotes {
+			for pid, v := range dv {
+				dv[pid] = int(math.Round(float64(v) * mults[pid]))
+			}
+		}
 	}
-	return AllocateSeats(votes, reg, reg.EffectiveParties(parties))
+	return AllocateRegionSeats(votes, districtVotes, reg, reg.EffectiveParties(parties))
 }
 
 func euPolicyShock(seed int64, swing float64) PolicyVec {
@@ -281,8 +320,8 @@ func simulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 }
 
 func resolveUnits(r Region) []PrecinctUnit {
-	if r.UseNUTS3 {
-		if units := NUTS3Units(r.ID); len(units) > 0 {
+	if pack := r.EffectiveGeoPack(); pack != "" {
+		if units := GeoPackUnits(pack, r.ID); len(units) > 0 {
 			return units
 		}
 	}
@@ -482,7 +521,7 @@ func streamRegionReports(ctx context.Context, out chan<- PrecinctReport, ri int,
 		return
 	}
 
-	if r.UseNUTS3 && len(reports) > 1 {
+	if r.EffectiveGeoPack() != "" && len(reports) > 1 {
 		rng.Shuffle(len(reports), func(i, j int) {
 			reports[i], reports[j] = reports[j], reports[i]
 		})

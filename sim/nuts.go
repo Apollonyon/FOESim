@@ -2,44 +2,33 @@ package sim
 
 import (
 	_ "embed"
-	"encoding/json"
-	"fmt"
 	"math"
-	"slices"
-	"strings"
-	"sync"
 )
 
 //go:embed data/nuts3_meta.json
 var nuts3MetaRaw []byte
 
-// PrecinctUnit describes a geographic reporting unit (such as a Eurostat NUTS-3 county).
+func init() {
+	RegisterGeoPackJSON(GeoPackEU, nuts3MetaRaw)
+}
+
+// PrecinctUnit describes a geographic reporting unit (such as a Eurostat NUTS-3 county
+// or a US county).
 type PrecinctUnit struct {
 	ID         string  `json:"id"`
 	DistrictID string  `json:"district_id,omitempty"`
 	Name       string  `json:"name"`
 	UrbanType  int     `json:"urban_type,omitempty"` // 1 = urban, 2 = intermediate, 3 = rural
-	Population int     `json:"population,omitempty"` // real Eurostat 2023 resident population
+	Population int     `json:"population,omitempty"` // resident population
 	Weight     float64 `json:"weight"`               // normalized share of region population
-	WealthZ    float64 `json:"wealth_z,omitempty"`   // country-relative log-GDP/capita z-score in [-1.5, 1.5]
-	AgeZ       float64 `json:"age_z,omitempty"`      // country-relative age 65+ share z-score in [-1.5, 1.5]
+	WealthZ    float64 `json:"wealth_z,omitempty"`   // region-relative wealth z-score in [-1.5, 1.5]
+	AgeZ       float64 `json:"age_z,omitempty"`      // region-relative age 65+ share z-score in [-1.5, 1.5]
 }
-
-var (
-	nuts3Once sync.Once
-	nuts3Data map[string][]PrecinctUnit
-)
 
 // NUTS3Units returns a copy of the embedded Eurostat NUTS-3 reporting units for
 // a 2-letter Eurostat country code (e.g. "de", "fr", "it", "el"), or nil if none exist.
 func NUTS3Units(regionID string) []PrecinctUnit {
-	nuts3Once.Do(func() {
-		nuts3Data = make(map[string][]PrecinctUnit)
-		if err := json.Unmarshal(nuts3MetaRaw, &nuts3Data); err != nil {
-			panic(fmt.Sprintf("sim: invalid embedded nuts3_meta.json: %v", err))
-		}
-	})
-	return slices.Clone(nuts3Data[strings.ToLower(regionID)])
+	return GeoPackUnits(GeoPackEU, regionID)
 }
 
 func countyTilt(g VoterGroup, u PrecinctUnit) float64 {

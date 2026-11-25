@@ -5,15 +5,98 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
+	"strings"
 )
 
-// Scenario bundles the EU groups, parties, and regions for an election simulation.
+// ScenarioMeta describes presentation, clock, and map metadata for a scenario.
+// Empty fields fall back to EU-27 defaults via Scenario.EffectiveMeta.
+type ScenarioMeta struct {
+	Title          string    `json:"title,omitempty"`
+	SeatLabel      string    `json:"seat_label,omitempty"`
+	RegionLabel    string    `json:"region_label,omitempty"`
+	UnitLabel      string    `json:"unit_label,omitempty"`
+	ChartType      string    `json:"chart_type,omitempty"` // "hemicycle" or "bar"
+	HideCoalitions bool      `json:"hide_coalitions,omitempty"`
+	Timezone       string    `json:"timezone,omitempty"`
+	ClockStartHour float64   `json:"clock_start_hour,omitempty"`
+	ClockEndHour   float64   `json:"clock_end_hour,omitempty"`
+	RegionsURL     string    `json:"regions_url,omitempty"`
+	UnitsURL       string    `json:"units_url,omitempty"`
+	ViewBox        string    `json:"view_box,omitempty"`
+	OverviewLabel  string    `json:"overview_label,omitempty"`
+	Attribution    string    `json:"attribution,omitempty"`
+	WealthLabel    string    `json:"wealth_label,omitempty"`
+	AgeLabel       string    `json:"age_label,omitempty"`
+	Axis2Label     string    `json:"axis2_label,omitempty"`
+	Axis2Poles     [3]string `json:"axis2_poles,omitempty"`
+}
+
+// Scenario bundles the political groups, parties, regions, and UI metadata for an election simulation.
 type Scenario struct {
 	Name      string         `json:"name"`
+	Meta      ScenarioMeta   `json:"meta,omitzero"`
 	Groups    []EUGroup      `json:"groups,omitempty"`
 	Parties   []Party        `json:"parties,omitempty"`
 	PrevSeats map[string]int `json:"prev_seats,omitempty"`
 	Regions   []Region       `json:"regions"`
+}
+
+// EffectiveMeta returns s.Meta with EU-27 defaults filled in for any empty fields.
+func (s Scenario) EffectiveMeta() ScenarioMeta {
+	m := s.Meta
+	if m.Title == "" {
+		m.Title = "European Parliament"
+	}
+	if m.SeatLabel == "" {
+		m.SeatLabel = "seats"
+	}
+	if m.RegionLabel == "" {
+		m.RegionLabel = "Member State"
+	}
+	if m.UnitLabel == "" {
+		m.UnitLabel = "County"
+	}
+	if m.ChartType == "" {
+		m.ChartType = "hemicycle"
+	}
+	if m.Timezone == "" {
+		m.Timezone = "CET"
+	}
+	if m.ClockStartHour <= 0 {
+		m.ClockStartHour = 18.0
+	}
+	if m.ClockEndHour <= 0 {
+		m.ClockEndHour = 25.5
+	}
+	if m.RegionsURL == "" {
+		m.RegionsURL = "/geo/europe_nuts0.json"
+	}
+	if m.UnitsURL == "" {
+		m.UnitsURL = "/geo/nuts3.json"
+	}
+	if m.ViewBox == "" {
+		m.ViewBox = "0 0 1000 860"
+	}
+	if m.OverviewLabel == "" {
+		m.OverviewLabel = "Europe"
+	}
+	if m.Attribution == "" {
+		m.Attribution = "© EuroGeographics / Eurostat"
+	}
+	if m.WealthLabel == "" {
+		m.WealthLabel = "GDP / capita"
+	}
+	if m.AgeLabel == "" {
+		m.AgeLabel = "Age 65+ share"
+	}
+	if m.Axis2Label == "" {
+		m.Axis2Label = "Pro-EU"
+	}
+	if m.Axis2Poles[0] == "" && m.Axis2Poles[1] == "" && m.Axis2Poles[2] == "" {
+		m.Axis2Poles = [3]string{"Eurosceptic", "Neutral", "Pro-EU"}
+	}
+	return m
 }
 
 // LoadScenario reads and validates a JSON election scenario from path.
@@ -82,6 +165,17 @@ func (s Scenario) Validate() error {
 	if len(s.Regions) == 0 {
 		return fmt.Errorf("scenario %q has no regions", s.Name)
 	}
+	switch s.Meta.ChartType {
+	case "", "hemicycle", "bar":
+	default:
+		return fmt.Errorf("scenario %q has unknown chart_type %q", s.Name, s.Meta.ChartType)
+	}
+	if err := validateGeoURL(s.Name, "regions_url", s.Meta.RegionsURL); err != nil {
+		return err
+	}
+	if err := validateGeoURL(s.Name, "units_url", s.Meta.UnitsURL); err != nil {
+		return err
+	}
 
 	knownGroups := make(map[string]bool, len(s.Groups))
 	for _, g := range s.Groups {
@@ -122,8 +216,23 @@ func (s Scenario) Validate() error {
 		if r.Threshold < 0 || r.Threshold > 1 || math.IsNaN(r.Threshold) {
 			return fmt.Errorf("region %q in scenario %q has invalid threshold %g", r.ID, s.Name, r.Threshold)
 		}
-		if r.PollCloseHour < 0 || r.PollCloseHour > 24 || isNonFinite(r.PollCloseHour) {
+		if r.PollCloseHour < 0 || r.PollCloseHour > 30 || isNonFinite(r.PollCloseHour) {
 			return fmt.Errorf("region %q in scenario %q has invalid poll_close_hour %g", r.ID, s.Name, r.PollCloseHour)
+		}
+		if r.GeoPack != "" && !HasGeoPack(r.GeoPack) {
+			return fmt.Errorf("region %q in scenario %q references unknown geo_pack %q", r.ID, s.Name, r.GeoPack)
+		}
+		if r.DistrictSeats < 0 {
+			return fmt.Errorf("region %q in scenario %q has negative district_seats %d", r.ID, s.Name, r.DistrictSeats)
+		}
+		if r.DistrictSeats > 0 {
+			districts := r.DistrictIDs()
+			if len(districts) == 0 {
+				return fmt.Errorf("region %q in scenario %q sets district_seats=%d but has no geopack districts", r.ID, s.Name, r.DistrictSeats)
+			}
+			if len(districts)*r.DistrictSeats > r.Seats {
+				return fmt.Errorf("region %q in scenario %q district seats (%d × %d) exceed total seats (%d)", r.ID, s.Name, len(districts), r.DistrictSeats, r.Seats)
+			}
 		}
 		parties := r.EffectiveParties(s.Parties)
 		if len(parties) == 0 {
@@ -226,4 +335,21 @@ func nonFiniteAxis(v PolicyVec) (int, bool) {
 		}
 	}
 	return -1, false
+}
+
+func validateGeoURL(scenarioName, field, raw string) error {
+	if raw == "" {
+		return nil
+	}
+	if !strings.HasPrefix(raw, "/geo/") || !strings.HasSuffix(raw, ".json") || strings.Contains(raw, "..") || path.Clean(raw) != raw {
+		return fmt.Errorf("scenario %q has invalid %s %q (must be /geo/*.json)", scenarioName, field, raw)
+	}
+	for i := 0; i < len(raw); i++ {
+		c := raw[i]
+		isAlphaNum := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+		if !isAlphaNum && c != '/' && c != '_' && c != '-' && c != '.' {
+			return fmt.Errorf("scenario %q has invalid %s %q (must be /geo/*.json)", scenarioName, field, raw)
+		}
+	}
+	return nil
 }

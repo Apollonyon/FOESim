@@ -12,6 +12,9 @@ type ElectionState struct {
 	partyGroup       map[string]map[string]string
 	euGroups         []EUGroup
 	tallies          map[string]map[string]int
+	districtTallies  map[string]map[string]map[string]int
+	regionDistricts  map[string][]string
+	districtWinners  map[string]map[string]string
 	regionSeats      map[string]map[string]int
 	regionGroupSeats map[string]map[string]int
 	euSeats          map[string]int
@@ -30,6 +33,9 @@ func NewElectionState(s Scenario) *ElectionState {
 		euGroups:         s.EffectiveGroups(),
 		regionByID:       make(map[string]Region, len(s.Regions)),
 		tallies:          make(map[string]map[string]int, len(s.Regions)),
+		districtTallies:  make(map[string]map[string]map[string]int),
+		regionDistricts:  make(map[string][]string),
+		districtWinners:  make(map[string]map[string]string),
 		regionSeats:      make(map[string]map[string]int, len(s.Regions)),
 		regionGroupSeats: make(map[string]map[string]int, len(s.Regions)),
 		euSeats:          make(map[string]int),
@@ -42,6 +48,11 @@ func NewElectionState(s Scenario) *ElectionState {
 		e.regionByID[r.ID] = r
 		e.tallies[r.ID] = make(map[string]int)
 		e.totalPrecincts += r.EffectivePrecinctCount()
+		if r.DistrictSeats > 0 {
+			e.districtTallies[r.ID] = make(map[string]map[string]int)
+			e.regionDistricts[r.ID] = r.DistrictIDs()
+			e.districtWinners[r.ID] = make(map[string]string)
+		}
 		if usesNational {
 			parties := r.EffectiveParties(s.Parties)
 			pg := make(map[string]string, len(parties))
@@ -69,6 +80,15 @@ func (e *ElectionState) Apply(rep PrecinctReport) bool {
 	for partyID, v := range rep.Votes {
 		e.tallies[rep.RegionID][partyID] += v
 	}
+	if reg.DistrictSeats > 0 && rep.DistrictID != "" {
+		dt := e.districtTallies[rep.RegionID]
+		if dt[rep.DistrictID] == nil {
+			dt[rep.DistrictID] = make(map[string]int, len(rep.Votes))
+		}
+		for partyID, v := range rep.Votes {
+			dt[rep.DistrictID][partyID] += v
+		}
+	}
 
 	prev := e.precinctPct[rep.PrecinctID]
 	cur := rep.ReportedPct
@@ -83,9 +103,42 @@ func (e *ElectionState) Apply(rep PrecinctReport) bool {
 		}
 	}
 
-	newSeats := AllocateSeats(e.tallies[rep.RegionID], reg, reg.EffectiveParties(e.scenario.Parties))
+	var newSeats map[string]int
+	if reg.DistrictSeats > 0 {
+		var liveWinners map[string]string
+		newSeats, liveWinners = allocateRegionSeatsWithDistricts(
+			e.tallies[rep.RegionID],
+			e.districtTallies[rep.RegionID],
+			reg,
+			reg.EffectiveParties(e.scenario.Parties),
+			e.regionDistricts[rep.RegionID],
+		)
+		// Preserve exit-poll winners for districts with 0 votes reported so far so
+		// total seat counts stay constant while partial counts stream in.
+		mergedWinners := e.districtWinners[rep.RegionID]
+		if mergedWinners == nil {
+			mergedWinners = make(map[string]string, len(liveWinners))
+			e.districtWinners[rep.RegionID] = mergedWinners
+		}
+		for did, winner := range liveWinners {
+			mergedWinners[did] = winner
+		}
+		for _, did := range e.regionDistricts[rep.RegionID] {
+			if _, reported := liveWinners[did]; reported {
+				continue
+			}
+			if prevWinner := mergedWinners[did]; prevWinner != "" {
+				newSeats[prevWinner] += reg.DistrictSeats
+			}
+		}
+	} else {
+		newSeats = AllocateSeats(e.tallies[rep.RegionID], reg, reg.EffectiveParties(e.scenario.Parties))
+	}
+
 	if e.updateRegionSeats(rep.RegionID, newSeats) {
-		e.coalitions = FindCoalitions(e.euSeats, e.euGroups, 5)
+		if !e.scenario.Meta.HideCoalitions {
+			e.coalitions = FindCoalitions(e.euSeats, e.euGroups, 5)
+		}
 		return true
 	}
 	return false
@@ -98,7 +151,29 @@ func (e *ElectionState) SeedSeats(regionSeats map[string]map[string]int) {
 		}
 		e.updateRegionSeats(rid, maps.Clone(seats))
 	}
-	e.coalitions = FindCoalitions(e.euSeats, e.euGroups, 5)
+	if !e.scenario.Meta.HideCoalitions {
+		e.coalitions = FindCoalitions(e.euSeats, e.euGroups, 5)
+	}
+}
+
+// SeedDistrictWinners seeds initial per-district winners (e.g. from exit polls)
+// for two-tier regions before all districts have reported votes.
+func (e *ElectionState) SeedDistrictWinners(winners map[string]map[string]string) {
+	for rid, dw := range winners {
+		if _, ok := e.regionByID[rid]; !ok {
+			continue
+		}
+		e.districtWinners[rid] = maps.Clone(dw)
+	}
+}
+
+// DistrictWinners returns a defensive copy of the current winning party ID per DistrictID
+// for regionID, or nil if regionID does not use district-tier seats.
+func (e *ElectionState) DistrictWinners(regionID string) map[string]string {
+	if len(e.districtWinners[regionID]) == 0 {
+		return nil
+	}
+	return maps.Clone(e.districtWinners[regionID])
 }
 
 func (e *ElectionState) rollupRegion(regionID string, seats map[string]int) map[string]int {

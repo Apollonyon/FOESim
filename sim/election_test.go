@@ -511,7 +511,7 @@ func TestLoadScenario(t *testing.T) {
 						ID:            "xx",
 						Seats:         10,
 						Groups:        []VoterGroup{validGroup},
-						PollCloseHour: 25.0,
+						PollCloseHour: 31.0,
 					}},
 				},
 				wantErr: "poll_close_hour",

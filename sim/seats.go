@@ -1,6 +1,10 @@
 package sim
 
-import "math"
+import (
+	"maps"
+	"math"
+	"slices"
+)
 
 // AllocationMethod identifies the seat-allocation rule used by a region.
 type AllocationMethod string
@@ -67,6 +71,86 @@ func NewAllocator(method AllocationMethod) SeatAllocator {
 
 func AllocateSeats(votes map[string]int, r Region, parties []Party) map[string]int {
 	return NewAllocator(r.Method).Allocate(votes, r, parties)
+}
+
+// AllocateRegionSeats computes seat totals for r, supporting both standard single-tier
+// regions (r.DistrictSeats == 0) and parallel two-tier regions (r.DistrictSeats > 0),
+// where each DistrictID awards r.DistrictSeats by FPTP and any remaining seats
+// (r.Seats - len(districts)*r.DistrictSeats) are awarded from regionVotes via r.Method.
+// When r.DistrictSeats > 0, it also returns the winning party ID per reported DistrictID.
+func AllocateRegionSeats(
+	regionVotes map[string]int,
+	districtVotes map[string]map[string]int,
+	r Region,
+	parties []Party,
+) (map[string]int, map[string]string) {
+	if r.DistrictSeats <= 0 {
+		return AllocateSeats(regionVotes, r, parties), nil
+	}
+	return allocateRegionSeatsWithDistricts(regionVotes, districtVotes, r, parties, r.DistrictIDs())
+}
+
+func allocateRegionSeatsWithDistricts(
+	regionVotes map[string]int,
+	districtVotes map[string]map[string]int,
+	r Region,
+	parties []Party,
+	cachedDistricts []string,
+) (map[string]int, map[string]string) {
+	if r.DistrictSeats <= 0 {
+		return AllocateSeats(regionVotes, r, parties), nil
+	}
+
+	districts := cachedDistricts
+	needsMerge := len(districts) == 0
+	if !needsMerge {
+		for did := range districtVotes {
+			if did != "" && !slices.Contains(districts, did) {
+				needsMerge = true
+				break
+			}
+		}
+	}
+	if needsMerge {
+		knownSet := make(map[string]struct{}, len(cachedDistricts)+len(districtVotes))
+		for _, did := range cachedDistricts {
+			knownSet[did] = struct{}{}
+		}
+		for did := range districtVotes {
+			if did != "" {
+				knownSet[did] = struct{}{}
+			}
+		}
+		districts = slices.Sorted(maps.Keys(knownSet))
+	}
+
+	totalSeats := make(map[string]int)
+	districtWinners := make(map[string]string, len(districts))
+
+	atLarge := r.Seats - len(districts)*r.DistrictSeats
+	if atLarge > 0 {
+		atLargeReg := r
+		atLargeReg.Seats = atLarge
+		for pid, count := range AllocateSeats(regionVotes, atLargeReg, parties) {
+			if count > 0 {
+				totalSeats[pid] += count
+			}
+		}
+	}
+
+	for _, did := range districts {
+		dv := districtVotes[did]
+		if len(dv) == 0 {
+			continue
+		}
+		for pid, count := range allocateFPTP(dv, r.DistrictSeats) {
+			if count > 0 {
+				totalSeats[pid] += count
+				districtWinners[did] = pid
+			}
+		}
+	}
+	return totalSeats, districtWinners
 }
 
 func filterEligible(votes map[string]int, threshold float64) (map[string]int, int) {

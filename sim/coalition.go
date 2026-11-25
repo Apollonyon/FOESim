@@ -40,8 +40,18 @@ func FindCoalitions(euSeats map[string]int, groups []EUGroup, maxResults int) []
 		}
 	}
 	n := len(eligible)
-	if n == 0 || n > 16 {
+	if n == 0 {
 		return nil
+	}
+	if n > 16 {
+		slices.SortFunc(eligible, func(a, b EUGroup) int {
+			if c := cmp.Compare(euSeats[b.ID], euSeats[a.ID]); c != 0 {
+				return c
+			}
+			return cmp.Compare(a.ID, b.ID)
+		})
+		eligible = eligible[:16]
+		n = 16
 	}
 
 	unitWeights := PolicyVec{}

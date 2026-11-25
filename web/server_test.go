@@ -364,3 +364,128 @@ func TestServerMethodOverrideDoesNotMutateScenario(t *testing.T) {
 		t.Errorf("method override mutated server scenario: got %q, want %q", scenario.Regions[0].Method, origMethod)
 	}
 }
+
+func TestServerUSA2024ScenarioAndAssets(t *testing.T) {
+	scenario, err := sim.LoadScenario("../scenarios/usa2024.json")
+	if err != nil {
+		t.Fatalf("LoadScenario(usa2024.json) failed: %v", err)
+	}
+	handler := NewServer(scenario).Handler()
+
+	// Verify /api/scenario includes resolved USA metadata.
+	req := httptest.NewRequest(http.MethodGet, "/api/scenario", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/api/scenario status = %d, want 200", rec.Code)
+	}
+	var gotScenario sim.Scenario
+	if err := json.Unmarshal(rec.Body.Bytes(), &gotScenario); err != nil {
+		t.Fatalf("decode /api/scenario: %v", err)
+	}
+	if gotScenario.Meta.ChartType != "bar" || gotScenario.Meta.RegionsURL != "/geo/us_states.json" {
+		t.Fatalf("unexpected USA scenario meta: %+v", gotScenario.Meta)
+	}
+
+	// Verify embedded US GeoJSON assets are served.
+	for _, asset := range []string{"/geo/us_states.json", "/geo/us_counties.json"} {
+		aReq := httptest.NewRequest(http.MethodGet, asset, nil)
+		aRec := httptest.NewRecorder()
+		handler.ServeHTTP(aRec, aReq)
+		if aRec.Code != http.StatusOK || aRec.Body.Len() < 1000 {
+			t.Errorf("GET %s: status=%d len=%d", asset, aRec.Code, aRec.Body.Len())
+		}
+	}
+
+	// Verify SSE stream emits exit_poll with ME/NE district winners and completes cleanly.
+	sReq := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=0&swing=0&seed=42", nil)
+	sRec := httptest.NewRecorder()
+	handler.ServeHTTP(sRec, sReq)
+	if sRec.Code != http.StatusOK {
+		t.Fatalf("/api/stream status = %d, want 200", sRec.Code)
+	}
+	body := sRec.Body.String()
+	if !strings.Contains(body, "event: complete\n") {
+		t.Errorf("expected complete event in USA SSE stream")
+	}
+
+	foundExit := false
+	for _, block := range strings.Split(body, "\n\n") {
+		if !strings.HasPrefix(block, "event: exit_poll\n") {
+			continue
+		}
+		foundExit = true
+		dataLine := strings.TrimPrefix(strings.Split(block, "\n")[1], "data: ")
+		var payload exitPollPayload
+		if err := json.Unmarshal([]byte(dataLine), &payload); err != nil {
+			t.Fatalf("decode USA exit_poll: %v", err)
+		}
+		if payload.EUSeats["rep"] != 312 || payload.EUSeats["dem"] != 226 {
+			t.Errorf("USA exit_poll EVs = %v, want rep:312 dem:226", payload.EUSeats)
+		}
+		if payload.DistrictWinners["me"]["ME-2"] != "rep" || payload.DistrictWinners["ne"]["NE-2"] != "dem" {
+			t.Errorf("USA exit_poll split districts = %v", payload.DistrictWinners)
+		}
+		break
+	}
+	if !foundExit {
+		t.Fatal("expected exit_poll event in USA SSE stream")
+	}
+}
+
+func TestServerSecurityHeadersGzipAndPerIPCap(t *testing.T) {
+	scenario := sim.Scenario{
+		Name:    "Hardening Test",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}
+	srv := NewServer(scenario)
+	srv.SetMaxStreams(10)
+	srv.SetMaxStreamsPerIP(1)
+	handler := srv.Handler()
+
+	// Security headers + gzip on /api/scenario
+	req := httptest.NewRequest(http.MethodGet, "/api/scenario", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/api/scenario status = %d, want 200", rec.Code)
+	}
+	if rec.Header().Get("Content-Encoding") != "gzip" {
+		t.Errorf("expected Content-Encoding: gzip, got %q", rec.Header().Get("Content-Encoding"))
+	}
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("X-Frame-Options") != "DENY" || rec.Header().Get("Content-Security-Policy") == "" {
+		t.Errorf("missing security headers: %v", rec.Header())
+	}
+
+	// ETag + 304 Not Modified on /geo/ static assets
+	gReq := httptest.NewRequest(http.MethodGet, "/geo/us_states.json", nil)
+	gRec := httptest.NewRecorder()
+	handler.ServeHTTP(gRec, gReq)
+	etag := gRec.Header().Get("ETag")
+	if gRec.Code != http.StatusOK || etag == "" || !strings.Contains(gRec.Header().Get("Cache-Control"), "must-revalidate") {
+		t.Errorf("static /geo asset headers: status=%d etag=%q cache=%q", gRec.Code, etag, gRec.Header().Get("Cache-Control"))
+	}
+	gReq304 := httptest.NewRequest(http.MethodGet, "/geo/us_states.json", nil)
+	gReq304.Header.Set("If-None-Match", etag)
+	gRec304 := httptest.NewRecorder()
+	handler.ServeHTTP(gRec304, gReq304)
+	if gRec304.Code != http.StatusNotModified {
+		t.Errorf("conditional GET status = %d, want 304", gRec304.Code)
+	}
+
+	// Per-IP SSE stream cap returns 429
+	if !srv.acquireIPSlot("198.51.100.7") {
+		t.Fatal("expected first per-IP slot to succeed")
+	}
+	defer srv.releaseIPSlot("198.51.100.7")
+
+	sReq := httptest.NewRequest(http.MethodGet, "/api/stream?duration_ms=0", nil)
+	sReq.RemoteAddr = "198.51.100.7:54321"
+	sRec := httptest.NewRecorder()
+	handler.ServeHTTP(sRec, sReq)
+	if sRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("per-IP cap status = %d, want 429", sRec.Code)
+	}
+}

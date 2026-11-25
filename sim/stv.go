@@ -18,6 +18,9 @@ func allocateSTV(votes map[string]int, totalSeats int, parties []Party) map[stri
 	if totalVotes == 0 {
 		return map[string]int{}
 	}
+	if totalVotes < totalSeats {
+		return allocateHare(votes, totalSeats, 0)
+	}
 
 	posByID := make(map[string]PolicyVec, len(parties))
 	for _, p := range parties {

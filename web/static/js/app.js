@@ -1,4 +1,5 @@
 // Main controller: scenario loading, SSE stream lifecycle, theme toggle, and HUD events.
+import { clearEl, el, swatch } from './dom.js';
 import { EuropeMap } from './map.js';
 import { Hemicycle } from './hemicycle.js';
 import { InspectorUI } from './inspector.js';
@@ -13,6 +14,8 @@ const state = {
 
   source: null,
   durationMs: 45000,
+  activeDurationMs: 45000,
+  appliedSeed: 42,
   methodOverride: '',
   overlay: 'winner',
   colorMode: 'auto',
@@ -27,8 +30,10 @@ const state = {
   hemiTab: 'seats',
   regionSeats: {},
   regionVotes: {},
+  districtWinners: {},
   regionReportedCount: {},
   regionTotalCount: {},
+  regionPct: {},
   precincts: {},
   precinctGeo: {},
   reportedPrecincts: 0,
@@ -59,10 +64,37 @@ let map;
 let hemicycle;
 let inspector;
 let hemiFrameQueued = false;
+let hudFrameId = 0;
+let pendingTickerRep = null;
+let inspectorDirty = false;
+let lastSlowHudMs = 0;
+
+function applyScenarioMeta(meta, hasGroups) {
+  const title = meta.title || 'European Parliament';
+  const initials = title
+    .replace(/[^A-Za-z0-9 ]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('') || 'PS';
+
+  document.title = `ParliamentSim — ${title}`;
+  document.getElementById('brand-mark').textContent = initials;
+  document.getElementById('hud-kicker').textContent = title.toUpperCase();
+  document.getElementById('seat-unit-label').textContent = meta.seat_label || 'seats';
+  document.getElementById('overview-focus-btn').textContent = meta.overview_label || 'Europe';
+  document.getElementById('map-attribution').textContent = meta.attribution || '© EuroGeographics / Eurostat';
+  document.getElementById('hemi-tabs-wrap').classList.toggle('hidden', Boolean(meta.hide_coalitions));
+  document.getElementById('ov-party-btn').textContent = hasGroups ? 'Group %' : 'Party %';
+  document.getElementById('party-select-label').textContent = hasGroups ? 'Group' : 'Party';
+  document.getElementById('ov-eu-axis').textContent = meta.axis2_label || 'Pro-EU';
+}
 
 async function init() {
   const savedTheme = localStorage.getItem('ps-theme') || 'light';
   document.documentElement.dataset.theme = savedTheme;
+  state.isDark = savedTheme === 'dark';
 
   try {
     const res = await fetch('/api/scenario');
@@ -73,12 +105,16 @@ async function init() {
     setStatus('idle', 'ERROR');
     return;
   }
-  document.getElementById('scenario-subtitle').textContent = state.scenario.name;
 
-  const groups = (state.scenario.groups?.length) ? state.scenario.groups : (state.scenario.parties || []);
+  const meta = state.scenario.meta || {};
+  const hasGroups = Boolean(state.scenario.groups?.length);
+  document.getElementById('scenario-subtitle').textContent = state.scenario.name;
+  applyScenarioMeta(meta, hasGroups);
+
+  const groups = hasGroups ? state.scenario.groups : (state.scenario.parties || []);
   for (const g of groups) {
     state.groupsById[g.id] = g;
-    if (!state.scenario.groups?.length) state.partiesById[g.id] = g;
+    if (!hasGroups) state.partiesById[g.id] = g;
   }
 
   state.orderedGroups = [...groups].sort((a, b) => {
@@ -93,18 +129,19 @@ async function init() {
     opt.textContent = `${g.short_name} — ${g.name}`;
     partySelect.appendChild(opt);
   }
-  state.heatmapPartyId = state.orderedGroups[Math.floor(state.orderedGroups.length / 2)]?.id || groups[0].id;
+  state.heatmapPartyId = state.orderedGroups[Math.floor(state.orderedGroups.length / 2)]?.id || groups[0]?.id || '';
   partySelect.value = state.heatmapPartyId;
 
   for (const p of (state.scenario.parties || [])) state.partiesById[p.id] = p;
 
   const focusPills = document.getElementById('focus-pills');
   const useDropdown = state.scenario.regions.length > 6;
+  const regionLabel = (meta.region_label || 'state').toLowerCase();
   if (useDropdown) {
     countrySelect.classList.remove('hidden');
     const defOpt = document.createElement('option');
     defOpt.value = 'eu';
-    defOpt.textContent = `Jump to state (${state.scenario.regions.length})…`;
+    defOpt.textContent = `Jump to ${regionLabel} (${state.scenario.regions.length})…`;
     countrySelect.appendChild(defOpt);
   }
 
@@ -132,11 +169,13 @@ async function init() {
   document.getElementById('hemicycle-maj').textContent = Math.floor(totalSeats / 2) + 1;
 
   inspector = new InspectorUI(state, {
-    onFocusRegion: (rid) => focusRegion(rid)
+    onFocusRegion: (rid) => focusRegion(rid),
+    onSelectionChange: () => map?.requestRender()
   });
 
-  map = new EuropeMap(document.getElementById('europe-map'), state, {
+  map = new EuropeMap(document.getElementById('map-canvas'), state, {
     onHoverStart: (e, rid, pid) => inspector.showTooltip(e, rid, pid),
+    onHoverCallout: (e, spec) => inspector.showCalloutTooltip(e, spec),
     onHoverMove: (e) => inspector.moveTooltip(e),
     onHoverEnd: () => inspector.hideTooltip(),
     onSelect: (type, id) => inspector.select(type, id),
@@ -153,7 +192,7 @@ async function init() {
     document.getElementById('hemicycle-svg'),
     document.getElementById('seat-ledger')
   );
-  hemicycle.build(totalSeats);
+  hemicycle.build(totalSeats, meta.chart_type || 'hemicycle', meta.seat_label || 'seats');
 
   try {
     await map.loadAndRender();
@@ -163,6 +202,12 @@ async function init() {
     return;
   }
   wireEvents();
+  if (window.innerWidth <= 820) {
+    document.getElementById('hemicycle-body').classList.add('hidden');
+    const toggleBtn = document.getElementById('btn-toggle-hemi');
+    toggleBtn.textContent = '▴';
+    toggleBtn.setAttribute('aria-expanded', 'false');
+  }
   refreshLegend();
   startStream();
 }
@@ -186,29 +231,42 @@ function coalitionKey(c) {
 }
 
 function renderCoalitions() {
-  coalitionListEl.innerHTML = '';
+  clearEl(coalitionListEl);
   if (!state.coalitions.length) {
-    coalitionListEl.innerHTML = '<div class="subtitle">No minimal-winning coalition found yet.</div>';
+    coalitionListEl.appendChild(el('div', { className: 'subtitle', text: 'No minimal-winning coalition found yet.' }));
     return;
   }
   state.coalitions.forEach((c) => {
     const key = coalitionKey(c);
-    const row = document.createElement('div');
-    row.className = `coalition-row${state.selectedCoalitionKey === key ? ' active' : ''}`;
-    const partnersHtml = c.group_ids.map((gid, i) => {
+    const partnersEl = el('div', { className: 'coalition-partners' });
+    c.group_ids.forEach((gid, i) => {
+      if (i > 0) partnersEl.appendChild(el('span', { text: '+' }));
       const col = state.groupsById[gid]?.color || '#64748b';
-      return `<span class="coalition-partner"><span class="swatch" style="background:${col}"></span>${c.names[i]}</span>`;
-    }).join('<span>+</span>');
+      partnersEl.appendChild(
+        el('span', { className: 'coalition-partner' }, swatch(col), c.names[i])
+      );
+    });
     const margin = c.seats - c.majority;
-    row.innerHTML = `
-      <div class="coalition-partners">${partnersHtml}</div>
-      <div class="coalition-meta"><strong>${c.seats}</strong> (+${margin}) · ${c.cohesion}%</div>
-    `;
-    row.onclick = () => {
-      state.selectedCoalitionKey = state.selectedCoalitionKey === key ? null : key;
-      renderCoalitions();
-      scheduleHemicycleRender();
-    };
+    const metaEl = el(
+      'div',
+      { className: 'coalition-meta' },
+      el('strong', { text: c.seats }),
+      ` (+${margin}) · ${c.cohesion}%`
+    );
+    const row = el(
+      'button',
+      {
+        type: 'button',
+        className: `coalition-row${state.selectedCoalitionKey === key ? ' active' : ''}`,
+        onClick: () => {
+          state.selectedCoalitionKey = state.selectedCoalitionKey === key ? null : key;
+          renderCoalitions();
+          scheduleHemicycleRender();
+        }
+      },
+      partnersEl,
+      metaEl
+    );
     coalitionListEl.appendChild(row);
   });
 }
@@ -228,21 +286,28 @@ function scheduleHemicycleRender() {
 }
 
 function updateClock(pct, finished = false) {
-  // Align clock with staggered poll-closing window: first 30% of duration spans 18:00 -> 23:00 CET,
-  // remaining 70% spans 23:00 -> 01:30 CET as final counties wrap up.
-  let minsFrom18 = 0;
+  const meta = state.scenario?.meta || {};
+  const startH = meta.clock_start_hour || 18.0;
+  const endH = meta.clock_end_hour || 25.5;
+  const tz = meta.timezone || 'CET';
+  const totalMins = Math.max(60, (endH - startH) * 60);
+  const pollCloseMins = totalMins * (2 / 3);
+  const wrapMins = totalMins - pollCloseMins;
+
+  let elapsedMins = 0;
   if (finished || pct >= 100) {
-    minsFrom18 = 450; // 01:30 CET
-  } else if (state.durationMs > 0 && state.streamStartTime > 0) {
-    const f = Math.min(1, Math.max(0, (performance.now() - state.streamStartTime) / state.durationMs));
-    minsFrom18 = f <= 0.30 ? (f / 0.30) * 300 : 300 + ((f - 0.30) / 0.70) * 150;
+    elapsedMins = totalMins;
+  } else if (state.activeDurationMs > 0 && state.streamStartTime > 0) {
+    const f = Math.min(1, Math.max(0, (performance.now() - state.streamStartTime) / state.activeDurationMs));
+    elapsedMins = f <= 0.30 ? (f / 0.30) * pollCloseMins : pollCloseMins + ((f - 0.30) / 0.70) * wrapMins;
   } else {
-    minsFrom18 = (Math.min(100, Math.max(0, pct)) / 100) * 450;
+    elapsedMins = (Math.min(100, Math.max(0, pct)) / 100) * totalMins;
   }
-  const rounded = Math.round(minsFrom18);
-  const hh = (18 + Math.floor(rounded / 60)) % 24;
-  const mm = String(rounded % 60).padStart(2, '0');
-  simClockEl.textContent = `${String(hh).padStart(2, '0')}:${mm} CET`;
+
+  const totalStartMins = Math.round(startH * 60 + elapsedMins);
+  const hh = Math.floor(totalStartMins / 60) % 24;
+  const mm = String(totalStartMins % 60).padStart(2, '0');
+  simClockEl.textContent = `${String(hh).padStart(2, '0')}:${mm} ${tz}`;
 }
 
 function setStatus(kind, label) {
@@ -257,6 +322,29 @@ function updateProgress() {
   updateClock(pct);
 }
 
+function scheduleHudFlush() {
+  if (hudFrameId) return;
+  hudFrameId = requestAnimationFrame((now) => {
+    hudFrameId = 0;
+    if (!state.source) return;
+    setStatus('live', `LIVE · ${Math.round(state.countedPct || 0)}%`);
+    updateProgress();
+
+    if (now - lastSlowHudMs >= 120) {
+      lastSlowHudMs = now;
+      if (pendingTickerRep) {
+        inspector.pushTicker(pendingTickerRep);
+        pendingTickerRep = null;
+      }
+      if (inspectorDirty) {
+        inspector.render();
+        inspectorDirty = false;
+      }
+      map?.refreshHoverTooltip();
+    }
+  });
+}
+
 function resetStreamState() {
   state.euSeats = {};
   state.coalitions = [];
@@ -264,19 +352,27 @@ function resetStreamState() {
   state.streamStartTime = performance.now();
   state.regionSeats = {};
   state.regionVotes = {};
+  state.districtWinners = {};
   state.regionReportedCount = {};
   state.regionPctSum = {};
+  state.regionPct = {};
   state.precincts = {};
   state.reportedPrecincts = 0;
   state.countedPct = 0;
   state.ticker = [];
-  document.getElementById('ticker').innerHTML = '';
+  if (hudFrameId) {
+    cancelAnimationFrame(hudFrameId);
+    hudFrameId = 0;
+  }
+  pendingTickerRep = null;
+  inspectorDirty = false;
+  lastSlowHudMs = 0;
+  clearEl(document.getElementById('ticker'));
   map.resetFills();
 
   for (const r of state.scenario.regions) {
     state.regionReportedCount[r.id] = 0;
-    const sub = document.getElementById(`label-sub-${r.id}`);
-    if (sub) sub.textContent = `0%`;
+    state.regionPct[r.id] = 0;
   }
   updateProgress();
   scheduleHemicycleRender();
@@ -288,10 +384,12 @@ function startStream() {
     state.source.close();
     state.source = null;
   }
+  state.activeDurationMs = state.durationMs;
   resetStreamState();
 
   const parsedSeed = parseInt(inputSeed.value, 10);
   const seed = Number.isNaN(parsedSeed) ? 42 : parsedSeed;
+  state.appliedSeed = seed;
   const parsedTemp = parseFloat(inputTemp.value);
   const temp = Number.isNaN(parsedTemp) || parsedTemp <= 0 ? 0.45 : parsedTemp;
   const waves = state.durationMs > 0 ? 3 : 1;
@@ -311,6 +409,7 @@ function startStream() {
     state.euSeats = data.eu_seats || {};
     state.coalitions = data.coalitions || [];
     state.regionSeats = data.region_seats || {};
+    state.districtWinners = data.district_winners || {};
     state.totalPrecincts = data.total_precincts || 0;
 
     updateProgress();
@@ -343,6 +442,9 @@ function startStream() {
 
     state.regionVotes[rep.region_id] = data.region_votes;
     state.regionSeats[rep.region_id] = data.region_seats;
+    if (data.district_winners) {
+      state.districtWinners[rep.region_id] = data.district_winners;
+    }
     if (data.eu_seats) {
       state.euSeats = data.eu_seats;
       state.coalitions = data.coalitions || [];
@@ -356,35 +458,39 @@ function startStream() {
     }
 
     const reg = state.regionsById[rep.region_id];
-    const totalCount = state.regionTotalCount[rep.region_id] || reg.precincts;
-    const sub = document.getElementById(`label-sub-${rep.region_id}`);
-    if (sub) {
-      state.regionPctSum = state.regionPctSum || {};
-      state.regionPctSum[rep.region_id] = (state.regionPctSum[rep.region_id] || 0) + Math.max(0, curPct - prevPct);
-      const pct = Math.min(100, Math.round((state.regionPctSum[rep.region_id] / Math.max(1, totalCount)) * 100));
-      sub.textContent = `${pct}%`;
-    }
+    const totalCount = state.regionTotalCount[rep.region_id] || reg?.precincts || 1;
+    state.regionPctSum[rep.region_id] = (state.regionPctSum[rep.region_id] || 0) + Math.max(0, curPct - prevPct);
+    state.regionPct[rep.region_id] = Math.min(100, Math.round((state.regionPctSum[rep.region_id] / Math.max(1, totalCount)) * 100));
 
-    setStatus('live', `LIVE · ${Math.round(state.countedPct)}%`);
-    updateProgress();
     map.queueRecolor(rep.precinct_id);
-
-    if (state.durationMs > 0 || state.reportedPrecincts % 15 === 0) {
-      inspector.pushTicker(state.precincts[rep.precinct_id]);
-    }
-
+    pendingTickerRep = state.precincts[rep.precinct_id];
     if (state.selection && (state.selection.id === rep.precinct_id || state.selection.id === rep.region_id)) {
-      inspector.render();
+      inspectorDirty = true;
     }
+    scheduleHudFlush();
   });
 
   es.addEventListener('complete', () => {
     if (state.source !== es) return;
     es.close();
     state.source = null;
+    if (hudFrameId) {
+      cancelAnimationFrame(hudFrameId);
+      hudFrameId = 0;
+    }
+    for (const r of state.scenario.regions) {
+      state.regionPct[r.id] = 100;
+    }
+    if (pendingTickerRep) {
+      inspector.pushTicker(pendingTickerRep);
+      pendingTickerRep = null;
+    }
+    inspectorDirty = false;
     setStatus('done', 'FINAL');
+    updateProgress();
     updateClock(100, true);
     map.flushRecolor();
+    map.refreshHoverTooltip();
     scheduleHemicycleRender();
     inspector.render();
   });
@@ -404,9 +510,12 @@ function wireEvents() {
   document.getElementById('btn-theme').addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
+    state.isDark = next === 'dark';
     localStorage.setItem('ps-theme', next);
+    map.refreshTheme();
     refreshLegend();
     map.recolorAll();
+    scheduleHemicycleRender();
   });
 
   document.querySelectorAll('.seg-btn').forEach((btn) => {
@@ -414,6 +523,7 @@ function wireEvents() {
       document.querySelectorAll('.seg-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       state.durationMs = parseInt(btn.dataset.duration, 10);
+      startStream();
     });
   });
 
@@ -432,9 +542,23 @@ function wireEvents() {
     startStream();
   });
 
+  inputSeed.addEventListener('change', () => {
+    const parsedSeed = parseInt(inputSeed.value, 10);
+    const seed = Number.isNaN(parsedSeed) ? 42 : parsedSeed;
+    if (seed === state.appliedSeed) return;
+    startStream();
+  });
+  inputSeed.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      startStream();
+    }
+  });
+
   inputTemp.addEventListener('input', () => {
     tempVal.textContent = parseFloat(inputTemp.value).toFixed(2);
   });
+  inputTemp.addEventListener('change', startStream);
 
   methodSelect.addEventListener('change', () => {
     state.methodOverride = methodSelect.value;
@@ -451,8 +575,12 @@ function wireEvents() {
 
   document.querySelectorAll('.ov-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.ov-btn').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.ov-btn').forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
       state.overlay = btn.dataset.overlay;
       refreshLegend();
       map.recolorAll();
@@ -469,6 +597,12 @@ function wireEvents() {
   document.getElementById('btn-zoom-out').addEventListener('click', () => map.zoomBy(1.33));
   document.getElementById('btn-zoom-reset').addEventListener('click', () => focusRegion('eu'));
   document.getElementById('btn-close-inspector').addEventListener('click', () => inspector.clear());
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && state.selection) {
+      inspector.clear();
+    }
+  });
 
   countrySelect.addEventListener('change', () => {
     const rid = countrySelect.value;
@@ -495,6 +629,7 @@ function wireEvents() {
   btnToggleHemi.addEventListener('click', () => {
     const collapsed = hemiBody.classList.toggle('hidden');
     btnToggleHemi.textContent = collapsed ? '▴' : '▾';
+    btnToggleHemi.setAttribute('aria-expanded', String(!collapsed));
   });
 }
 

@@ -23,6 +23,7 @@ func main() {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	cliMode := flag.Bool("cli", false, "run live election night in the terminal instead of starting the web server")
 	maxStreams := flag.Int("max-streams", 256, "maximum concurrent SSE election streams (0 = unlimited)")
+	maxStreamsPerIP := flag.Int("max-streams-per-ip", 16, "maximum concurrent SSE streams per client IP (0 = unlimited; set 0 behind a reverse proxy)")
 	flag.Parse()
 
 	scenario, err := sim.LoadScenario(*scenarioPath)
@@ -40,6 +41,7 @@ func main() {
 
 	srv := web.NewServer(scenario)
 	srv.SetMaxStreams(*maxStreams)
+	srv.SetMaxStreamsPerIP(*maxStreamsPerIP)
 	httpSrv := &http.Server{
 		Addr:              *addr,
 		Handler:           srv.Handler(),
@@ -109,6 +111,7 @@ func runCLI(scenario sim.Scenario) {
 		fmt.Println()
 	}
 
+	meta := scenario.EffectiveMeta()
 	fmt.Println("\n=== Final Results by Region ===")
 	for _, r := range regions {
 		method := r.Method
@@ -119,14 +122,14 @@ func runCLI(scenario sim.Scenario) {
 		seats := state.RegionSeats(r.ID)
 		votes := state.RegionVotes(r.ID)
 		for _, p := range r.EffectiveParties(parties) {
-			fmt.Printf("  %-8s %3d seats (%d votes)\n", p.ShortName, seats[p.ID], votes[p.ID])
+			fmt.Printf("  %-8s %3d %s (%d votes)\n", p.ShortName, seats[p.ID], meta.SeatLabel, votes[p.ID])
 		}
 	}
 
 	totalSeats := state.EUSeats()
-	fmt.Println("\n=== European Parliament Final Total ===")
+	fmt.Printf("\n=== %s Final Total ===\n", meta.Title)
 	for _, g := range euGroups {
-		fmt.Printf("  %-8s %3d seats\n", g.ShortName, totalSeats[g.ID])
+		fmt.Printf("  %-8s %3d %s\n", g.ShortName, totalSeats[g.ID], meta.SeatLabel)
 	}
 }
 
