@@ -138,17 +138,24 @@ function base64UrlToBytes(str) {
   return bytes;
 }
 
-async function streamTransformBytes(bytes, transform) {
+const MAX_SHARE_HASH_LEN = 32768;
+const MAX_SHARE_DECOMPRESSED_BYTES = 2 * 1024 * 1024;
+
+async function streamTransformBytes(bytes, transform, maxBytes = MAX_SHARE_DECOMPRESSED_BYTES) {
   const writer = transform.writable.getWriter();
-  const writePromise = writer.write(bytes).then(() => writer.close());
+  const writePromise = writer.write(bytes).then(() => writer.close()).catch(() => {});
   const reader = transform.readable.getReader();
   const chunks = [];
   let total = 0;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    chunks.push(value);
     total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw new Error('Share link payload exceeds maximum size');
+    }
+    chunks.push(value);
   }
   await writePromise;
   const out = new Uint8Array(total);
@@ -174,15 +181,19 @@ export async function encodeSharePayload(payload) {
 }
 
 export async function decodeSharePayload(raw) {
-  if (typeof raw !== 'string' || raw.length < 3) {
-    throw new Error('Empty share payload');
+  if (typeof raw !== 'string' || raw.length < 3 || raw.length > MAX_SHARE_HASH_LEN) {
+    throw new Error('Invalid or oversized share payload');
   }
   let bytes;
   if (raw.startsWith('z.')) {
     if (typeof DecompressionStream !== 'function') {
       throw new Error('Browser cannot decompress deflated share links');
     }
-    bytes = await streamTransformBytes(base64UrlToBytes(raw.slice(2)), new DecompressionStream('deflate-raw'));
+    bytes = await streamTransformBytes(
+      base64UrlToBytes(raw.slice(2)),
+      new DecompressionStream('deflate-raw'),
+      MAX_SHARE_DECOMPRESSED_BYTES
+    );
   } else if (raw.startsWith('j.')) {
     bytes = base64UrlToBytes(raw.slice(2));
   } else {

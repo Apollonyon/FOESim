@@ -121,6 +121,9 @@ func (rs *runStore) Get(id string) (sim.Scenario, bool) {
 }
 
 func validateCustomRunLimits(sc sim.Scenario) error {
+	if len(sc.Meta.Description) > 500 {
+		return fmt.Errorf("scenario description too long (%d > 500)", len(sc.Meta.Description))
+	}
 	if len(sc.Regions) > 100 {
 		return fmt.Errorf("too many regions (%d > 100)", len(sc.Regions))
 	}

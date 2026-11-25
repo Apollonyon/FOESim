@@ -361,6 +361,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(15 * time.Second))
 	r.Body = http.MaxBytesReader(w, r.Body, maxCustomRunBodySize)
 	dec := json.NewDecoder(r.Body)
 

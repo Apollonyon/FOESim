@@ -1,4 +1,4 @@
-ParliamentSim
+FOES (Free Open Election Simulator / ParliamentSim)
 Copyright (C) 2026 River
 
 This program is free software: you can redistribute it and/or modify it under
@@ -10,16 +10,19 @@ Additional Terms under AGPL-3.0 Section 7:
    modified versions) must preserve this copyright notice and attribution to the
    original author (River) and source repository.
 2. Trademarks & Branding (Section 7(e)): This license does not grant permission
-   to use the project name "ParliamentSim", its logos, or author identity to
+   to use the project names "FOES" or "ParliamentSim", its logos, or author identity to
    endorse, brand, or imply official affiliation with modified versions or
    third-party hosted instances. Modified public instances must clearly identify
    themselves as independent forks.
 
 Third-Party Data Attribution:
-- Administrative boundaries: Eurostat GISCO NUTS 2021 (© EuroGeographics).
-- Sub-national socioeconomic statistics: Eurostat (demo_r_pjanaggr3,
+- EU administrative boundaries: Eurostat GISCO NUTS 2021 (© EuroGeographics).
+- EU sub-national socioeconomic statistics: Eurostat (demo_r_pjanaggr3,
   nama_10r_3gdp, demo_r_pjanind3).
 - Party ideological positions: 2024 Chapel Hill Expert Survey (CHES-Europe,
   chesdata.eu).
 - 2024 European Parliament baseline results: European Parliament Open Data
   (results.elections.europa.eu).
+- U.S. boundaries & 2024 county results: U.S. Census Bureau TIGER/Line 2023
+  Cartographic Boundaries (cb_2023_us_state_20m, cb_2023_us_county_20m,
+  cb_2023_us_cd118_20m) and certified 2024 county presidential election totals.

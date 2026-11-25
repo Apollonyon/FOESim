@@ -49,6 +49,8 @@ export class EuropeMap {
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.bufCanvas = document.createElement('canvas');
     this.bufCtx = this.bufCanvas.getContext('2d', { alpha: false });
+    this.overviewCanvas = document.createElement('canvas');
+    this.overviewCtx = this.overviewCanvas.getContext('2d', { alpha: false });
     this.hitCtx = document.createElement('canvas').getContext('2d');
     this.state = state;
     this.cb = callbacks;
@@ -68,6 +70,8 @@ export class EuropeMap {
     this.pendingRecolor = new Set();
     this.bufDirtyFull = true;
     this.bufViewBox = null;
+    this.overviewDirtyFull = true;
+    this.overviewViewBox = null;
     this.bakeTimer = null;
     this.renderQueued = false;
     this.hoverFrameQueued = false;
@@ -137,6 +141,7 @@ export class EuropeMap {
       dotEmpty: get('--dot-empty', '#cbd5e1')
     };
     this.bufDirtyFull = true;
+    this.overviewDirtyFull = true;
   }
 
   resizeCanvas() {
@@ -152,7 +157,10 @@ export class EuropeMap {
       this.canvas.height = Math.round(h * dpr);
       this.bufCanvas.width = this.canvas.width;
       this.bufCanvas.height = this.canvas.height;
+      this.overviewCanvas.width = w;
+      this.overviewCanvas.height = h;
       this.bufDirtyFull = true;
+      this.overviewDirtyFull = true;
     }
   }
 
@@ -220,21 +228,14 @@ export class EuropeMap {
     this.lastPointerEvent = null;
     this.bufViewBox = null;
     this.bufDirtyFull = true;
+    this.overviewViewBox = null;
+    this.overviewDirtyFull = true;
     this.state.zoomedIn = false;
 
     const activeRegionIds = new Set(this.state.scenario.regions.map((r) => r.id));
 
-    for (const c of (n0.countries || [])) {
-      this.countryMeta[c.id] = c;
-      if (c.d) {
-        const bbox = c.bbox
-          ? [c.bbox[0], c.bbox[1], c.bbox[0] + c.bbox[2], c.bbox[1] + c.bbox[3]]
-          : pathBBox(c.d);
-        this.ctxPaths.push({ path: new Path2D(c.d), bbox });
-      }
-    }
-
     const countyCounts = {};
+    const singleCountyByRegion = {};
     for (const f of (n3.features || [])) {
       if (!activeRegionIds.has(f.c) || !f.d) continue;
       countyCounts[f.c] = (countyCounts[f.c] || 0) + 1;
@@ -260,6 +261,18 @@ export class EuropeMap {
       };
       this.counties.push(item);
       this.countyById.set(f.id, item);
+      if (countyCounts[f.c] === 1) singleCountyByRegion[f.c] = item;
+      else delete singleCountyByRegion[f.c];
+    }
+
+    for (const c of (n0.countries || [])) {
+      this.countryMeta[c.id] = c;
+      if (c.d && (!activeRegionIds.has(c.id) || !countyCounts[c.id])) {
+        const bbox = c.bbox
+          ? [c.bbox[0], c.bbox[1], c.bbox[0] + c.bbox[2], c.bbox[1] + c.bbox[3]]
+          : pathBBox(c.d);
+        this.ctxPaths.push({ path: new Path2D(c.d), bbox });
+      }
     }
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -275,16 +288,20 @@ export class EuropeMap {
         if (by + bh > maxY) maxY = by + bh;
       }
 
-      const borderBBox = rMeta.bbox
-        ? [rMeta.bbox[0], rMeta.bbox[1], rMeta.bbox[0] + rMeta.bbox[2], rMeta.bbox[1] + rMeta.bbox[3]]
-        : pathBBox(rMeta.d);
+      const singleCounty = countyCounts[r.id] === 1 ? singleCountyByRegion[r.id] : null;
+      const borderBBox = singleCounty && Number.isFinite(singleCounty.minX)
+        ? [singleCounty.minX, singleCounty.minY, singleCounty.maxX, singleCounty.maxY]
+        : (rMeta.bbox
+          ? [rMeta.bbox[0], rMeta.bbox[1], rMeta.bbox[0] + rMeta.bbox[2], rMeta.bbox[1] + rMeta.bbox[3]]
+          : pathBBox(rMeta.d));
       const borderObj = {
         id: r.id,
         label: r.id.toUpperCase(),
-        path: new Path2D(rMeta.d),
+        path: singleCounty ? singleCounty.path : new Path2D(rMeta.d),
         bbox: borderBBox,
         center: rMeta.center || null,
-        hideLabel: Boolean(rMeta.hide_label)
+        hideLabel: Boolean(rMeta.hide_label),
+        isSingleUnit: Boolean(singleCounty)
       };
       this.borders.push(borderObj);
       this.borderById.set(r.id, borderObj);
@@ -320,6 +337,7 @@ export class EuropeMap {
     this.resizeCanvas();
     this.viewBox = this.fitToViewport(this.defaultBox);
     this.syncZoomThreshold();
+    this.bakeOverview();
     this.bakeBuffer();
     this.render();
     this.bindInteraction();
@@ -386,6 +404,7 @@ export class EuropeMap {
     }
     this.updateCalloutColors();
     this.bufDirtyFull = true;
+    this.overviewDirtyFull = true;
     this.requestRender();
   }
 
@@ -440,22 +459,20 @@ export class EuropeMap {
     for (const c of this.counties) c.fill = '';
     for (const item of this.callouts) item.fill = '';
     this.bufDirtyFull = true;
+    this.overviewDirtyFull = true;
     this.requestRender();
   }
 
-  // Full vector bake of background + visible counties into bufCanvas (state borders drawn live).
-  bakeBuffer() {
-    const ctx = this.bufCtx;
-    const dpr = this.dpr;
-    const [vx, vy, vw, vh] = this.viewBox;
+  bakeInto(ctx, cssW, cssH, dpr, box, showCountyBorders) {
+    const [vx, vy, vw, vh] = box;
     const vx2 = vx + vw;
     const vy2 = vy + vh;
-    const scale = this.width / vw;
+    const scale = cssW / vw;
     const theme = this.theme;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = theme.ocean;
-    ctx.fillRect(0, 0, this.width, this.height);
+    ctx.fillRect(0, 0, cssW, cssH);
 
     ctx.setTransform(scale * dpr, 0, 0, scale * dpr, -vx * scale * dpr, -vy * scale * dpr);
 
@@ -471,7 +488,6 @@ export class EuropeMap {
     }
 
     // Counties
-    const showCountyBorders = this.state.zoomedIn;
     const defaultFill = theme.unreported;
     ctx.strokeStyle = theme.countyStroke;
     ctx.lineWidth = 0.6 / scale;
@@ -482,22 +498,28 @@ export class EuropeMap {
       ctx.fill(c.path);
       if (showCountyBorders) ctx.stroke(c.path);
     }
+  }
 
+  bakeOverview() {
+    const box = this.fitToViewport(this.defaultBox);
+    this.bakeInto(this.overviewCtx, this.width, this.height, 1, box, false);
+    this.overviewViewBox = box;
+    this.overviewDirtyFull = false;
+  }
+
+  // Full vector bake of background + visible counties into bufCanvas (state borders drawn live).
+  bakeBuffer() {
+    this.bakeInto(this.bufCtx, this.width, this.height, this.dpr, this.viewBox, this.state.zoomedIn);
     this.bufViewBox = [...this.viewBox];
     this.bufDirtyFull = false;
   }
 
-  // Paint ONLY newly updated counties onto the existing buffer (no border alpha-compounding!).
-  patchBuffer(dirtyCounties) {
-    if (!this.bufViewBox || dirtyCounties.length === 0) return;
-    const ctx = this.bufCtx;
-    const dpr = this.dpr;
-    const [vx, vy, vw, vh] = this.bufViewBox;
+  patchInto(ctx, cssW, dpr, box, dirtyCounties, showCountyBorders) {
+    const [vx, vy, vw, vh] = box;
     const vx2 = vx + vw;
     const vy2 = vy + vh;
-    const scale = this.width / vw;
+    const scale = cssW / vw;
     const theme = this.theme;
-    const showCountyBorders = this.state.zoomedIn;
 
     ctx.setTransform(scale * dpr, 0, 0, scale * dpr, -vx * scale * dpr, -vy * scale * dpr);
     ctx.strokeStyle = theme.countyStroke;
@@ -509,6 +531,17 @@ export class EuropeMap {
       ctx.fillStyle = c.fill || theme.unreported;
       ctx.fill(c.path);
       if (showCountyBorders) ctx.stroke(c.path);
+    }
+  }
+
+  // Paint ONLY newly updated counties onto the cached buffers (no border alpha-compounding!).
+  patchBuffer(dirtyCounties) {
+    if (dirtyCounties.length === 0) return;
+    if (this.bufViewBox) {
+      this.patchInto(this.bufCtx, this.width, this.dpr, this.bufViewBox, dirtyCounties, this.state.zoomedIn);
+    }
+    if (this.overviewViewBox && !this.overviewDirtyFull) {
+      this.patchInto(this.overviewCtx, this.width, 1, this.overviewViewBox, dirtyCounties, false);
     }
   }
 
@@ -585,7 +618,10 @@ export class EuropeMap {
     }
     this.updateCalloutColors();
 
-    // 2. Keep offscreen buffer up to date
+    // 2. Keep offscreen buffers up to date
+    if (!this.overviewViewBox || (this.overviewDirtyFull && !interacting)) {
+      this.bakeOverview();
+    }
     if (!this.bufViewBox || (this.bufDirtyFull && !interacting)) {
       this.bakeBuffer();
     } else if (dirtyCounties && dirtyCounties.length > 0) {
@@ -600,12 +636,21 @@ export class EuropeMap {
     const scale = this.width / vw;
     const theme = this.theme;
 
-    // 3. Single GPU texture blit of the cached county buffer
+    // 3. GPU texture blit of cached overview backdrop (only when bufCanvas misses viewport) + sharp bufCanvas
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = theme.ocean;
     ctx.fillRect(0, 0, this.width, this.height);
 
     const [bx, by, bw, bh] = this.bufViewBox;
+    if (this.overviewViewBox && (bx > vx + 0.5 || by > vy + 0.5 || bx + bw < vx2 - 0.5 || by + bh < vy2 - 0.5)) {
+      const [ox, oy, ow, oh] = this.overviewViewBox;
+      ctx.drawImage(
+        this.overviewCanvas,
+        0, 0, this.overviewCanvas.width, this.overviewCanvas.height,
+        (ox - vx) * scale, (oy - vy) * scale, ow * scale, oh * scale
+      );
+    }
+
     const destX = (bx - vx) * scale;
     const destY = (by - vy) * scale;
     const destW = bw * scale;
@@ -637,7 +682,7 @@ export class EuropeMap {
           ctx.stroke(b.path);
         }
       }
-      if (sel.type === 'precinct') {
+      if (sel.type === 'precinct' && !(selRegionId && this.borderById.get(selRegionId)?.isSingleUnit)) {
         const c = this.countyById.get(sel.id);
         if (c) {
           ctx.strokeStyle = theme.borderActive;

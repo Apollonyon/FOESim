@@ -1634,8 +1634,17 @@ html[data-theme="dark"] .editor-error {
   background: var(--text);
 }
 
+.meta-pills {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .version-pill {
   pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
   border: 1px solid var(--hud-border);
   background: var(--hud-bg);
   color: var(--muted);
