@@ -141,6 +141,25 @@ export function computeCountyColor(state, votesMap, eligibleVoters, fallbackSeat
   return dark ? '#212b36' : '#dfe4e8';
 }
 
+export function computeForecastColor(state, regionId, districtId = null) {
+  const dark = isDark(state);
+  const neutral = dark ? [33, 43, 54] : [223, 228, 232];
+  const rf = state.forecast?.regions?.[regionId];
+  if (!rf) return dark ? '#212b36' : '#dfe4e8';
+
+  const probs = (districtId && !state.methodOverride && rf.district_win_prob?.[districtId])
+    ? rf.district_win_prob[districtId]
+    : rf.win_prob;
+  const ranked = rankParties(probs);
+  if (!ranked.length || ranked[0][1] <= 0) {
+    return dark ? '#212b36' : '#dfe4e8';
+  }
+  const leader = state.partiesById[ranked[0][0]];
+  const p = ranked[0][1];
+  const intensity = 0.22 + Math.max(0, Math.min(1, (p - 0.35) / 0.65)) * 0.72;
+  return mixColor(neutral, hexToRgb(resolvePartyColor(state, leader)), intensity);
+}
+
 function appendLegendBar(legendEl, gradient, labels) {
   legendEl.appendChild(el('div', { className: 'legend-bar', style: { background: gradient } }));
   legendEl.appendChild(el('div', { className: 'legend-labels' }, ...labels.map((txt) => el('span', { text: txt }))));
@@ -148,14 +167,26 @@ function appendLegendBar(legendEl, gradient, labels) {
 
 export function renderLegend(state, legendEl, partyPickerWrap, colorModeRow) {
   const hasGroups = Boolean(state.scenario?.groups?.length);
-  partyPickerWrap.classList.toggle('hidden', state.overlay !== 'party');
-  colorModeRow.classList.toggle('hidden', state.overlay !== 'winner' || !hasGroups);
+  const isForecast = state.viewMode === 'forecast';
+  partyPickerWrap.classList.toggle('hidden', isForecast || state.overlay !== 'party');
+  colorModeRow.classList.toggle('hidden', (isForecast ? false : state.overlay !== 'winner') || !hasGroups);
 
   const dark = isDark(state);
   const baseHex = dark ? '#212b36' : '#dfe4e8';
   const midHex = dark ? '#343f4c' : '#eef1f4';
 
   clearEl(legendEl);
+
+  if (isForecast) {
+    const runsLabel = state.forecast ? `${state.forecast.runs} runs · ` : '';
+    legendEl.appendChild(
+      el('div', { className: 'legend-labels' },
+        el('span', { text: `${runsLabel}Win Probability` }),
+        el('span', { text: 'Toss-up 50% -> Safe 95%+' })
+      )
+    );
+    return;
+  }
 
   if (state.overlay === 'winner') {
     const modeNote = !hasGroups

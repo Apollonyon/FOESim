@@ -2,7 +2,7 @@
 // - Incremental county patching on an offscreen buffer during live SSE streaming (<0.5ms/frame)
 // - Live vector state borders drawn on top of blit (zero border darkening, crisp during zoom)
 // - 32x32 spatial hash grid + rAF-throttled hit-testing (O(1) hover even on 3,141+ counties)
-import { computeCountyColor, rankParties, resolvePartyColor } from './overlays.js';
+import { computeCountyColor, computeForecastColor, rankParties, resolvePartyColor } from './overlays.js';
 
 const DEFAULT_BOX = [180, 345, 540, 580];
 const GRID_N = 32;
@@ -392,15 +392,21 @@ export class EuropeMap {
   updateCountyColor(precinctId) {
     const c = this.countyById.get(precinctId);
     if (!c) return null;
-    const rep = this.state.precincts[precinctId];
-    const fallbackSeats = this.state.regionSeats[c.regionId];
-    const fill = computeCountyColor(
-      this.state,
-      rep?.votes,
-      rep?.eligible_voters || 0,
-      fallbackSeats,
-      rep?.reported_pct || 0
-    );
+    let fill;
+    if (this.state.viewMode === 'forecast' && this.state.forecast) {
+      const distId = this.state.precinctGeo[precinctId]?.districtId || null;
+      fill = computeForecastColor(this.state, c.regionId, distId);
+    } else {
+      const rep = this.state.precincts[precinctId];
+      const fallbackSeats = this.state.regionSeats[c.regionId];
+      fill = computeCountyColor(
+        this.state,
+        rep?.votes,
+        rep?.eligible_voters || 0,
+        fallbackSeats,
+        rep?.reported_pct || 0
+      );
+    }
     if (c.fill === fill) return null;
     c.fill = fill;
     return c;
@@ -410,6 +416,10 @@ export class EuropeMap {
     if (!this.callouts.length) return;
     for (const item of this.callouts) {
       const spec = item.spec;
+      if (this.state.viewMode === 'forecast' && this.state.forecast) {
+        item.fill = computeForecastColor(this.state, spec.region_id, spec.district_id || null);
+        continue;
+      }
       let partyId = null;
       if (spec.district_id && !this.state.methodOverride) {
         partyId = this.state.districtWinners?.[spec.region_id]?.[spec.district_id] || null;

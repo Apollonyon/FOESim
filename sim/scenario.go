@@ -13,6 +13,7 @@ import (
 // Empty fields fall back to EU-27 defaults via Scenario.EffectiveMeta.
 type ScenarioMeta struct {
 	Title          string    `json:"title,omitempty"`
+	Description    string    `json:"description,omitempty"`
 	SeatLabel      string    `json:"seat_label,omitempty"`
 	RegionLabel    string    `json:"region_label,omitempty"`
 	UnitLabel      string    `json:"unit_label,omitempty"`

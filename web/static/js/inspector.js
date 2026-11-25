@@ -86,6 +86,23 @@ export class InspectorUI {
         })
       );
 
+      if (this.state.viewMode === 'forecast' && this.state.forecast?.regions?.[reg.id]) {
+        const rf = this.state.forecast.regions[reg.id];
+        const probs = (geo.districtId && !this.state.methodOverride && rf.district_win_prob?.[geo.districtId])
+          ? rf.district_win_prob[geo.districtId]
+          : rf.win_prob;
+        const rankedProb = rankParties(probs);
+        const topLead = rankedProb.length ? this.state.partiesById[rankedProb[0][0]] : null;
+        const topOdds = rankedProb.length ? `${topLead?.short_name || rankedProb[0][0]} ${Math.round(rankedProb[0][1] * 100)}%` : '—';
+        statsEl.append(
+          statBox(geo.districtId ? `${geo.districtId} Odds` : 'Region Odds', topOdds),
+          statBox('Simulations', this.state.forecast.runs),
+          statBox('Type', urbanTag)
+        );
+        this.renderForecastBars(barsEl, probs, rf.mean_seats, seatLabel);
+        return;
+      }
+
       if (!rep) {
         statsEl.append(
           statBox('Status', 'Counting'),
@@ -143,6 +160,42 @@ export class InspectorUI {
     );
 
     const seatHeading = seatLabel.charAt(0).toUpperCase() + seatLabel.slice(1);
+    if (this.state.viewMode === 'forecast' && this.state.forecast?.regions?.[rid]) {
+      const rf = this.state.forecast.regions[rid];
+      const rankedProb = rankParties(rf.win_prob);
+      const topLead = rankedProb.length ? this.state.partiesById[rankedProb[0][0]] : null;
+      const topOdds = rankedProb.length ? `${topLead?.short_name || rankedProb[0][0]} ${Math.round(rankedProb[0][1] * 100)}%` : '—';
+
+      statsEl.append(
+        statBox(seatHeading, reg.seats),
+        statBox('Simulations', this.state.forecast.runs),
+        statBox('Top Odds', topOdds)
+      );
+
+      if (rf.district_win_prob && Object.keys(rf.district_win_prob).length > 0 && !this.state.methodOverride) {
+        const strip = el('div', { className: 'district-badges' });
+        for (const did of Object.keys(rf.district_win_prob).sort()) {
+          const dRanked = rankParties(rf.district_win_prob[did]);
+          const topPid = dRanked[0]?.[0];
+          const winner = topPid ? this.state.partiesById[topPid] : null;
+          const pctTxt = dRanked[0] ? ` ${Math.round(dRanked[0][1] * 100)}%` : '';
+          strip.appendChild(
+            el(
+              'span',
+              { className: 'district-badge' },
+              swatch(winner?.color),
+              el('strong', { text: did }),
+              ` ${winner ? winner.short_name : '—'}${pctTxt}`
+            )
+          );
+        }
+        barsEl.appendChild(strip);
+      }
+
+      this.renderForecastBars(barsEl, rf.win_prob, rf.mean_seats, seatLabel);
+      return;
+    }
+
     statsEl.append(
       statBox(seatHeading, reg.seats),
       statBox('Counted', `${regPct}% (${repCount}/${totalCount})`),
@@ -240,6 +293,44 @@ export class InspectorUI {
     }
   }
 
+  renderForecastBars(container, winProbMap, meanSeatsMap, seatLabel = 'seats') {
+    const ids = new Set([
+      ...Object.keys(winProbMap || {}),
+      ...Object.keys(meanSeatsMap || {})
+    ]);
+    const sorted = [...ids].sort((a, b) => {
+      const pDiff = (winProbMap?.[b] || 0) - (winProbMap?.[a] || 0);
+      if (Math.abs(pDiff) > 1e-6) return pDiff;
+      return (meanSeatsMap?.[b] || 0) - (meanSeatsMap?.[a] || 0);
+    });
+
+    for (const pid of sorted) {
+      const prob = winProbMap?.[pid] || 0;
+      const avgSeats = meanSeatsMap?.[pid] || 0;
+      if (prob < 0.005 && avgSeats < 0.05) continue;
+      const p = this.state.partiesById[pid];
+      if (!p) continue;
+      const pct = prob * 100;
+      const col = safeColor(p.color);
+      container.appendChild(
+        el(
+          'div',
+          { className: 'bar-row' },
+          el(
+            'div',
+            { className: 'bar-meta' },
+            el('span', { className: 'bar-party' }, swatch(col), p.short_name),
+            el('span', { className: 'mono' }, el('strong', { text: `${pct.toFixed(0)}%` }), ` win · Avg ${avgSeats.toFixed(1)} ${seatLabel}`)
+          ),
+          el('div', { className: 'bar-track' }, el('div', {
+            className: 'bar-fill',
+            style: { width: `${Math.min(100, pct).toFixed(1)}%`, background: col }
+          }))
+        )
+      );
+    }
+  }
+
   showTooltip(e, regionId, precinctId) {
     const geo = this.state.precinctGeo[precinctId];
     const reg = this.state.regionsById[regionId];
@@ -248,7 +339,17 @@ export class InspectorUI {
     const urbanTag = URBAN_LABELS[geo.urbanType] || '';
 
     let sub = `${urbanTag}${geo.districtId ? ` · ${geo.districtId}` : ''} · Counting…`;
-    if (rep) {
+    if (this.state.viewMode === 'forecast' && this.state.forecast?.regions?.[regionId]) {
+      const rf = this.state.forecast.regions[regionId];
+      const probs = (geo.districtId && !this.state.methodOverride && rf.district_win_prob?.[geo.districtId])
+        ? rf.district_win_prob[geo.districtId]
+        : rf.win_prob;
+      const ranked = rankParties(probs);
+      const lead = ranked.length ? this.state.partiesById[ranked[0][0]] : null;
+      const probPct = ranked.length ? `${(ranked[0][1] * 100).toFixed(0)}%` : '0%';
+      const scopeTxt = geo.districtId ? `${geo.districtId} odds` : 'Region odds';
+      sub = `${lead ? lead.short_name : '—'} ${probPct} (${scopeTxt}) · ${urbanTag}`;
+    } else if (rep) {
       const total = sumVotes(rep.votes);
       const repPct = Math.round((rep.reported_pct || 1) * 100);
       const ranked = rankParties(rep.votes);
@@ -278,7 +379,20 @@ export class InspectorUI {
     let title = `${reg.name} (${reg.seats} ${seatLabel})`;
     let sub = 'Exit poll / counting…';
 
-    if (spec.district_id && !this.state.methodOverride) {
+    if (this.state.viewMode === 'forecast' && this.state.forecast?.regions?.[spec.region_id]) {
+      const rf = this.state.forecast.regions[spec.region_id];
+      if (spec.district_id && !this.state.methodOverride && rf.district_win_prob?.[spec.district_id]) {
+        const ranked = rankParties(rf.district_win_prob[spec.district_id]);
+        const winner = ranked.length ? this.state.partiesById[ranked[0][0]] : null;
+        title = `${spec.label} · ${reg.name} (${reg.district_seats || 1} ${seatLabel})`;
+        sub = winner ? `${winner.short_name} ${(ranked[0][1] * 100).toFixed(0)}% win odds` : 'Forecast';
+      } else {
+        const ranked = rankParties(rf.win_prob);
+        const lead = ranked.length ? this.state.partiesById[ranked[0][0]] : null;
+        const avg = ranked.length ? (rf.mean_seats?.[ranked[0][0]] || 0).toFixed(1) : '0.0';
+        sub = lead ? `${lead.short_name} ${(ranked[0][1] * 100).toFixed(0)}% win odds · Avg ${avg}` : 'Forecast';
+      }
+    } else if (spec.district_id && !this.state.methodOverride) {
       const winnerId = this.state.districtWinners?.[spec.region_id]?.[spec.district_id];
       const winner = winnerId ? this.state.partiesById[winnerId] : null;
       title = `${spec.label} · ${reg.name} (${reg.district_seats || 1} ${seatLabel})`;

@@ -23,6 +23,7 @@
             <h1>ParliamentSim</h1>
             <div id="scenario-subtitle" class="subtitle">Loading election atlas…</div>
             <select id="scenario-select" class="scenario-select hidden" aria-label="Select election scenario"></select>
+            <div id="scenario-note" class="scenario-note hidden"></div>
           </div>
         </div>
         <div class="brand-right">
@@ -36,9 +37,30 @@
       </div>
 
       <div class="controls-row">
+        <div id="mode-switch" class="segmented" role="group" aria-label="Simulation mode">
+          <button class="mode-btn active" data-mode="live">Live</button>
+          <button class="mode-btn" data-mode="forecast" title="Simulate N election nights for win odds and seat percentiles">Forecast</button>
+        </div>
         <button id="btn-run" class="btn btn-ink">▶ Start</button>
         <button id="btn-reset" class="btn btn-icon" title="Reset election" aria-label="Reset election" disabled>↺</button>
-        <div class="segmented" role="group" aria-label="Broadcast speed">
+        <div id="forecast-controls" class="forecast-controls hidden">
+          <label class="mini-field" title="Polling uncertainty / election-night volatility">
+            <span>Swing</span>
+            <input id="input-swing" type="range" min="0" max="0.60" step="0.05" value="0.15" />
+            <output id="swing-val">0.15</output>
+          </label>
+          <label class="mini-field" title="Number of correlated Monte Carlo runs">
+            <span>Runs</span>
+            <select id="forecast-runs" aria-label="Monte Carlo simulation count">
+              <option value="100">100</option>
+              <option value="200" selected>200</option>
+              <option value="500">500</option>
+            </select>
+          </label>
+          <button id="btn-run-forecast" class="btn btn-ink">↻ Re-run</button>
+        </div>
+        <button id="btn-editor" class="btn btn-accent" title="Open Scenario Editor (E)">✎ Scenario Editor</button>
+        <div id="speed-group" class="segmented" role="group" aria-label="Broadcast speed">
           <button class="seg-btn active" data-duration="45000">1×</button>
           <button class="seg-btn" data-duration="22000">2×</button>
           <button class="seg-btn" data-duration="9000">5×</button>
@@ -114,6 +136,14 @@
         <div id="map-legend" class="legend"></div>
       </aside>
 
+      <aside id="battlegrounds" class="hud battlegrounds hidden" aria-label="Closest races">
+        <div class="hud-header">
+          <span class="hud-kicker">CLOSEST RACES</span>
+          <span id="battlegrounds-sub" class="hud-sub mono"></span>
+        </div>
+        <div id="battlegrounds-list" class="battlegrounds-list"></div>
+      </aside>
+
       <aside id="inspector" class="hud inspector hidden" aria-label="Selection inspector">
         <div class="inspector-head">
           <div>
@@ -153,6 +183,7 @@
       </div>
       <div id="hemicycle-body" class="hemicycle-body">
         <svg id="hemicycle-svg" viewBox="0 0 360 195" aria-label="Seat distribution chart"></svg>
+        <div id="forecast-summary" class="forecast-summary hidden"></div>
         <div id="seat-ledger" class="seat-ledger"></div>
         <div id="coalition-list" class="coalition-list hidden"></div>
       </div>
@@ -161,8 +192,12 @@
     <!-- Bottom-right live county ticker + map attribution -->
     <div class="bottom-right-stack">
       <aside id="ticker" class="hud ticker" aria-live="polite"></aside>
+      <button id="btn-version" type="button" class="version-pill hidden" title="Version &amp; changelog"></button>
       <div id="map-attribution" class="attribution"></div>
     </div>
+
+    <div id="editor-modal" class="editor-modal hidden" aria-hidden="true"></div>
+    <div id="changelog-modal" class="editor-modal hidden" aria-hidden="true"></div>
   </main>
 
   <script type="module" src="js/app.js"></script>

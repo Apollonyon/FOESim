@@ -30,11 +30,13 @@ function readableScoreColor(hex) {
 }
 
 export class Hemicycle {
-  constructor(svgElRef, ledgerEl) {
+  constructor(svgElRef, ledgerEl, forecastSummaryEl = null) {
     this.svg = svgElRef;
     this.ledger = ledgerEl;
+    this.forecastSummary = forecastSummaryEl;
     this.dots = [];
     this.ledgerRows = new Map();
+    this.selectedForecastGroupId = '';
     this.totalSeats = 0;
     this.chartType = 'hemicycle';
     this.seatLabel = 'seats';
@@ -46,7 +48,12 @@ export class Hemicycle {
     this.seatLabel = seatLabel || 'seats';
     this.svg.replaceChildren();
     this.ledgerRows.clear();
+    this.selectedForecastGroupId = '';
     clearEl(this.ledger);
+    if (this.forecastSummary) {
+      clearEl(this.forecastSummary);
+      this.forecastSummary.classList.add('hidden');
+    }
     this.svg.classList.toggle('bar-mode', this.chartType === 'bar');
 
     if (this.chartType === 'bar') {
@@ -216,36 +223,11 @@ export class Hemicycle {
   }
 
   render(orderedGroups, euSeats, prevEUSeats, highlightGroupIds = null) {
-    if (this.chartType === 'bar') {
-      this.renderBar(orderedGroups, euSeats, prevEUSeats);
-    } else {
-      const colors = [];
-      const dimmed = [];
-      const hasHighlight = highlightGroupIds && highlightGroupIds.size > 0;
-      for (const g of orderedGroups) {
-        const s = euSeats[g.id] || 0;
-        const isDim = hasHighlight && !highlightGroupIds.has(g.id);
-        const col = safeColor(g.color);
-        for (let i = 0; i < s; i++) {
-          colors.push(col);
-          dimmed.push(isDim);
-        }
-      }
-
-      for (let i = 0; i < this.dots.length; i++) {
-        const dot = this.dots[i];
-        const fill = colors[i] || 'var(--dot-empty)';
-        const op = dimmed[i] ? '0.16' : '1';
-        if (dot._fill !== fill) {
-          dot._fill = fill;
-          dot.setAttribute('fill', fill);
-        }
-        if (dot._op !== op) {
-          dot._op = op;
-          dot.setAttribute('opacity', op);
-        }
-      }
+    if (this.forecastSummary) {
+      clearEl(this.forecastSummary);
+      this.forecastSummary.classList.add('hidden');
     }
+    this.#renderChart(orderedGroups, euSeats, prevEUSeats, highlightGroupIds);
 
     this.ensureLedger(orderedGroups);
     for (const g of orderedGroups) {
@@ -259,6 +241,265 @@ export class Hemicycle {
         row.seatsEl.textContent = String(cur);
         row.deltaEl.className = `ledger-delta ${deltaClass}`;
         row.deltaEl.textContent = deltaTxt;
+      }
+    }
+  }
+
+  #resolveForecastGroup(orderedGroups, forecast) {
+    if (this.selectedForecastGroupId && orderedGroups.some((g) => g.id === this.selectedForecastGroupId)) {
+      return orderedGroups.find((g) => g.id === this.selectedForecastGroupId);
+    }
+    let best = orderedGroups[0] || null;
+    let bestScore = -1;
+    for (const g of orderedGroups) {
+      const dist = forecast?.groups?.[g.id];
+      const score = dist ? (dist.p50 * 1000 + dist.mean) : 0;
+      if (score > bestScore) {
+        bestScore = score;
+        best = g;
+      }
+    }
+    this.selectedForecastGroupId = best?.id || '';
+    return best;
+  }
+
+  #renderForecastSummary(orderedGroups, forecast, selectedGroup) {
+    if (!this.forecastSummary) return;
+    clearEl(this.forecastSummary);
+    this.forecastSummary.classList.remove('hidden');
+
+    // 1. Win-the-Election Odds bar when majority probabilities exist
+    const majContenders = orderedGroups
+      .map((g) => ({ group: g, prob: forecast?.groups?.[g.id]?.majority_prob || 0 }))
+      .filter((x) => x.prob > 0.004)
+      .sort((a, b) => b.prob - a.prob);
+
+    if (majContenders.length > 0) {
+      const oddsLabels = majContenders.map((x) => (
+        el('span', { className: 'forecast-odds-tag' },
+          swatch(x.group.color),
+          el('strong', { text: x.group.short_name }),
+          ` ${Math.round(x.prob * 100)}%`
+        )
+      ));
+      const noMajProb = Math.max(0, 1 - majContenders.reduce((acc, x) => acc + x.prob, 0));
+      if ((forecast?.tie_prob || 0) >= 0.005) {
+        oddsLabels.push(el('span', { className: 'forecast-odds-tag mono', text: `Tie ${Math.round(forecast.tie_prob * 100)}%` }));
+      } else if (noMajProb >= 0.01) {
+        oddsLabels.push(el('span', { className: 'forecast-odds-tag mono', text: `Split ${Math.round(noMajProb * 100)}%` }));
+      }
+
+      const bar = el('div', { className: 'forecast-odds-bar' });
+      for (const x of majContenders) {
+        bar.appendChild(el('div', {
+          className: 'forecast-odds-seg',
+          style: { width: `${(x.prob * 100).toFixed(1)}%`, background: safeColor(x.group.color) }
+        }));
+      }
+      this.forecastSummary.appendChild(el('div', { className: 'forecast-odds-wrap' },
+        el('div', { className: 'forecast-odds-labels' }, ...oddsLabels),
+        bar
+      ));
+    }
+
+    // 2. Interactive SVG Seat Distribution Histogram for selected group
+    if (!selectedGroup || !forecast?.groups?.[selectedGroup.id]) return;
+    const dist = forecast.groups[selectedGroup.id];
+    const bins = dist.bins || [];
+    const color = safeColor(selectedGroup.color);
+
+    const histHead = el('div', { className: 'forecast-hist-head' },
+      el('span', { className: 'forecast-hist-title' },
+        swatch(color),
+        el('strong', { text: selectedGroup.short_name }),
+        ` P10 ${dist.p10} · Med ${dist.p50} · P90 ${dist.p90}`
+      ),
+      el('span', { className: 'forecast-hist-hint', text: 'Click row below' })
+    );
+
+    const svg = svgEl('svg', { viewBox: '0 0 340 70', class: 'forecast-hist-svg', 'aria-label': `${selectedGroup.short_name} seat distribution` });
+    const padL = 8;
+    const plotW = 324;
+    const baseY = 52;
+    const plotH = 40;
+    const maxCount = Math.max(1, ...bins.map((b) => b.count));
+
+    if (bins.length === 1) {
+      const barW = 32;
+      const barX = 170 - barW / 2;
+      svg.appendChild(svgEl('rect', {
+        x: barX, y: baseY - plotH, width: barW, height: plotH, rx: 2,
+        fill: color, opacity: '0.92'
+      }));
+      const singleLbl = svgEl('text', {
+        x: 170, y: 66, 'text-anchor': 'middle', fill: 'var(--muted)',
+        'font-size': 9, 'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace'
+      });
+      singleLbl.textContent = `${bins[0].start} ${this.seatLabel} (100%)`;
+      svg.appendChild(singleLbl);
+    } else if (bins.length > 1) {
+      const minX = bins[0].start;
+      const maxX = bins[bins.length - 1].end;
+      const span = Math.max(1, maxX - minX + 1);
+      const xOf = (s) => padL + ((s - minX) / span) * plotW;
+
+      for (const b of bins) {
+        const x1 = xOf(b.start);
+        const x2 = xOf(b.end + 1);
+        const w = Math.max(2, x2 - x1 - 1);
+        const h = b.count > 0 ? Math.max(2, (b.count / maxCount) * plotH) : 0;
+        const belowMaj = forecast.majority <= maxX && b.end < forecast.majority;
+        svg.appendChild(svgEl('rect', {
+          x: x1.toFixed(1),
+          y: (baseY - h).toFixed(1),
+          width: w.toFixed(1),
+          height: h.toFixed(1),
+          rx: 1.5,
+          fill: color,
+          opacity: belowMaj ? '0.40' : '0.92'
+        }));
+      }
+
+      if (forecast.majority >= minX - span * 0.12 && forecast.majority <= maxX + span * 0.12) {
+        const majX = Math.max(padL, Math.min(padL + plotW, xOf(forecast.majority)));
+        svg.appendChild(svgEl('line', {
+          x1: majX.toFixed(1), y1: 6, x2: majX.toFixed(1), y2: baseY + 2,
+          stroke: 'currentColor', 'stroke-opacity': '0.55', 'stroke-dasharray': '2.5,2', 'stroke-width': 1.1
+        }));
+        const majTxt = svgEl('text', {
+          x: Math.min(314, Math.max(26, majX)).toFixed(1), y: 10, 'text-anchor': 'middle',
+          fill: 'var(--muted)', 'font-size': 8.5, 'font-weight': 700,
+          'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace'
+        });
+        majTxt.textContent = `Maj ${forecast.majority}`;
+        svg.appendChild(majTxt);
+      }
+
+      const addTick = (x, anchor, label) => {
+        const t = svgEl('text', {
+          x, y: 66, 'text-anchor': anchor, fill: 'var(--muted)',
+          'font-size': 9, 'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace'
+        });
+        t.textContent = label;
+        svg.appendChild(t);
+      };
+      addTick(padL, 'start', String(dist.min));
+      addTick(Math.max(padL + 28, Math.min(padL + plotW - 28, xOf(dist.p50))).toFixed(1), 'middle', `P50 ${dist.p50}`);
+      addTick(padL + plotW, 'end', String(dist.max));
+    }
+
+    this.forecastSummary.append(histHead, svg);
+  }
+
+  renderForecast(orderedGroups, forecast, highlightGroupIds = null) {
+    const selectedGroup = this.#resolveForecastGroup(orderedGroups, forecast);
+    const p50Seats = {};
+    let maxP90 = 1;
+    for (const g of orderedGroups) {
+      const dist = forecast?.groups?.[g.id];
+      p50Seats[g.id] = dist ? dist.p50 : 0;
+      if (dist && dist.p90 > maxP90) maxP90 = dist.p90;
+    }
+
+    this.#renderChart(orderedGroups, p50Seats, {}, highlightGroupIds);
+    this.#renderForecastSummary(orderedGroups, forecast, selectedGroup);
+    this.ledgerRows.clear();
+    clearEl(this.ledger);
+
+    for (const g of orderedGroups) {
+      const dist = forecast?.groups?.[g.id];
+      const p10 = dist?.p10 ?? 0;
+      const p50 = dist?.p50 ?? 0;
+      const p90 = dist?.p90 ?? 0;
+      const majProb = dist?.majority_prob ?? 0;
+      const topProb = dist?.largest_prob ?? 0;
+
+      const col = safeColor(g.color);
+      const topRow = el('div', { className: 'ledger-top' }, swatch(col), el('span', { text: g.short_name }));
+      if (majProb >= 0.005) {
+        topRow.appendChild(el('span', { className: 'ledger-odds-pill', text: `Maj ${Math.round(majProb * 100)}%` }));
+      } else if (topProb >= 0.005) {
+        topRow.appendChild(el('span', { className: 'ledger-odds-pill', text: `#1 ${Math.round(topProb * 100)}%` }));
+      }
+
+      const leftPct = Math.max(0, Math.min(100, (p10 / maxP90) * 100));
+      const rightPct = Math.max(leftPct, Math.min(100, (p90 / maxP90) * 100));
+      const medPct = Math.max(0, Math.min(100, (p50 / maxP90) * 100));
+
+      const track = el('div', { className: 'ledger-range-track' },
+        el('div', {
+          className: 'ledger-range-band',
+          style: {
+            left: `${leftPct.toFixed(1)}%`,
+            width: `${Math.max(2, rightPct - leftPct).toFixed(1)}%`,
+            background: col
+          }
+        }),
+        el('div', {
+          className: 'ledger-range-median',
+          style: { left: `${medPct.toFixed(1)}%` }
+        })
+      );
+
+      const selectGroup = () => {
+        this.selectedForecastGroupId = g.id;
+        this.renderForecast(orderedGroups, forecast, highlightGroupIds);
+      };
+
+      const item = el('div', {
+        className: `ledger-item ledger-item-forecast${selectedGroup?.id === g.id ? ' is-selected' : ''}`,
+        role: 'button',
+        tabindex: '0',
+        title: `Show ${g.short_name} seat distribution`,
+        onClick: selectGroup,
+        onKeydown: (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            selectGroup();
+          }
+        }
+      },
+        topRow,
+        el('div', { className: 'ledger-nums' },
+          el('span', { className: 'ledger-seats', text: String(p50) }),
+          el('span', { className: 'ledger-range-text', text: `${p10}–${p90}` })
+        ),
+        track
+      );
+      this.ledger.appendChild(item);
+    }
+  }
+
+  #renderChart(orderedGroups, euSeats, prevEUSeats, highlightGroupIds = null) {
+    if (this.chartType === 'bar') {
+      this.renderBar(orderedGroups, euSeats, prevEUSeats);
+      return;
+    }
+    const colors = [];
+    const dimmed = [];
+    const hasHighlight = highlightGroupIds && highlightGroupIds.size > 0;
+    for (const g of orderedGroups) {
+      const s = euSeats[g.id] || 0;
+      const isDim = hasHighlight && !highlightGroupIds.has(g.id);
+      const col = safeColor(g.color);
+      for (let i = 0; i < s; i++) {
+        colors.push(col);
+        dimmed.push(isDim);
+      }
+    }
+
+    for (let i = 0; i < this.dots.length; i++) {
+      const dot = this.dots[i];
+      const fill = colors[i] || 'var(--dot-empty)';
+      const op = dimmed[i] ? '0.16' : '1';
+      if (dot._fill !== fill) {
+        dot._fill = fill;
+        dot.setAttribute('fill', fill);
+      }
+      if (dot._op !== op) {
+        dot._op = op;
+        dot.setAttribute('opacity', op);
       }
     }
   }

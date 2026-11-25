@@ -1,12 +1,18 @@
 // Main controller: scenario loading, SSE stream lifecycle, theme toggle, and HUD events.
-import { clearEl, el, swatch } from './dom.js';
+import { clearEl, el, safeColor, swatch } from './dom.js';
 import { EuropeMap } from './map.js';
 import { Hemicycle } from './hemicycle.js';
 import { InspectorUI } from './inspector.js';
 import { renderLegend } from './overlays.js';
+import { ScenarioEditor } from './editor.js';
+import { applyScenarioPatch, decodeSharePayload } from './share.js';
+import { ChangelogModal } from './changelog.js';
 
 const state = {
   scenarioId: '',
+  customRunId: '',
+  baseScenarioId: '',
+  baseScenario: null,
   scenario: null,
   groupsById: {},
   partiesById: {},
@@ -14,10 +20,16 @@ const state = {
   orderedGroups: [],
 
   source: null,
+  viewMode: 'live', // 'live' | 'forecast'
+  forecastRuns: 200,
+  forecast: null,
   runPhase: 'ready', // 'ready' | 'running' | 'paused' | 'done'
   durationMs: 45000,
   activeDurationMs: 45000,
   appliedSeed: 42,
+  temp: 0.45,
+  swing: 0.15,
+  wavesOverride: 0,
   methodOverride: '',
   overlay: 'winner',
   colorMode: 'auto',
@@ -49,10 +61,21 @@ const statusText = document.getElementById('status-text');
 const simClockEl = document.getElementById('sim-clock');
 const btnRun = document.getElementById('btn-run');
 const btnReset = document.getElementById('btn-reset');
+const btnEditor = document.getElementById('btn-editor');
+const speedGroup = document.getElementById('speed-group');
+const forecastControls = document.getElementById('forecast-controls');
+const forecastRunsSelect = document.getElementById('forecast-runs');
+const btnRunForecast = document.getElementById('btn-run-forecast');
+const inputSwing = document.getElementById('input-swing');
+const swingVal = document.getElementById('swing-val');
 const inputSeed = document.getElementById('input-seed');
 const inputTemp = document.getElementById('input-temp');
 const tempVal = document.getElementById('temp-val');
 const methodSelect = document.getElementById('method-select');
+const btnVersion = document.getElementById('btn-version');
+const battlegroundsEl = document.getElementById('battlegrounds');
+const battlegroundsSubEl = document.getElementById('battlegrounds-sub');
+const battlegroundsListEl = document.getElementById('battlegrounds-list');
 const progressFill = document.getElementById('progress-fill');
 const progressLabel = document.getElementById('progress-label');
 const partyPickerWrap = document.getElementById('party-picker-wrap');
@@ -61,6 +84,7 @@ const partySelect = document.getElementById('party-select');
 const countrySelect = document.getElementById('country-select');
 const scenarioSelect = document.getElementById('scenario-select');
 const scenarioSubtitle = document.getElementById('scenario-subtitle');
+const scenarioNoteEl = document.getElementById('scenario-note');
 const seatLedgerEl = document.getElementById('seat-ledger');
 const coalitionListEl = document.getElementById('coalition-list');
 const legendEl = document.getElementById('map-legend');
@@ -68,6 +92,9 @@ const legendEl = document.getElementById('map-legend');
 let map;
 let hemicycle;
 let inspector;
+let editor;
+let changelog;
+let forecastAbortCtrl = null;
 let hemiFrameQueued = false;
 let hudFrameId = 0;
 let pendingTickerRep = null;
@@ -104,6 +131,22 @@ function applyScenarioMeta(meta, hasGroups) {
   document.getElementById('ov-eu-axis').textContent = meta.axis2_label || 'Pro-EU';
 }
 
+function applyModifiersToHUD(modifiers) {
+  if (!modifiers) return;
+  state.swing = Number.isFinite(modifiers.swing) ? Math.min(2, Math.max(0, modifiers.swing)) : 0.15;
+  inputSwing.value = String(Math.min(0.60, Math.max(0, state.swing)));
+  swingVal.textContent = state.swing.toFixed(2);
+  state.wavesOverride = parseInt(modifiers.wavesOverride, 10) || 0;
+  if (Number.isFinite(modifiers.temp) && modifiers.temp > 0) {
+    state.temp = Math.min(5, Math.max(0.05, modifiers.temp));
+    inputTemp.value = String(Math.min(1.5, Math.max(0.25, state.temp)));
+    tempVal.textContent = state.temp.toFixed(2);
+  }
+  if (Number.isFinite(modifiers.seed)) {
+    inputSeed.value = String(modifiers.seed);
+  }
+}
+
 async function init() {
   const savedTheme = localStorage.getItem('ps-theme') || 'light';
   document.documentElement.dataset.theme = savedTheme;
@@ -131,8 +174,26 @@ async function init() {
 
   hemicycle = new Hemicycle(
     document.getElementById('hemicycle-svg'),
-    document.getElementById('seat-ledger')
+    document.getElementById('seat-ledger'),
+    document.getElementById('forecast-summary')
   );
+
+  changelog = new ChangelogModal(document.getElementById('changelog-modal'));
+  changelog.init(btnVersion);
+
+  editor = new ScenarioEditor(document.getElementById('editor-modal'), {
+    onApplied: async (runId, autoStart, modifiers) => {
+      applyModifiersToHUD(modifiers);
+      if (autoStart && state.viewMode !== 'live') {
+        setViewMode('live', { skipReset: true });
+      }
+      await loadScenario({
+        runId,
+        autoStart,
+        initialMethodOverride: modifiers?.methodOverride || ''
+      });
+    }
+  });
 
   wireEvents();
   if (window.innerWidth <= 820) {
@@ -143,7 +204,9 @@ async function init() {
   }
 
   let initialId = '';
-  const urlScenario = new URLSearchParams(window.location.search).get('scenario') || '';
+  const searchParams = new URLSearchParams(window.location.search);
+  const urlScenario = searchParams.get('scenario') || '';
+  const urlRun = searchParams.get('run') || '';
   try {
     const listRes = await fetch('/api/scenarios');
     if (listRes.ok) {
@@ -167,11 +230,60 @@ async function init() {
     // Fallback to single-scenario /api/scenario when /api/scenarios is unavailable.
   }
 
-  await loadScenario(initialId);
+  state.baseScenarioId = initialId;
+  if (window.location.hash.startsWith('#share=')) {
+    try {
+      const shared = await decodeSharePayload(window.location.hash.slice('#share='.length));
+      const baseId = shared.base || initialId;
+      const baseQuery = baseId ? `?scenario=${encodeURIComponent(baseId)}` : '';
+      const baseRes = await fetch(`/api/scenario${baseQuery}`);
+      if (!baseRes.ok) throw new Error(`HTTP ${baseRes.status}`);
+      const baseSc = await baseRes.json();
+      const patched = applyScenarioPatch(baseSc, shared.patch);
+      const runRes = await fetch('/api/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patched)
+      });
+      if (!runRes.ok) throw new Error(`HTTP ${runRes.status}`);
+      const { run_id: runId } = await runRes.json();
+      applyModifiersToHUD(shared.mods);
+      state.baseScenarioId = baseId;
+      const ok = await loadScenario({
+        scenarioId: baseId,
+        runId,
+        baseScenarioOverride: baseSc,
+        initialMethodOverride: shared.mods?.methodOverride || '',
+        suppressError: true
+      });
+      if (ok) return;
+    } catch {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }
+
+  if (urlRun) {
+    const ok = await loadScenario({ runId: urlRun, suppressError: true });
+    if (ok) return;
+  }
+  await loadScenario({ scenarioId: initialId });
 }
 
-async function loadScenario(scenarioId) {
+async function loadScenario({
+  scenarioId = state.baseScenarioId,
+  runId = '',
+  autoStart = false,
+  suppressError = false,
+  initialMethodOverride = '',
+  baseScenarioOverride = null
+} = {}) {
   const seq = ++scenarioLoadSeq;
+  if (forecastAbortCtrl) {
+    forecastAbortCtrl.abort();
+    forecastAbortCtrl = null;
+  }
+  state.forecast = null;
+  renderBattlegrounds();
   if (state.source) {
     state.source.close();
     state.source = null;
@@ -189,26 +301,40 @@ async function loadScenario(scenarioId) {
   inspector.hideTooltip();
   inspector.clear();
 
-  state.methodOverride = '';
-  methodSelect.value = '';
+  state.methodOverride = initialMethodOverride;
+  methodSelect.value = initialMethodOverride;
   setStatus('live', 'LOADING');
 
-  const query = scenarioId ? `?scenario=${encodeURIComponent(scenarioId)}` : '';
+  const query = runId
+    ? `?run=${encodeURIComponent(runId)}`
+    : (scenarioId ? `?scenario=${encodeURIComponent(scenarioId)}` : '');
   let loaded;
   try {
     const res = await fetch(`/api/scenario${query}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     loaded = await res.json();
   } catch (err) {
-    if (seq !== scenarioLoadSeq) return;
-    scenarioSubtitle.classList.remove('hidden');
-    scenarioSubtitle.textContent = `Failed to load scenario (${err.message})`;
-    setStatus('idle', 'ERROR');
-    return;
+    if (seq !== scenarioLoadSeq) return false;
+    if (!suppressError) {
+      scenarioSubtitle.classList.remove('hidden');
+      scenarioSubtitle.textContent = `Failed to load scenario (${err.message})`;
+      setStatus('idle', 'ERROR');
+    }
+    return false;
   }
-  if (seq !== scenarioLoadSeq) return;
+  if (seq !== scenarioLoadSeq) return false;
 
-  state.scenarioId = scenarioId;
+  state.customRunId = runId;
+  btnEditor.classList.toggle('is-custom', Boolean(runId));
+  if (baseScenarioOverride) {
+    state.baseScenario = structuredClone(baseScenarioOverride);
+  } else if (!runId) {
+    state.scenarioId = scenarioId;
+    state.baseScenarioId = scenarioId;
+    state.baseScenario = structuredClone(loaded);
+  } else if (!state.baseScenario) {
+    state.baseScenario = structuredClone(loaded);
+  }
   state.scenario = loaded;
   state.groupsById = {};
   state.partiesById = {};
@@ -220,11 +346,28 @@ async function loadScenario(scenarioId) {
 
   const meta = loaded.meta || {};
   const hasGroups = Boolean(loaded.groups?.length);
-  scenarioSubtitle.textContent = loaded.name;
+  const desc = (meta.description || '').trim();
+  scenarioNoteEl.textContent = desc;
+  scenarioNoteEl.title = desc;
+  scenarioNoteEl.classList.toggle('hidden', !desc);
+  scenarioSubtitle.textContent = runId ? `Custom · ${loaded.name}` : loaded.name;
+  const oldCustomOpt = scenarioSelect.querySelector('option[value="__custom__"]');
+  if (oldCustomOpt) oldCustomOpt.remove();
   if (scenarioSelect.options.length > 1) {
     scenarioSubtitle.classList.add('hidden');
     scenarioSelect.classList.remove('hidden');
-    if (scenarioId) scenarioSelect.value = scenarioId;
+    if (runId) {
+      const customOpt = document.createElement('option');
+      customOpt.value = '__custom__';
+      customOpt.textContent = `Custom · ${loaded.name}`;
+      customOpt.disabled = true;
+      scenarioSelect.prepend(customOpt);
+      scenarioSelect.value = '__custom__';
+    } else if (scenarioId) {
+      scenarioSelect.value = scenarioId;
+    }
+  } else {
+    scenarioSubtitle.classList.remove('hidden');
   }
   applyScenarioMeta(meta, hasGroups);
 
@@ -304,23 +447,30 @@ async function loadScenario(scenarioId) {
 
   try {
     const active = await map.loadAndRender();
-    if (!active || seq !== scenarioLoadSeq) return;
+    if (!active || seq !== scenarioLoadSeq) return false;
   } catch (err) {
-    if (seq !== scenarioLoadSeq) return;
+    if (seq !== scenarioLoadSeq) return false;
     scenarioSubtitle.classList.remove('hidden');
     scenarioSubtitle.textContent = `Failed to load map geometry (${err.message})`;
     setStatus('idle', 'ERROR');
-    return;
+    return false;
   }
 
-  if (scenarioId) {
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set('scenario', scenarioId);
-    window.history.replaceState(null, '', nextUrl);
+  const nextUrl = new URL(window.location.href);
+  if (runId) {
+    nextUrl.searchParams.set('run', runId);
+  } else {
+    nextUrl.searchParams.delete('run');
+    nextUrl.hash = '';
+    if (scenarioId) nextUrl.searchParams.set('scenario', scenarioId);
   }
+  window.history.replaceState(null, '', nextUrl);
 
   refreshLegend();
   resetToReady();
+  if (autoStart) startStream();
+  else if (state.viewMode === 'forecast') runForecast();
+  return true;
 }
 
 function focusRegion(rid) {
@@ -391,7 +541,11 @@ function scheduleHemicycleRender() {
       ? state.coalitions.find((c) => coalitionKey(c) === state.selectedCoalitionKey)
       : null;
     const highlight = activeCoalition ? new Set(activeCoalition.group_ids) : null;
-    hemicycle.render(state.orderedGroups, state.euSeats, state.prevEUSeats, highlight);
+    if (state.viewMode === 'forecast' && state.forecast) {
+      hemicycle.renderForecast(state.orderedGroups, state.forecast, highlight);
+    } else {
+      hemicycle.render(state.orderedGroups, state.euSeats, state.prevEUSeats, highlight);
+    }
     if (state.hemiTab === 'coalitions') renderCoalitions();
   });
 }
@@ -716,9 +870,172 @@ function toggleRunPause() {
   else startStream();
 }
 
-function onSettingChanged() {
+function onSettingChanged(fromSpeed = false) {
+  if (state.viewMode === 'forecast') {
+    if (!fromSpeed) runForecast();
+    return;
+  }
   if (state.runPhase === 'running' || state.runPhase === 'done') startStream();
   else if (state.runPhase === 'paused') resetToReady();
+}
+
+function setViewMode(mode, { skipReset = false } = {}) {
+  const next = mode === 'forecast' ? 'forecast' : 'live';
+  if (state.viewMode === next) return;
+  state.viewMode = next;
+
+  document.querySelectorAll('.mode-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === next);
+  });
+
+  const isForecast = next === 'forecast';
+  btnRun.classList.toggle('hidden', isForecast);
+  btnReset.classList.toggle('hidden', isForecast);
+  speedGroup.classList.toggle('hidden', isForecast);
+  forecastControls.classList.toggle('hidden', !isForecast);
+
+  if (isForecast) {
+    runForecast();
+  } else {
+    if (forecastAbortCtrl) {
+      forecastAbortCtrl.abort();
+      forecastAbortCtrl = null;
+    }
+    state.forecast = null;
+    renderBattlegrounds();
+    refreshLegend();
+    if (!skipReset) resetToReady();
+  }
+}
+
+function renderBattlegrounds() {
+  clearEl(battlegroundsListEl);
+  if (state.viewMode !== 'forecast' || !state.forecast || !state.scenario) {
+    battlegroundsEl.classList.add('hidden');
+    return;
+  }
+
+  battlegroundsEl.classList.remove('hidden');
+  const races = [];
+  for (const r of state.scenario.regions) {
+    const rf = state.forecast.regions?.[r.id];
+    if (!rf) continue;
+    races.push({ rid: r.id, label: r.name, seats: r.seats, probs: rf.win_prob || {} });
+    if (r.district_seats > 0 && !state.methodOverride && rf.district_win_prob) {
+      for (const [did, probs] of Object.entries(rf.district_win_prob)) {
+        races.push({ rid: r.id, label: `${did} (${r.name})`, seats: r.district_seats, probs });
+      }
+    }
+  }
+
+  const competitive = [];
+  for (const race of races) {
+    const ranked = Object.entries(race.probs)
+      .filter(([, p]) => p > 0)
+      .sort((a, b) => b[1] - a[1]);
+    if (!ranked.length) continue;
+    const leadProb = ranked[0][1];
+    if (leadProb >= 0.85) continue;
+    competitive.push({ ...race, ranked, leadProb });
+  }
+
+  competitive.sort((a, b) => a.leadProb - b.leadProb);
+  const top = competitive.slice(0, 7);
+  battlegroundsSubEl.textContent = `${competitive.length} <85%`;
+
+  if (!top.length) {
+    battlegroundsListEl.appendChild(el('div', {
+      className: 'subtitle',
+      text: `All races lean safe (>=85%) at Swing ${state.swing.toFixed(2)}. Try raising Swing.`
+    }));
+    return;
+  }
+
+  const seatUnit = state.scenario.meta?.seat_label || 'seats';
+  for (const race of top) {
+    const p1 = state.partiesById[race.ranked[0][0]];
+    const p2 = race.ranked[1] ? state.partiesById[race.ranked[1][0]] : null;
+    const pct1 = Math.round(race.ranked[0][1] * 100);
+    const pct2 = race.ranked[1] ? Math.round(race.ranked[1][1] * 100) : 0;
+    const c1 = safeColor(p1?.color);
+    const c2 = safeColor(p2?.color, '#94a3b8');
+
+    const bar = el('div', { className: 'bg-bar' },
+      el('div', { className: 'bg-bar-seg', style: { width: `${pct1}%`, background: c1 } }),
+      p2 ? el('div', { className: 'bg-bar-seg', style: { width: `${pct2}%`, background: c2 } }) : null
+    );
+
+    const oddsTxt = p2
+      ? `${p1?.short_name || race.ranked[0][0]} ${pct1}% · ${p2.short_name} ${pct2}%`
+      : `${p1?.short_name || race.ranked[0][0]} ${pct1}%`;
+
+    battlegroundsListEl.appendChild(el('button', {
+      type: 'button',
+      className: 'bg-row',
+      onClick: () => {
+        focusRegion(race.rid);
+        inspector.select('country', race.rid);
+      }
+    },
+      el('div', { className: 'bg-row-head' },
+        el('strong', { text: race.label }),
+        el('span', { className: 'mono editor-muted', text: `${race.seats} ${seatUnit}` })
+      ),
+      el('div', { className: 'bg-row-odds mono', text: oddsTxt }),
+      bar
+    ));
+  }
+}
+
+async function runForecast() {
+  if (!state.scenario) return;
+  const reqSeq = scenarioLoadSeq;
+  if (forecastAbortCtrl) forecastAbortCtrl.abort();
+  const ctrl = new AbortController();
+  forecastAbortCtrl = ctrl;
+
+  if (state.source) {
+    state.source.close();
+    state.source = null;
+  }
+  clearQueue();
+  state.runPhase = 'ready';
+  syncRunControls();
+  if (!state.forecast) {
+    resetStreamState();
+    renderBattlegrounds();
+  }
+  setStatus('live', 'FORECASTING…');
+  refreshLegend();
+
+  const parsedSeed = parseInt(inputSeed.value, 10);
+  const seed = Number.isNaN(parsedSeed) ? 42 : parsedSeed;
+  const temp = Number.isFinite(state.temp) && state.temp > 0 ? state.temp : 0.45;
+  const swing = Number.isFinite(state.swing) && state.swing >= 0 ? Math.min(2, state.swing) : 0.15;
+  const targetParam = state.customRunId
+    ? `&run=${encodeURIComponent(state.customRunId)}`
+    : (state.scenarioId ? `&scenario=${encodeURIComponent(state.scenarioId)}` : '');
+  const methodParam = state.methodOverride ? `&method=${encodeURIComponent(state.methodOverride)}` : '';
+  const url = `/api/forecast?runs=${state.forecastRuns}&seed=${seed}&temp=${temp}&swing=${swing}${targetParam}${methodParam}`;
+
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const fc = await res.json();
+    if (reqSeq !== scenarioLoadSeq || state.viewMode !== 'forecast' || forecastAbortCtrl !== ctrl) return;
+    forecastAbortCtrl = null;
+    state.forecast = fc;
+    setStatus('done', `FORECAST · ${fc.runs} RUNS`);
+    refreshLegend();
+    map.recolorAll();
+    scheduleHemicycleRender();
+    renderBattlegrounds();
+    inspector.render();
+    map.refreshHoverTooltip();
+  } catch (err) {
+    if (err.name === 'AbortError' || reqSeq !== scenarioLoadSeq || state.viewMode !== 'forecast') return;
+    setStatus('idle', 'FORECAST ERR');
+  }
 }
 
 function startStream() {
@@ -738,12 +1055,16 @@ function startStream() {
   const parsedSeed = parseInt(inputSeed.value, 10);
   const seed = Number.isNaN(parsedSeed) ? 42 : parsedSeed;
   state.appliedSeed = seed;
-  const parsedTemp = parseFloat(inputTemp.value);
-  const temp = Number.isNaN(parsedTemp) || parsedTemp <= 0 ? 0.45 : parsedTemp;
-  const waves = state.durationMs > 0 ? 3 : 1;
-  const scenarioParam = state.scenarioId ? `&scenario=${encodeURIComponent(state.scenarioId)}` : '';
+  const temp = Number.isFinite(state.temp) && state.temp > 0 ? state.temp : 0.45;
+  const swing = Number.isFinite(state.swing) && state.swing >= 0 ? Math.min(2, state.swing) : 0.15;
+  const waves = state.wavesOverride >= 1 && state.wavesOverride <= 4
+    ? state.wavesOverride
+    : (state.durationMs > 0 ? 3 : 1);
+  const targetParam = state.customRunId
+    ? `&run=${encodeURIComponent(state.customRunId)}`
+    : (state.scenarioId ? `&scenario=${encodeURIComponent(state.scenarioId)}` : '');
   const methodParam = state.methodOverride ? `&method=${encodeURIComponent(state.methodOverride)}` : '';
-  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&swing=0.15${scenarioParam}${methodParam}`;
+  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&swing=${swing}${targetParam}${methodParam}`;
 
   setStatus('live', 'EXIT POLLS');
   syncRunControls();
@@ -783,11 +1104,45 @@ function startStream() {
   };
 }
 
+function openScenarioEditor() {
+  if (!state.scenario) return;
+  const parsedSeed = parseInt(inputSeed.value, 10);
+  editor.open(
+    state.baseScenario || state.scenario,
+    state.scenario,
+    {
+      swing: state.swing,
+      temp: state.temp,
+      seed: Number.isNaN(parsedSeed) ? 42 : parsedSeed,
+      wavesOverride: state.wavesOverride,
+      methodOverride: state.methodOverride
+    },
+    { baseScenarioId: state.baseScenarioId }
+  );
+}
+
 function wireEvents() {
+  document.querySelectorAll('.mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setViewMode(btn.dataset.mode));
+  });
+  forecastRunsSelect.addEventListener('change', () => {
+    state.forecastRuns = parseInt(forecastRunsSelect.value, 10) || 200;
+    if (state.viewMode === 'forecast') runForecast();
+  });
+  inputSwing.addEventListener('input', () => {
+    state.swing = parseFloat(inputSwing.value) || 0;
+    swingVal.textContent = state.swing.toFixed(2);
+  });
+  inputSwing.addEventListener('change', () => onSettingChanged());
+  btnRunForecast.addEventListener('click', runForecast);
+  btnVersion.addEventListener('click', () => changelog?.open());
+
   btnRun.addEventListener('click', toggleRunPause);
   btnReset.addEventListener('click', resetToReady);
+  btnEditor.addEventListener('click', openScenarioEditor);
   scenarioSelect.addEventListener('change', () => {
-    loadScenario(scenarioSelect.value);
+    if (scenarioSelect.value === '__custom__') return;
+    loadScenario({ scenarioId: scenarioSelect.value });
   });
 
   document.getElementById('btn-theme').addEventListener('click', () => {
@@ -806,7 +1161,7 @@ function wireEvents() {
       document.querySelectorAll('.seg-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       state.durationMs = parseInt(btn.dataset.duration, 10);
-      onSettingChanged();
+      onSettingChanged(true);
     });
   });
 
@@ -840,7 +1195,8 @@ function wireEvents() {
   });
 
   inputTemp.addEventListener('input', () => {
-    tempVal.textContent = parseFloat(inputTemp.value).toFixed(2);
+    state.temp = parseFloat(inputTemp.value) || 0.45;
+    tempVal.textContent = state.temp.toFixed(2);
   });
   inputTemp.addEventListener('change', onSettingChanged);
 
@@ -883,16 +1239,35 @@ function wireEvents() {
   document.getElementById('btn-close-inspector').addEventListener('click', () => inspector.clear());
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && state.selection) {
-      inspector.clear();
+    if (e.key === 'Escape') {
+      if (changelog?.isOpen) {
+        changelog.close();
+        return;
+      }
+      if (editor?.isOpen) {
+        editor.close();
+        return;
+      }
+      if (state.selection) {
+        inspector.clear();
+        return;
+      }
+    }
+    if ((e.key === 'e' || e.key === 'E') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (changelog?.isOpen || editor?.isOpen || !state.scenario) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
+      e.preventDefault();
+      openScenarioEditor();
       return;
     }
     if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
+      if (changelog?.isOpen || editor?.isOpen) return;
+      if (document.activeElement?.closest('input, select, textarea, button, a, [role="button"]')) return;
       if (!state.scenario) return;
       e.preventDefault();
-      toggleRunPause();
+      if (state.viewMode === 'forecast') runForecast();
+      else toggleRunPause();
     }
   });
 

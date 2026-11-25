@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -14,6 +15,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -42,7 +44,9 @@ var staticFiles embed.FS
 type Server struct {
 	scenario        sim.Scenario
 	registry        *sim.ScenarioRegistry
+	runs            *runStore
 	streamSem       chan struct{}
+	forecastSem     chan struct{}
 	maxStreamsPerIP int
 	ipMu            sync.Mutex
 	ipStreams       map[string]int
@@ -52,7 +56,9 @@ type Server struct {
 func NewServer(scenario sim.Scenario) *Server {
 	return &Server{
 		scenario:        scenario,
+		runs:            newRunStore(defaultRunMaxEntries, defaultRunTTL),
 		streamSem:       make(chan struct{}, defaultMaxStreams),
+		forecastSem:     make(chan struct{}, min(max(2, runtime.NumCPU()), 8)),
 		maxStreamsPerIP: defaultMaxStreamsPerIP,
 		ipStreams:       make(map[string]int),
 	}
@@ -92,6 +98,8 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("GET /api/scenarios", gzipMiddleware(http.HandlerFunc(s.handleScenarios)))
 	mux.Handle("GET /api/scenario", gzipMiddleware(http.HandlerFunc(s.handleScenario)))
+	mux.Handle("GET /api/forecast", gzipMiddleware(http.HandlerFunc(s.handleForecast)))
+	mux.HandleFunc("POST /api/runs", s.handleCreateRun)
 	mux.HandleFunc("GET /api/stream", s.handleStream)
 
 	sub, err := fs.Sub(staticFiles, "static")
@@ -270,16 +278,160 @@ func (s *Server) handleScenarios(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
-func (s *Server) handleScenario(w http.ResponseWriter, r *http.Request) {
+type createRunResponse struct {
+	RunID        string `json:"run_id"`
+	ExpiresInSec int    `json:"expires_in_sec"`
+}
+
+func (s *Server) resolveScenarioForRequest(r *http.Request) (sim.Scenario, bool, bool) {
+	if runID := r.URL.Query().Get("run"); runID != "" {
+		if s.runs == nil {
+			return sim.Scenario{}, true, false
+		}
+		sc, ok := s.runs.Get(runID)
+		return sc, true, ok
+	}
 	sc, ok := s.resolveScenario(r.URL.Query().Get("scenario"))
+	return sc, false, ok
+}
+
+func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
+	if s.runs == nil {
+		http.Error(w, "custom runs disabled", http.StatusServiceUnavailable)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxCustomRunBodySize)
+	dec := json.NewDecoder(r.Body)
+
+	var sc sim.Scenario
+	if err := dec.Decode(&sc); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, "scenario payload too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, fmt.Sprintf("invalid scenario JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	var trailing any
+	if err := dec.Decode(&trailing); err != io.EOF {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, "scenario payload too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "unexpected trailing JSON data", http.StatusBadRequest)
+		return
+	}
+
+	if err := validateCustomRunLimits(sc); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := sc.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	id, err := s.runs.Put(sc)
+	if err != nil {
+		http.Error(w, "failed to store custom run", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(createRunResponse{
+		RunID:        id,
+		ExpiresInSec: int(s.runs.ttl / time.Second),
+	})
+}
+
+func (s *Server) handleScenario(w http.ResponseWriter, r *http.Request) {
+	sc, isCustom, ok := s.resolveScenarioForRequest(r)
 	if !ok {
-		http.Error(w, "unknown scenario", http.StatusNotFound)
+		if isCustom {
+			http.Error(w, "custom run not found or expired", http.StatusNotFound)
+		} else {
+			http.Error(w, "unknown scenario", http.StatusNotFound)
+		}
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-cache")
+	if isCustom {
+		w.Header().Set("Cache-Control", "no-store")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache")
+	}
 	sc.Meta = sc.EffectiveMeta()
 	_ = json.NewEncoder(w).Encode(sc)
+}
+
+func (s *Server) handleForecast(w http.ResponseWriter, r *http.Request) {
+	baseScenario, isCustom, ok := s.resolveScenarioForRequest(r)
+	if !ok {
+		if isCustom {
+			http.Error(w, "custom run not found or expired", http.StatusNotFound)
+		} else {
+			http.Error(w, "unknown scenario", http.StatusNotFound)
+		}
+		return
+	}
+
+	ip := clientIP(r)
+	if !s.acquireIPSlot(ip) {
+		w.Header().Set("Retry-After", "3")
+		http.Error(w, "too many concurrent requests from this address", http.StatusTooManyRequests)
+		return
+	}
+	defer s.releaseIPSlot(ip)
+
+	if s.forecastSem != nil {
+		select {
+		case s.forecastSem <- struct{}{}:
+			defer func() { <-s.forecastSem }()
+		default:
+			w.Header().Set("Retry-After", "3")
+			http.Error(w, "forecast worker pool busy", http.StatusServiceUnavailable)
+			return
+		}
+	}
+
+	q := r.URL.Query()
+	streamCfg := s.parseElectionConfig(r)
+	runs := 200
+	if v, err := strconv.Atoi(q.Get("runs")); err == nil && v > 0 {
+		runs = max(10, min(v, 500))
+	}
+
+	sc := scenarioForMethod(baseScenario, parseMethodOverride(q.Get("method")))
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	res, err := sim.RunForecast(ctx, sc, sim.ForecastConfig{
+		Runs:        runs,
+		Temperature: streamCfg.Temperature,
+		Swing:       streamCfg.Swing,
+		BaseSeed:    streamCfg.Seed,
+	})
+	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
+		http.Error(w, "forecast timed out or failed", http.StatusServiceUnavailable)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if isCustom {
+		w.Header().Set("Cache-Control", "no-store")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache")
+	}
+	_ = json.NewEncoder(w).Encode(res)
 }
 
 type exitPollPayload struct {
@@ -310,9 +462,13 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	baseScenario, ok := s.resolveScenario(r.URL.Query().Get("scenario"))
+	baseScenario, isCustom, ok := s.resolveScenarioForRequest(r)
 	if !ok {
-		http.Error(w, "unknown scenario", http.StatusNotFound)
+		if isCustom {
+			http.Error(w, "custom run not found or expired", http.StatusNotFound)
+		} else {
+			http.Error(w, "unknown scenario", http.StatusNotFound)
+		}
 		return
 	}
 

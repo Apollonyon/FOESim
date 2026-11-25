@@ -1,12 +1,14 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"parliamentsim/sim"
 )
@@ -555,5 +557,244 @@ func TestServerMultiScenarioRegistry(t *testing.T) {
 	}
 	if !strings.Contains(stRec.Body.String(), `"rep":312`) || !strings.Contains(stRec.Body.String(), `"dem":226`) {
 		t.Errorf("expected USA 2024 312/226 EVs in stream output")
+	}
+}
+
+func TestRunStoreTTLEviction(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	rs := newRunStore(3, 10*time.Second)
+	rs.now = func() time.Time { return now }
+
+	makeSc := func(name string) sim.Scenario {
+		return sim.Scenario{
+			Name:    name,
+			Parties: sim.DefaultParties(),
+			Regions: sim.DefaultRegions(),
+		}
+	}
+
+	id1, err := rs.Put(makeSc("one"))
+	if err != nil || len(id1) != 24 {
+		t.Fatalf("Put one failed: id=%q err=%v", id1, err)
+	}
+
+	now = now.Add(2 * time.Second)
+	id2, _ := rs.Put(makeSc("two"))
+	now = now.Add(2 * time.Second)
+	id3, _ := rs.Put(makeSc("three"))
+
+	// Capacity is 3: adding a fourth non-expired run evicts the earliest-expiring one (id1).
+	now = now.Add(2 * time.Second)
+	id4, _ := rs.Put(makeSc("four"))
+
+	if _, ok := rs.Get(id1); ok {
+		t.Fatalf("expected oldest run %s to be evicted at capacity", id1)
+	}
+	for _, pair := range []struct {
+		id   string
+		name string
+	}{{id2, "two"}, {id3, "three"}, {id4, "four"}} {
+		got, ok := rs.Get(pair.id)
+		if !ok || got.Name != pair.name {
+			t.Fatalf("Get(%s) = (%q, %v), want (%q, true)", pair.id, got.Name, ok, pair.name)
+		}
+	}
+
+	// Advancing past id2's expiry removes id2 while leaving id4 valid.
+	now = now.Add(6 * time.Second) // t = +12s: id2 expired at +12s, id4 expires at +16s
+	if _, ok := rs.Get(id2); ok {
+		t.Fatalf("expected %s to expire at TTL boundary", id2)
+	}
+	if _, ok := rs.Get(id4); !ok {
+		t.Fatalf("expected %s to still be active before its TTL", id4)
+	}
+}
+
+func TestServerCustomRunsLifecycle(t *testing.T) {
+	base := sim.Scenario{
+		Name:    "Base EU",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}
+	srv := NewServer(base)
+	handler := srv.Handler()
+
+	custom := base
+	custom.Name = "Custom Sandbox EU"
+	custom.Regions = append([]sim.Region(nil), base.Regions...)
+	custom.Regions[0].Seats = 110
+
+	body, err := json.Marshal(custom)
+	if err != nil {
+		t.Fatalf("marshal custom scenario: %v", err)
+	}
+
+	postReq := httptest.NewRequest(http.MethodPost, "/api/runs", bytes.NewReader(body))
+	postReq.Header.Set("Content-Type", "application/json")
+	postRec := httptest.NewRecorder()
+	handler.ServeHTTP(postRec, postReq)
+
+	if postRec.Code != http.StatusCreated {
+		t.Fatalf("POST /api/runs status = %d, want 201 (%s)", postRec.Code, postRec.Body.String())
+	}
+	if cc := postRec.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("POST /api/runs Cache-Control = %q, want no-store", cc)
+	}
+
+	var created createRunResponse
+	if err := json.Unmarshal(postRec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode createRunResponse: %v", err)
+	}
+	if created.RunID == "" || created.ExpiresInSec <= 0 {
+		t.Fatalf("unexpected createRunResponse: %+v", created)
+	}
+
+	// GET /api/scenario?run=<id> returns the custom scenario with no-store.
+	getReq := httptest.NewRequest(http.MethodGet, "/api/scenario?run="+created.RunID, nil)
+	getRec := httptest.NewRecorder()
+	handler.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("GET /api/scenario?run status = %d, want 200", getRec.Code)
+	}
+	if cc := getRec.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("GET /api/scenario?run Cache-Control = %q, want no-store", cc)
+	}
+	var gotSc sim.Scenario
+	if err := json.Unmarshal(getRec.Body.Bytes(), &gotSc); err != nil {
+		t.Fatalf("decode /api/scenario?run: %v", err)
+	}
+	if gotSc.Name != "Custom Sandbox EU" || gotSc.Regions[0].Seats != 110 {
+		t.Fatalf("unexpected custom scenario: name=%q seats[0]=%d", gotSc.Name, gotSc.Regions[0].Seats)
+	}
+
+	// GET /api/stream?run=<id> simulates the custom run.
+	stReq := httptest.NewRequest(http.MethodGet, "/api/stream?run="+created.RunID+"&duration_ms=0&seed=42&swing=0", nil)
+	stRec := httptest.NewRecorder()
+	handler.ServeHTTP(stRec, stReq)
+	if stRec.Code != http.StatusOK {
+		t.Fatalf("GET /api/stream?run status = %d, want 200 (%s)", stRec.Code, stRec.Body.String())
+	}
+	sseBody := stRec.Body.String()
+	for _, want := range []string{"event: exit_poll", "event: precinct", "event: complete"} {
+		if !strings.Contains(sseBody, want) {
+			t.Errorf("expected %q in custom run SSE output", want)
+		}
+	}
+
+	// Unknown/expired run returns 404 without leaking stream slots.
+	for _, path := range []string{"/api/scenario?run=deadbeefdeadbeefdeadbeef", "/api/stream?run=deadbeefdeadbeefdeadbeef"} {
+		missReq := httptest.NewRequest(http.MethodGet, path, nil)
+		missRec := httptest.NewRecorder()
+		handler.ServeHTTP(missRec, missReq)
+		if missRec.Code != http.StatusNotFound {
+			t.Errorf("GET %s status = %d, want 404", path, missRec.Code)
+		}
+	}
+	if len(srv.streamSem) != 0 {
+		t.Errorf("streamSem leaked after 404: len=%d", len(srv.streamSem))
+	}
+}
+
+func TestServerCustomRunsValidationAndLimits(t *testing.T) {
+	base := sim.Scenario{
+		Name:    "Base EU",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}
+	handler := NewServer(base).Handler()
+
+	postJSON := func(raw []byte) int {
+		req := httptest.NewRequest(http.MethodPost, "/api/runs", bytes.NewReader(raw))
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	if code := postJSON([]byte("{invalid")); code != http.StatusBadRequest {
+		t.Errorf("malformed JSON status = %d, want 400", code)
+	}
+
+	validBytes, _ := json.Marshal(base)
+	trailing := append(append([]byte(nil), validBytes...), []byte(`{"extra":1}`)...)
+	if code := postJSON(trailing); code != http.StatusBadRequest {
+		t.Errorf("trailing JSON token status = %d, want 400", code)
+	}
+
+	badGeo := base
+	badGeo.Meta.RegionsURL = "../etc/passwd"
+	badGeoBytes, _ := json.Marshal(badGeo)
+	if code := postJSON(badGeoBytes); code != http.StatusBadRequest {
+		t.Errorf("unsafe RegionsURL status = %d, want 400", code)
+	}
+
+	tooManySeats := base
+	tooManySeats.Regions = append([]sim.Region(nil), base.Regions...)
+	tooManySeats.Regions[0].Seats = 2001
+	seatsBytes, _ := json.Marshal(tooManySeats)
+	if code := postJSON(seatsBytes); code != http.StatusBadRequest {
+		t.Errorf("excessive seats status = %d, want 400", code)
+	}
+
+	oversized := bytes.Repeat([]byte("a"), maxCustomRunBodySize+1024)
+	if code := postJSON(oversized); code != http.StatusRequestEntityTooLarge {
+		t.Errorf("oversized body status = %d, want 413", code)
+	}
+}
+
+func TestServerForecastEndpoint(t *testing.T) {
+	base := sim.Scenario{
+		Name:    "Forecast Web Test",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}
+	srv := NewServer(base)
+	handler := srv.Handler()
+
+	// Preset forecast with runs clamping and positive swing.
+	req := httptest.NewRequest(http.MethodGet, "/api/forecast?runs=9999&swing=0.18&temp=0.45&seed=19", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/forecast status = %d, want 200 (%s)", rec.Code, rec.Body.String())
+	}
+	if cc := rec.Header().Get("Cache-Control"); cc != "no-cache" {
+		t.Errorf("Cache-Control = %q, want no-cache", cc)
+	}
+	var fc sim.ForecastResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &fc); err != nil {
+		t.Fatalf("decode ForecastResult: %v", err)
+	}
+	if fc.Runs != 500 || fc.TotalSeats <= 0 || len(fc.Groups) == 0 || len(fc.Regions) != len(base.Regions) {
+		t.Fatalf("unexpected ForecastResult: runs=%d seats=%d groups=%d regions=%d",
+			fc.Runs, fc.TotalSeats, len(fc.Groups), len(fc.Regions))
+	}
+
+	// Custom run forecast returns 200 with Cache-Control: no-store.
+	body, _ := json.Marshal(base)
+	postReq := httptest.NewRequest(http.MethodPost, "/api/runs", bytes.NewReader(body))
+	postRec := httptest.NewRecorder()
+	handler.ServeHTTP(postRec, postReq)
+	var created createRunResponse
+	_ = json.Unmarshal(postRec.Body.Bytes(), &created)
+
+	custReq := httptest.NewRequest(http.MethodGet, "/api/forecast?run="+created.RunID+"&runs=20&method=fptp", nil)
+	custRec := httptest.NewRecorder()
+	handler.ServeHTTP(custRec, custReq)
+	if custRec.Code != http.StatusOK {
+		t.Fatalf("GET /api/forecast?run status = %d, want 200 (%s)", custRec.Code, custRec.Body.String())
+	}
+	if cc := custRec.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("custom /api/forecast Cache-Control = %q, want no-store", cc)
+	}
+
+	// Missing custom run returns 404 without leaking forecastSem.
+	missReq := httptest.NewRequest(http.MethodGet, "/api/forecast?run=missingrunid", nil)
+	missRec := httptest.NewRecorder()
+	handler.ServeHTTP(missRec, missReq)
+	if missRec.Code != http.StatusNotFound {
+		t.Fatalf("missing run status = %d, want 404", missRec.Code)
+	}
+	if len(srv.forecastSem) != 0 {
+		t.Errorf("forecastSem leaked after 404: len=%d", len(srv.forecastSem))
 	}
 }
