@@ -6,6 +6,7 @@ import { InspectorUI } from './inspector.js';
 import { renderLegend } from './overlays.js';
 
 const state = {
+  scenarioId: '',
   scenario: null,
   groupsById: {},
   partiesById: {},
@@ -13,6 +14,7 @@ const state = {
   orderedGroups: [],
 
   source: null,
+  runPhase: 'ready', // 'ready' | 'running' | 'paused' | 'done'
   durationMs: 45000,
   activeDurationMs: 45000,
   appliedSeed: 42,
@@ -46,6 +48,7 @@ const statusBadge = document.getElementById('status-badge');
 const statusText = document.getElementById('status-text');
 const simClockEl = document.getElementById('sim-clock');
 const btnRun = document.getElementById('btn-run');
+const btnReset = document.getElementById('btn-reset');
 const inputSeed = document.getElementById('input-seed');
 const inputTemp = document.getElementById('input-temp');
 const tempVal = document.getElementById('temp-val');
@@ -56,6 +59,8 @@ const partyPickerWrap = document.getElementById('party-picker-wrap');
 const colorModeRow = document.getElementById('color-mode-row');
 const partySelect = document.getElementById('party-select');
 const countrySelect = document.getElementById('country-select');
+const scenarioSelect = document.getElementById('scenario-select');
+const scenarioSubtitle = document.getElementById('scenario-subtitle');
 const seatLedgerEl = document.getElementById('seat-ledger');
 const coalitionListEl = document.getElementById('coalition-list');
 const legendEl = document.getElementById('map-legend');
@@ -68,6 +73,14 @@ let hudFrameId = 0;
 let pendingTickerRep = null;
 let inspectorDirty = false;
 let lastSlowHudMs = 0;
+let scenarioLoadSeq = 0;
+let streamWallStart = 0;
+let playbackOrigin = 0;
+let pausedAt = 0;
+let eventQueue = [];
+let queueHead = 0;
+let drainRafId = 0;
+let streamErrorWhilePaused = false;
 
 function applyScenarioMeta(meta, hasGroups) {
   const title = meta.title || 'European Parliament';
@@ -96,78 +109,6 @@ async function init() {
   document.documentElement.dataset.theme = savedTheme;
   state.isDark = savedTheme === 'dark';
 
-  try {
-    const res = await fetch('/api/scenario');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    state.scenario = await res.json();
-  } catch (err) {
-    document.getElementById('scenario-subtitle').textContent = `Failed to load scenario (${err.message})`;
-    setStatus('idle', 'ERROR');
-    return;
-  }
-
-  const meta = state.scenario.meta || {};
-  const hasGroups = Boolean(state.scenario.groups?.length);
-  document.getElementById('scenario-subtitle').textContent = state.scenario.name;
-  applyScenarioMeta(meta, hasGroups);
-
-  const groups = hasGroups ? state.scenario.groups : (state.scenario.parties || []);
-  for (const g of groups) {
-    state.groupsById[g.id] = g;
-    if (!hasGroups) state.partiesById[g.id] = g;
-  }
-
-  state.orderedGroups = [...groups].sort((a, b) => {
-    if (a.id === 'ni') return 1;
-    if (b.id === 'ni') return -1;
-    return (a.position[0] * 0.65 + a.position[1] * 0.35) - (b.position[0] * 0.65 + b.position[1] * 0.35);
-  });
-
-  for (const g of state.orderedGroups) {
-    const opt = document.createElement('option');
-    opt.value = g.id;
-    opt.textContent = `${g.short_name} — ${g.name}`;
-    partySelect.appendChild(opt);
-  }
-  state.heatmapPartyId = state.orderedGroups[Math.floor(state.orderedGroups.length / 2)]?.id || groups[0]?.id || '';
-  partySelect.value = state.heatmapPartyId;
-
-  for (const p of (state.scenario.parties || [])) state.partiesById[p.id] = p;
-
-  const focusPills = document.getElementById('focus-pills');
-  const useDropdown = state.scenario.regions.length > 6;
-  const regionLabel = (meta.region_label || 'state').toLowerCase();
-  if (useDropdown) {
-    countrySelect.classList.remove('hidden');
-    const defOpt = document.createElement('option');
-    defOpt.value = 'eu';
-    defOpt.textContent = `Jump to ${regionLabel} (${state.scenario.regions.length})…`;
-    countrySelect.appendChild(defOpt);
-  }
-
-  let totalSeats = 0;
-  for (const r of state.scenario.regions) {
-    state.regionsById[r.id] = r;
-    for (const p of (r.parties || [])) state.partiesById[p.id] = p;
-    totalSeats += r.seats;
-
-    if (useDropdown) {
-      const opt = document.createElement('option');
-      opt.value = r.id;
-      opt.textContent = `${r.name} (${r.seats})`;
-      countrySelect.appendChild(opt);
-    } else {
-      const btn = document.createElement('button');
-      btn.className = 'focus-btn';
-      btn.dataset.focus = r.id;
-      btn.textContent = r.name;
-      focusPills.appendChild(btn);
-    }
-  }
-
-  document.getElementById('hemicycle-total').textContent = totalSeats;
-  document.getElementById('hemicycle-maj').textContent = Math.floor(totalSeats / 2) + 1;
-
   inspector = new InspectorUI(state, {
     onFocusRegion: (rid) => focusRegion(rid),
     onSelectionChange: () => map?.requestRender()
@@ -192,15 +133,7 @@ async function init() {
     document.getElementById('hemicycle-svg'),
     document.getElementById('seat-ledger')
   );
-  hemicycle.build(totalSeats, meta.chart_type || 'hemicycle', meta.seat_label || 'seats');
 
-  try {
-    await map.loadAndRender();
-  } catch (err) {
-    document.getElementById('scenario-subtitle').textContent = `Failed to load map geometry (${err.message})`;
-    setStatus('idle', 'ERROR');
-    return;
-  }
   wireEvents();
   if (window.innerWidth <= 820) {
     document.getElementById('hemicycle-body').classList.add('hidden');
@@ -208,8 +141,186 @@ async function init() {
     toggleBtn.textContent = '▴';
     toggleBtn.setAttribute('aria-expanded', 'false');
   }
+
+  let initialId = '';
+  const urlScenario = new URLSearchParams(window.location.search).get('scenario') || '';
+  try {
+    const listRes = await fetch('/api/scenarios');
+    if (listRes.ok) {
+      const catalog = await listRes.json();
+      const items = catalog.scenarios || [];
+      if (items.length > 1) {
+        clearEl(scenarioSelect);
+        for (const item of items) {
+          const opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = `${item.name} (${item.seats} ${item.seat_label})`;
+          scenarioSelect.appendChild(opt);
+        }
+        scenarioSubtitle.classList.add('hidden');
+        scenarioSelect.classList.remove('hidden');
+      }
+      const validIds = new Set(items.map((item) => item.id));
+      initialId = validIds.has(urlScenario) ? urlScenario : (catalog.default_id || items[0]?.id || '');
+    }
+  } catch {
+    // Fallback to single-scenario /api/scenario when /api/scenarios is unavailable.
+  }
+
+  await loadScenario(initialId);
+}
+
+async function loadScenario(scenarioId) {
+  const seq = ++scenarioLoadSeq;
+  if (state.source) {
+    state.source.close();
+    state.source = null;
+  }
+  if (hudFrameId) {
+    cancelAnimationFrame(hudFrameId);
+    hudFrameId = 0;
+  }
+  clearQueue();
+  streamErrorWhilePaused = false;
+  state.runPhase = 'ready';
+  syncRunControls();
+  pendingTickerRep = null;
+  inspectorDirty = false;
+  inspector.hideTooltip();
+  inspector.clear();
+
+  state.methodOverride = '';
+  methodSelect.value = '';
+  setStatus('live', 'LOADING');
+
+  const query = scenarioId ? `?scenario=${encodeURIComponent(scenarioId)}` : '';
+  let loaded;
+  try {
+    const res = await fetch(`/api/scenario${query}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    loaded = await res.json();
+  } catch (err) {
+    if (seq !== scenarioLoadSeq) return;
+    scenarioSubtitle.classList.remove('hidden');
+    scenarioSubtitle.textContent = `Failed to load scenario (${err.message})`;
+    setStatus('idle', 'ERROR');
+    return;
+  }
+  if (seq !== scenarioLoadSeq) return;
+
+  state.scenarioId = scenarioId;
+  state.scenario = loaded;
+  state.groupsById = {};
+  state.partiesById = {};
+  state.regionsById = {};
+  state.orderedGroups = [];
+  state.precinctGeo = {};
+  state.regionTotalCount = {};
+  state.prevEUSeats = {};
+
+  const meta = loaded.meta || {};
+  const hasGroups = Boolean(loaded.groups?.length);
+  scenarioSubtitle.textContent = loaded.name;
+  if (scenarioSelect.options.length > 1) {
+    scenarioSubtitle.classList.add('hidden');
+    scenarioSelect.classList.remove('hidden');
+    if (scenarioId) scenarioSelect.value = scenarioId;
+  }
+  applyScenarioMeta(meta, hasGroups);
+
+  if (meta.hide_coalitions && state.hemiTab === 'coalitions') {
+    state.hemiTab = 'seats';
+    document.querySelectorAll('.htab-btn').forEach((b) => {
+      b.classList.toggle('active', b.dataset.htab === 'seats');
+    });
+    seatLedgerEl.classList.remove('hidden');
+    coalitionListEl.classList.add('hidden');
+    state.selectedCoalitionKey = null;
+  }
+
+  const groups = hasGroups ? loaded.groups : (loaded.parties || []);
+  for (const g of groups) {
+    state.groupsById[g.id] = g;
+    if (!hasGroups) state.partiesById[g.id] = g;
+  }
+
+  state.orderedGroups = [...groups].sort((a, b) => {
+    if (a.id === 'ni') return 1;
+    if (b.id === 'ni') return -1;
+    return (a.position[0] * 0.65 + a.position[1] * 0.35) - (b.position[0] * 0.65 + b.position[1] * 0.35);
+  });
+
+  clearEl(partySelect);
+  for (const g of state.orderedGroups) {
+    const opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = `${g.short_name} — ${g.name}`;
+    partySelect.appendChild(opt);
+  }
+  state.heatmapPartyId = state.orderedGroups[Math.floor(state.orderedGroups.length / 2)]?.id || groups[0]?.id || '';
+  partySelect.value = state.heatmapPartyId;
+
+  for (const p of (loaded.parties || [])) state.partiesById[p.id] = p;
+
+  const focusPills = document.getElementById('focus-pills');
+  document.querySelectorAll('#focus-pills .focus-btn:not(#overview-focus-btn)').forEach((b) => b.remove());
+  document.getElementById('overview-focus-btn').classList.add('active');
+  clearEl(countrySelect);
+  countrySelect.classList.add('hidden');
+
+  const useDropdown = loaded.regions.length > 6;
+  const regionLabel = (meta.region_label || 'state').toLowerCase();
+  if (useDropdown) {
+    countrySelect.classList.remove('hidden');
+    const defOpt = document.createElement('option');
+    defOpt.value = 'eu';
+    defOpt.textContent = `Jump to ${regionLabel} (${loaded.regions.length})…`;
+    countrySelect.appendChild(defOpt);
+  }
+
+  let totalSeats = 0;
+  for (const r of loaded.regions) {
+    state.regionsById[r.id] = r;
+    for (const p of (r.parties || [])) state.partiesById[p.id] = p;
+    totalSeats += r.seats;
+
+    if (useDropdown) {
+      const opt = document.createElement('option');
+      opt.value = r.id;
+      opt.textContent = `${r.name} (${r.seats})`;
+      countrySelect.appendChild(opt);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'focus-btn';
+      btn.dataset.focus = r.id;
+      btn.textContent = r.name;
+      focusPills.appendChild(btn);
+    }
+  }
+
+  document.getElementById('hemicycle-total').textContent = totalSeats;
+  document.getElementById('hemicycle-maj').textContent = Math.floor(totalSeats / 2) + 1;
+  hemicycle.build(totalSeats, meta.chart_type || 'hemicycle', meta.seat_label || 'seats');
+
+  try {
+    const active = await map.loadAndRender();
+    if (!active || seq !== scenarioLoadSeq) return;
+  } catch (err) {
+    if (seq !== scenarioLoadSeq) return;
+    scenarioSubtitle.classList.remove('hidden');
+    scenarioSubtitle.textContent = `Failed to load map geometry (${err.message})`;
+    setStatus('idle', 'ERROR');
+    return;
+  }
+
+  if (scenarioId) {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('scenario', scenarioId);
+    window.history.replaceState(null, '', nextUrl);
+  }
+
   refreshLegend();
-  startStream();
+  resetToReady();
 }
 
 function focusRegion(rid) {
@@ -295,10 +406,13 @@ function updateClock(pct, finished = false) {
   const wrapMins = totalMins - pollCloseMins;
 
   let elapsedMins = 0;
-  if (finished || pct >= 100) {
+  if (state.runPhase === 'ready') {
+    elapsedMins = 0;
+  } else if (finished || pct >= 100) {
     elapsedMins = totalMins;
-  } else if (state.activeDurationMs > 0 && state.streamStartTime > 0) {
-    const f = Math.min(1, Math.max(0, (performance.now() - state.streamStartTime) / state.activeDurationMs));
+  } else if (state.activeDurationMs > 0 && playbackOrigin > 0) {
+    const refNow = pausedAt || performance.now();
+    const f = Math.min(1, Math.max(0, (refNow - playbackOrigin) / state.activeDurationMs));
     elapsedMins = f <= 0.30 ? (f / 0.30) * pollCloseMins : pollCloseMins + ((f - 0.30) / 0.70) * wrapMins;
   } else {
     elapsedMins = (Math.min(100, Math.max(0, pct)) / 100) * totalMins;
@@ -315,6 +429,19 @@ function setStatus(kind, label) {
   statusText.textContent = label;
 }
 
+function syncRunControls() {
+  if (state.runPhase === 'running') {
+    btnRun.textContent = '⏸ Pause';
+  } else if (state.runPhase === 'paused') {
+    btnRun.textContent = '▶ Resume';
+  } else if (state.runPhase === 'done') {
+    btnRun.textContent = '▶ Replay';
+  } else {
+    btnRun.textContent = '▶ Start';
+  }
+  btnReset.disabled = state.runPhase === 'ready';
+}
+
 function updateProgress() {
   const pct = state.countedPct ?? (state.totalPrecincts ? (state.reportedPrecincts / state.totalPrecincts) * 100 : 0);
   progressFill.style.width = `${Math.min(100, pct).toFixed(1)}%`;
@@ -326,7 +453,7 @@ function scheduleHudFlush() {
   if (hudFrameId) return;
   hudFrameId = requestAnimationFrame((now) => {
     hudFrameId = 0;
-    if (!state.source) return;
+    if (state.runPhase !== 'running') return;
     setStatus('live', `LIVE · ${Math.round(state.countedPct || 0)}%`);
     updateProgress();
 
@@ -346,10 +473,10 @@ function scheduleHudFlush() {
 }
 
 function resetStreamState() {
+  state.prevEUSeats = {};
   state.euSeats = {};
   state.coalitions = [];
   state.selectedCoalitionKey = null;
-  state.streamStartTime = performance.now();
   state.regionSeats = {};
   state.regionVotes = {};
   state.districtWinners = {};
@@ -370,13 +497,228 @@ function resetStreamState() {
   clearEl(document.getElementById('ticker'));
   map.resetFills();
 
+  let totalP = 0;
   for (const r of state.scenario.regions) {
     state.regionReportedCount[r.id] = 0;
     state.regionPct[r.id] = 0;
+    totalP += state.regionTotalCount[r.id] || r.precincts || 1;
   }
+  state.totalPrecincts = totalP;
   updateProgress();
   scheduleHemicycleRender();
   inspector.render();
+}
+
+function applyExitPoll(data) {
+  state.prevEUSeats = data.prev_eu_seats || {};
+  state.euSeats = data.eu_seats || {};
+  state.coalitions = data.coalitions || [];
+  state.regionSeats = data.region_seats || {};
+  state.districtWinners = data.district_winners || {};
+  state.totalPrecincts = data.total_precincts || state.totalPrecincts;
+
+  updateProgress();
+  scheduleHemicycleRender();
+  map.recolorAll();
+  inspector.render();
+}
+
+function applyPrecinct(data) {
+  const rep = data.report;
+  const existing = state.precincts[rep.precinct_id];
+  const prevPct = existing?.reported_pct || 0;
+  const curPct = rep.reported_pct > 0 ? rep.reported_pct : 1.0;
+
+  if (!existing) {
+    state.precincts[rep.precinct_id] = {
+      ...rep,
+      reported_pct: curPct,
+      votes: { ...rep.votes }
+    };
+  } else {
+    existing.reported_pct = Math.max(existing.reported_pct, curPct);
+    for (const [pid, v] of Object.entries(rep.votes || {})) {
+      existing.votes[pid] = (existing.votes[pid] || 0) + v;
+    }
+  }
+
+  state.regionVotes[rep.region_id] = data.region_votes;
+  state.regionSeats[rep.region_id] = data.region_seats;
+  if (data.district_winners) {
+    state.districtWinners[rep.region_id] = data.district_winners;
+  }
+  if (data.eu_seats) {
+    state.euSeats = data.eu_seats;
+    state.coalitions = data.coalitions || [];
+    scheduleHemicycleRender();
+  }
+  state.reportedPrecincts = data.reported_precincts;
+  state.countedPct = data.counted_pct ?? (state.totalPrecincts > 0 ? (state.reportedPrecincts / state.totalPrecincts) * 100 : 0);
+
+  if (prevPct < 1.0 && curPct >= 1.0) {
+    state.regionReportedCount[rep.region_id] = (state.regionReportedCount[rep.region_id] || 0) + 1;
+  }
+
+  const reg = state.regionsById[rep.region_id];
+  const totalCount = state.regionTotalCount[rep.region_id] || reg?.precincts || 1;
+  state.regionPctSum[rep.region_id] = (state.regionPctSum[rep.region_id] || 0) + Math.max(0, curPct - prevPct);
+  state.regionPct[rep.region_id] = Math.min(100, Math.round((state.regionPctSum[rep.region_id] / Math.max(1, totalCount)) * 100));
+
+  map.queueRecolor(rep.precinct_id);
+  pendingTickerRep = state.precincts[rep.precinct_id];
+  if (state.selection && (state.selection.id === rep.precinct_id || state.selection.id === rep.region_id)) {
+    inspectorDirty = true;
+  }
+  scheduleHudFlush();
+}
+
+function applyComplete() {
+  state.runPhase = 'done';
+  if (drainRafId) {
+    cancelAnimationFrame(drainRafId);
+    drainRafId = 0;
+  }
+  if (hudFrameId) {
+    cancelAnimationFrame(hudFrameId);
+    hudFrameId = 0;
+  }
+  for (const r of state.scenario.regions) {
+    state.regionPct[r.id] = 100;
+  }
+  if (pendingTickerRep) {
+    inspector.pushTicker(pendingTickerRep);
+    pendingTickerRep = null;
+  }
+  inspectorDirty = false;
+  setStatus('done', 'FINAL');
+  syncRunControls();
+  updateProgress();
+  updateClock(100, true);
+  map.flushRecolor();
+  map.refreshHoverTooltip();
+  scheduleHemicycleRender();
+  inspector.render();
+}
+
+function clearQueue() {
+  if (drainRafId) {
+    cancelAnimationFrame(drainRafId);
+    drainRafId = 0;
+  }
+  eventQueue = [];
+  queueHead = 0;
+}
+
+function scheduleQueueDrain() {
+  if (drainRafId || state.runPhase !== 'running' || queueHead >= eventQueue.length) return;
+  drainRafId = requestAnimationFrame((now) => {
+    drainRafId = 0;
+    drainQueue(now);
+  });
+}
+
+function drainQueue(now) {
+  if (state.runPhase !== 'running') return;
+  const elapsed = now - playbackOrigin;
+  while (queueHead < eventQueue.length) {
+    const item = eventQueue[queueHead];
+    if (state.activeDurationMs > 0 && item.offsetMs > elapsed) break;
+    queueHead++;
+    if (item.kind === 'exit_poll') {
+      applyExitPoll(item.data);
+    } else if (item.kind === 'precinct') {
+      applyPrecinct(item.data);
+    } else if (item.kind === 'complete') {
+      applyComplete();
+      break;
+    }
+  }
+  if (queueHead >= eventQueue.length) {
+    eventQueue = [];
+    queueHead = 0;
+    if (streamErrorWhilePaused && state.runPhase === 'running') {
+      streamErrorWhilePaused = false;
+      state.runPhase = 'ready';
+      setStatus('idle', 'DISCONNECTED');
+      syncRunControls();
+    }
+  } else if (state.runPhase === 'running') {
+    scheduleQueueDrain();
+  }
+}
+
+function enqueueOrApply(kind, data) {
+  if (state.runPhase === 'running' && queueHead >= eventQueue.length) {
+    if (kind === 'exit_poll') applyExitPoll(data);
+    else if (kind === 'precinct') applyPrecinct(data);
+    else if (kind === 'complete') applyComplete();
+    return;
+  }
+  eventQueue.push({
+    kind,
+    data,
+    offsetMs: Math.max(0, performance.now() - streamWallStart)
+  });
+}
+
+function resetToReady() {
+  if (state.source) {
+    state.source.close();
+    state.source = null;
+  }
+  clearQueue();
+  streamErrorWhilePaused = false;
+  streamWallStart = 0;
+  playbackOrigin = 0;
+  pausedAt = 0;
+  state.runPhase = 'ready';
+  resetStreamState();
+  setStatus('idle', 'READY');
+  syncRunControls();
+}
+
+function pauseStream() {
+  if (state.runPhase !== 'running') return;
+  state.runPhase = 'paused';
+  pausedAt = performance.now();
+  if (drainRafId) {
+    cancelAnimationFrame(drainRafId);
+    drainRafId = 0;
+  }
+  if (hudFrameId) {
+    cancelAnimationFrame(hudFrameId);
+    hudFrameId = 0;
+  }
+  setStatus('paused', `PAUSED · ${Math.round(state.countedPct || 0)}%`);
+  syncRunControls();
+}
+
+function resumeStream() {
+  if (state.runPhase !== 'paused') return;
+  playbackOrigin += performance.now() - pausedAt;
+  pausedAt = 0;
+  if (queueHead >= eventQueue.length && streamErrorWhilePaused) {
+    streamErrorWhilePaused = false;
+    state.runPhase = 'ready';
+    setStatus('idle', 'DISCONNECTED');
+    syncRunControls();
+    return;
+  }
+  state.runPhase = 'running';
+  setStatus('live', `LIVE · ${Math.round(state.countedPct || 0)}%`);
+  syncRunControls();
+  scheduleQueueDrain();
+}
+
+function toggleRunPause() {
+  if (state.runPhase === 'running') pauseStream();
+  else if (state.runPhase === 'paused') resumeStream();
+  else startStream();
+}
+
+function onSettingChanged() {
+  if (state.runPhase === 'running' || state.runPhase === 'done') startStream();
+  else if (state.runPhase === 'paused') resetToReady();
 }
 
 function startStream() {
@@ -384,7 +726,13 @@ function startStream() {
     state.source.close();
     state.source = null;
   }
+  clearQueue();
+  streamErrorWhilePaused = false;
   state.activeDurationMs = state.durationMs;
+  streamWallStart = performance.now();
+  playbackOrigin = streamWallStart;
+  pausedAt = 0;
+  state.runPhase = 'running';
   resetStreamState();
 
   const parsedSeed = parseInt(inputSeed.value, 10);
@@ -393,119 +741,54 @@ function startStream() {
   const parsedTemp = parseFloat(inputTemp.value);
   const temp = Number.isNaN(parsedTemp) || parsedTemp <= 0 ? 0.45 : parsedTemp;
   const waves = state.durationMs > 0 ? 3 : 1;
+  const scenarioParam = state.scenarioId ? `&scenario=${encodeURIComponent(state.scenarioId)}` : '';
   const methodParam = state.methodOverride ? `&method=${encodeURIComponent(state.methodOverride)}` : '';
-  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&swing=0.15${methodParam}`;
+  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&swing=0.15${scenarioParam}${methodParam}`;
 
   setStatus('live', 'EXIT POLLS');
-  btnRun.textContent = 'Restart';
+  syncRunControls();
 
   const es = new EventSource(url);
   state.source = es;
 
   es.addEventListener('exit_poll', (ev) => {
     if (state.source !== es) return;
-    const data = JSON.parse(ev.data);
-    state.prevEUSeats = data.prev_eu_seats || {};
-    state.euSeats = data.eu_seats || {};
-    state.coalitions = data.coalitions || [];
-    state.regionSeats = data.region_seats || {};
-    state.districtWinners = data.district_winners || {};
-    state.totalPrecincts = data.total_precincts || 0;
-
-    updateProgress();
-    scheduleHemicycleRender();
-    map.recolorAll();
-    inspector.render();
+    enqueueOrApply('exit_poll', JSON.parse(ev.data));
   });
 
   es.addEventListener('precinct', (ev) => {
     if (state.source !== es) return;
-    const data = JSON.parse(ev.data);
-    const rep = data.report;
-
-    const existing = state.precincts[rep.precinct_id];
-    const prevPct = existing?.reported_pct || 0;
-    const curPct = rep.reported_pct > 0 ? rep.reported_pct : 1.0;
-
-    if (!existing) {
-      state.precincts[rep.precinct_id] = {
-        ...rep,
-        reported_pct: curPct,
-        votes: { ...rep.votes }
-      };
-    } else {
-      existing.reported_pct = Math.max(existing.reported_pct, curPct);
-      for (const [pid, v] of Object.entries(rep.votes || {})) {
-        existing.votes[pid] = (existing.votes[pid] || 0) + v;
-      }
-    }
-
-    state.regionVotes[rep.region_id] = data.region_votes;
-    state.regionSeats[rep.region_id] = data.region_seats;
-    if (data.district_winners) {
-      state.districtWinners[rep.region_id] = data.district_winners;
-    }
-    if (data.eu_seats) {
-      state.euSeats = data.eu_seats;
-      state.coalitions = data.coalitions || [];
-      scheduleHemicycleRender();
-    }
-    state.reportedPrecincts = data.reported_precincts;
-    state.countedPct = data.counted_pct ?? (state.totalPrecincts > 0 ? (state.reportedPrecincts / state.totalPrecincts) * 100 : 0);
-
-    if (prevPct < 1.0 && curPct >= 1.0) {
-      state.regionReportedCount[rep.region_id] = (state.regionReportedCount[rep.region_id] || 0) + 1;
-    }
-
-    const reg = state.regionsById[rep.region_id];
-    const totalCount = state.regionTotalCount[rep.region_id] || reg?.precincts || 1;
-    state.regionPctSum[rep.region_id] = (state.regionPctSum[rep.region_id] || 0) + Math.max(0, curPct - prevPct);
-    state.regionPct[rep.region_id] = Math.min(100, Math.round((state.regionPctSum[rep.region_id] / Math.max(1, totalCount)) * 100));
-
-    map.queueRecolor(rep.precinct_id);
-    pendingTickerRep = state.precincts[rep.precinct_id];
-    if (state.selection && (state.selection.id === rep.precinct_id || state.selection.id === rep.region_id)) {
-      inspectorDirty = true;
-    }
-    scheduleHudFlush();
+    enqueueOrApply('precinct', JSON.parse(ev.data));
   });
 
   es.addEventListener('complete', () => {
     if (state.source !== es) return;
     es.close();
     state.source = null;
-    if (hudFrameId) {
-      cancelAnimationFrame(hudFrameId);
-      hudFrameId = 0;
-    }
-    for (const r of state.scenario.regions) {
-      state.regionPct[r.id] = 100;
-    }
-    if (pendingTickerRep) {
-      inspector.pushTicker(pendingTickerRep);
-      pendingTickerRep = null;
-    }
-    inspectorDirty = false;
-    setStatus('done', 'FINAL');
-    updateProgress();
-    updateClock(100, true);
-    map.flushRecolor();
-    map.refreshHoverTooltip();
-    scheduleHemicycleRender();
-    inspector.render();
+    enqueueOrApply('complete', null);
   });
 
   es.onerror = () => {
     if (state.source === es) {
       es.close();
       state.source = null;
-      setStatus('idle', 'DISCONNECTED');
+      if (state.runPhase === 'running' && queueHead >= eventQueue.length) {
+        state.runPhase = 'ready';
+        setStatus('idle', 'DISCONNECTED');
+        syncRunControls();
+      } else if (state.runPhase !== 'done') {
+        streamErrorWhilePaused = true;
+      }
     }
   };
 }
 
 function wireEvents() {
-  btnRun.addEventListener('click', startStream);
+  btnRun.addEventListener('click', toggleRunPause);
+  btnReset.addEventListener('click', resetToReady);
+  scenarioSelect.addEventListener('change', () => {
+    loadScenario(scenarioSelect.value);
+  });
 
   document.getElementById('btn-theme').addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -523,7 +806,7 @@ function wireEvents() {
       document.querySelectorAll('.seg-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       state.durationMs = parseInt(btn.dataset.duration, 10);
-      startStream();
+      onSettingChanged();
     });
   });
 
@@ -539,30 +822,31 @@ function wireEvents() {
 
   document.getElementById('btn-rand-seed').addEventListener('click', () => {
     inputSeed.value = Math.floor(Math.random() * 9999) + 1;
-    startStream();
+    onSettingChanged();
   });
 
   inputSeed.addEventListener('change', () => {
     const parsedSeed = parseInt(inputSeed.value, 10);
     const seed = Number.isNaN(parsedSeed) ? 42 : parsedSeed;
-    if (seed === state.appliedSeed) return;
-    startStream();
+    if (seed === state.appliedSeed && state.runPhase !== 'ready') return;
+    onSettingChanged();
   });
   inputSeed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      startStream();
+      state.appliedSeed = Number.isNaN(parseInt(inputSeed.value, 10)) ? 42 : parseInt(inputSeed.value, 10);
+      onSettingChanged();
     }
   });
 
   inputTemp.addEventListener('input', () => {
     tempVal.textContent = parseFloat(inputTemp.value).toFixed(2);
   });
-  inputTemp.addEventListener('change', startStream);
+  inputTemp.addEventListener('change', onSettingChanged);
 
   methodSelect.addEventListener('change', () => {
     state.methodOverride = methodSelect.value;
-    startStream();
+    onSettingChanged();
   });
 
   document.getElementById('focus-pills').addEventListener('click', (e) => {
@@ -601,6 +885,14 @@ function wireEvents() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.selection) {
       inspector.clear();
+      return;
+    }
+    if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
+      if (!state.scenario) return;
+      e.preventDefault();
+      toggleRunPause();
     }
   });
 

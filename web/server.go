@@ -41,13 +41,14 @@ var staticFiles embed.FS
 // Server serves the ParliamentSim web dashboard and JSON/SSE API endpoints.
 type Server struct {
 	scenario        sim.Scenario
+	registry        *sim.ScenarioRegistry
 	streamSem       chan struct{}
 	maxStreamsPerIP int
 	ipMu            sync.Mutex
 	ipStreams       map[string]int
 }
 
-// NewServer creates a Server configured with the given election scenario.
+// NewServer creates a Server configured with the given single election scenario.
 func NewServer(scenario sim.Scenario) *Server {
 	return &Server{
 		scenario:        scenario,
@@ -55,6 +56,18 @@ func NewServer(scenario sim.Scenario) *Server {
 		maxStreamsPerIP: defaultMaxStreamsPerIP,
 		ipStreams:       make(map[string]int),
 	}
+}
+
+// NewServerWithRegistry creates a Server backed by a multi-scenario registry.
+func NewServerWithRegistry(registry *sim.ScenarioRegistry) *Server {
+	srv := NewServer(sim.Scenario{})
+	srv.registry = registry
+	if registry != nil {
+		if def, ok := registry.Get(""); ok {
+			srv.scenario = def
+		}
+	}
+	return srv
 }
 
 // SetMaxStreams overrides the maximum number of concurrent SSE streams.
@@ -77,6 +90,7 @@ func (s *Server) SetMaxStreamsPerIP(n int) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.Handle("GET /api/scenarios", gzipMiddleware(http.HandlerFunc(s.handleScenarios)))
 	mux.Handle("GET /api/scenario", gzipMiddleware(http.HandlerFunc(s.handleScenario)))
 	mux.HandleFunc("GET /api/stream", s.handleStream)
 
@@ -227,11 +241,45 @@ func (s *Server) releaseIPSlot(ip string) {
 	}
 }
 
-func (s *Server) handleScenario(w http.ResponseWriter, r *http.Request) {
+type scenariosListPayload struct {
+	DefaultID string                `json:"default_id"`
+	Scenarios []sim.ScenarioSummary `json:"scenarios"`
+}
+
+func (s *Server) resolveScenario(id string) (sim.Scenario, bool) {
+	if s.registry != nil {
+		return s.registry.Get(id)
+	}
+	if id == "" || id == "default" {
+		return s.scenario, true
+	}
+	return sim.Scenario{}, false
+}
+
+func (s *Server) handleScenarios(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	out := s.scenario
-	out.Meta = s.scenario.EffectiveMeta()
-	_ = json.NewEncoder(w).Encode(out)
+	w.Header().Set("Cache-Control", "no-cache")
+	var payload scenariosListPayload
+	if s.registry != nil {
+		payload.DefaultID = s.registry.DefaultID()
+		payload.Scenarios = s.registry.List()
+	} else {
+		payload.DefaultID = "default"
+		payload.Scenarios = []sim.ScenarioSummary{s.scenario.Summary("default")}
+	}
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func (s *Server) handleScenario(w http.ResponseWriter, r *http.Request) {
+	sc, ok := s.resolveScenario(r.URL.Query().Get("scenario"))
+	if !ok {
+		http.Error(w, "unknown scenario", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	sc.Meta = sc.EffectiveMeta()
+	_ = json.NewEncoder(w).Encode(sc)
 }
 
 type exitPollPayload struct {
@@ -262,6 +310,12 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	baseScenario, ok := s.resolveScenario(r.URL.Query().Get("scenario"))
+	if !ok {
+		http.Error(w, "unknown scenario", http.StatusNotFound)
+		return
+	}
+
 	ip := clientIP(r)
 	if !s.acquireIPSlot(ip) {
 		w.Header().Set("Retry-After", "5")
@@ -286,7 +340,7 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := s.parseElectionConfig(r)
-	scenario := s.scenarioForMethod(parseMethodOverride(r.URL.Query().Get("method")))
+	scenario := scenarioForMethod(baseScenario, parseMethodOverride(r.URL.Query().Get("method")))
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -359,12 +413,12 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) scenarioForMethod(override sim.AllocationMethod) sim.Scenario {
+func scenarioForMethod(base sim.Scenario, override sim.AllocationMethod) sim.Scenario {
 	if override == "" {
-		return s.scenario
+		return base
 	}
-	sc := s.scenario
-	sc.Regions = slices.Clone(s.scenario.Regions)
+	sc := base
+	sc.Regions = slices.Clone(base.Regions)
 	for i := range sc.Regions {
 		sc.Regions[i].Method = override
 		sc.Regions[i].DistrictSeats = 0

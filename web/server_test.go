@@ -489,3 +489,71 @@ func TestServerSecurityHeadersGzipAndPerIPCap(t *testing.T) {
 		t.Fatalf("per-IP cap status = %d, want 429", sRec.Code)
 	}
 }
+
+func TestServerMultiScenarioRegistry(t *testing.T) {
+	reg, err := sim.LoadScenariosDir("../scenarios", "eu27")
+	if err != nil {
+		t.Fatalf("LoadScenariosDir failed: %v", err)
+	}
+	handler := NewServerWithRegistry(reg).Handler()
+
+	// GET /api/scenarios returns ordered summaries with gzip + security headers.
+	req := httptest.NewRequest(http.MethodGet, "/api/scenarios", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/api/scenarios status = %d, want 200", rec.Code)
+	}
+	if rec.Header().Get("Content-Encoding") != "gzip" || rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Errorf("unexpected headers on /api/scenarios: %v", rec.Header())
+	}
+
+	// Uncompressed /api/scenarios parses cleanly.
+	rawReq := httptest.NewRequest(http.MethodGet, "/api/scenarios", nil)
+	rawRec := httptest.NewRecorder()
+	handler.ServeHTTP(rawRec, rawReq)
+	var listResp scenariosListPayload
+	if err := json.Unmarshal(rawRec.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("decode /api/scenarios: %v", err)
+	}
+	if listResp.DefaultID != "eu27" || len(listResp.Scenarios) < 3 || listResp.Scenarios[0].ID != "eu27" {
+		t.Fatalf("unexpected /api/scenarios payload: %+v", listResp)
+	}
+
+	// GET /api/scenario?scenario=usa2024 resolves the requested scenario.
+	scReq := httptest.NewRequest(http.MethodGet, "/api/scenario?scenario=usa2024", nil)
+	scRec := httptest.NewRecorder()
+	handler.ServeHTTP(scRec, scReq)
+	if scRec.Code != http.StatusOK {
+		t.Fatalf("/api/scenario?scenario=usa2024 status = %d, want 200", scRec.Code)
+	}
+	var gotUS sim.Scenario
+	if err := json.Unmarshal(scRec.Body.Bytes(), &gotUS); err != nil {
+		t.Fatalf("decode usa2024 scenario: %v", err)
+	}
+	if gotUS.Meta.ChartType != "bar" {
+		t.Errorf("usa2024 ChartType = %q, want %q", gotUS.Meta.ChartType, "bar")
+	}
+
+	// Unknown scenario returns 404 on both /api/scenario and /api/stream.
+	for _, path := range []string{"/api/scenario?scenario=does_not_exist", "/api/stream?scenario=does_not_exist"} {
+		badReq := httptest.NewRequest(http.MethodGet, path, nil)
+		badRec := httptest.NewRecorder()
+		handler.ServeHTTP(badRec, badReq)
+		if badRec.Code != http.StatusNotFound {
+			t.Errorf("GET %s status = %d, want 404", path, badRec.Code)
+		}
+	}
+
+	// GET /api/stream?scenario=usa2024 streams USA 2024 EVs even when default is eu27.
+	stReq := httptest.NewRequest(http.MethodGet, "/api/stream?scenario=usa2024&duration_ms=0&swing=0&seed=42", nil)
+	stRec := httptest.NewRecorder()
+	handler.ServeHTTP(stRec, stReq)
+	if stRec.Code != http.StatusOK {
+		t.Fatalf("/api/stream?scenario=usa2024 status = %d, want 200", stRec.Code)
+	}
+	if !strings.Contains(stRec.Body.String(), `"rep":312`) || !strings.Contains(stRec.Body.String(), `"dem":226`) {
+		t.Errorf("expected USA 2024 312/226 EVs in stream output")
+	}
+}

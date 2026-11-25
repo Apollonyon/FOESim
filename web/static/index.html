@@ -22,6 +22,7 @@
           <div>
             <h1>ParliamentSim</h1>
             <div id="scenario-subtitle" class="subtitle">Loading election atlas…</div>
+            <select id="scenario-select" class="scenario-select hidden" aria-label="Select election scenario"></select>
           </div>
         </div>
         <div class="brand-right">
@@ -35,7 +36,8 @@
       </div>
 
       <div class="controls-row">
-        <button id="btn-run" class="btn btn-ink">Start</button>
+        <button id="btn-run" class="btn btn-ink">▶ Start</button>
+        <button id="btn-reset" class="btn btn-icon" title="Reset election" aria-label="Reset election" disabled>↺</button>
         <div class="segmented" role="group" aria-label="Broadcast speed">
           <button class="seg-btn active" data-duration="45000">1×</button>
           <button class="seg-btn" data-duration="22000">2×</button>

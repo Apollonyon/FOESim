@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -19,7 +20,8 @@ import (
 )
 
 func main() {
-	scenarioPath := flag.String("scenario", "scenarios/eu27.json", "path to JSON scenario file")
+	scenarioPath := flag.String("scenario", "scenarios/eu27.json", "path to default JSON scenario file")
+	scenariosDir := flag.String("scenarios-dir", "scenarios", "directory of JSON scenarios for the web switcher (empty disables directory scan)")
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	cliMode := flag.Bool("cli", false, "run live election night in the terminal instead of starting the web server")
 	maxStreams := flag.Int("max-streams", 256, "maximum concurrent SSE election streams (0 = unlimited)")
@@ -36,10 +38,15 @@ func main() {
 		return
 	}
 
+	reg, err := buildScenarioRegistry(*scenariosDir, *scenarioPath, scenario)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	srv := web.NewServer(scenario)
+	srv := web.NewServerWithRegistry(reg)
 	srv.SetMaxStreams(*maxStreams)
 	srv.SetMaxStreamsPerIP(*maxStreamsPerIP)
 	httpSrv := &http.Server{
@@ -59,7 +66,8 @@ func main() {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("ParliamentSim dashboard listening on http://%s", displayAddr(ln.Addr().String()))
+		log.Printf("ParliamentSim dashboard listening on http://%s (%d scenarios, default=%s)",
+			displayAddr(ln.Addr().String()), len(reg.List()), reg.DefaultID())
 		if err := httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -131,6 +139,38 @@ func runCLI(scenario sim.Scenario) {
 	for _, g := range euGroups {
 		fmt.Printf("  %-8s %3d %s\n", g.ShortName, totalSeats[g.ID], meta.SeatLabel)
 	}
+}
+
+func buildScenarioRegistry(dir, primaryPath string, primary sim.Scenario) (*sim.ScenarioRegistry, error) {
+	primaryID := strings.TrimSuffix(filepath.Base(primaryPath), ".json")
+	if primaryID == "" {
+		primaryID = "default"
+	}
+
+	entries := []sim.ScenarioEntry{{ID: primaryID, Scenario: primary}}
+	if dir != "" {
+		dirEntries, err := os.ReadDir(dir)
+		if err == nil {
+			for _, de := range dirEntries {
+				if de.IsDir() || !strings.HasSuffix(de.Name(), ".json") {
+					continue
+				}
+				id := strings.TrimSuffix(de.Name(), ".json")
+				if id == "" || id == primaryID {
+					continue
+				}
+				sc, err := sim.LoadScenario(filepath.Join(dir, de.Name()))
+				if err != nil {
+					log.Printf("skipping scenario %s: %v", de.Name(), err)
+					continue
+				}
+				entries = append(entries, sim.ScenarioEntry{ID: id, Scenario: sc})
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+	return sim.NewScenarioRegistry(primaryID, entries)
 }
 
 func displayAddr(addr string) string {

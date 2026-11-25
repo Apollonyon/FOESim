@@ -81,6 +81,8 @@ export class EuropeMap {
     this.defaultBox = [...DEFAULT_BOX];
     this.viewBox = [...DEFAULT_BOX];
     this.animFrame = null;
+    this.loadSeq = 0;
+    this.interactionBound = false;
     this.dragging = false;
     this.didDrag = false;
     this.dragStart = null;
@@ -182,6 +184,7 @@ export class EuropeMap {
   }
 
   async loadAndRender() {
+    const loadId = ++this.loadSeq;
     const meta = this.state.scenario?.meta || {};
     const regionsURL = meta.regions_url || '/geo/europe_nuts0.json';
     const unitsURL = meta.units_url || '/geo/nuts3.json';
@@ -193,8 +196,31 @@ export class EuropeMap {
     if (!n0Res.ok || !n3Res.ok) {
       throw new Error(`geo HTTP ${n0Res.status}/${n3Res.status}`);
     }
-    const n0 = await n0Res.json();
-    const n3 = await n3Res.json();
+    const [n0, n3] = await Promise.all([n0Res.json(), n3Res.json()]);
+    if (loadId !== this.loadSeq) return false;
+
+    if (this.animFrame) {
+      cancelAnimationFrame(this.animFrame);
+      this.animFrame = null;
+    }
+    if (this.bakeTimer) {
+      clearTimeout(this.bakeTimer);
+      this.bakeTimer = null;
+    }
+    this.countryMeta = {};
+    this.ctxPaths = [];
+    this.counties = [];
+    this.countyById.clear();
+    this.borders = [];
+    this.borderById.clear();
+    this.callouts = [];
+    this.pendingRecolor.clear();
+    this.hoveredCounty = null;
+    this.hoveredCallout = null;
+    this.lastPointerEvent = null;
+    this.bufViewBox = null;
+    this.bufDirtyFull = true;
+    this.state.zoomedIn = false;
 
     const activeRegionIds = new Set(this.state.scenario.regions.map((r) => r.id));
 
@@ -297,6 +323,7 @@ export class EuropeMap {
     this.bakeBuffer();
     this.render();
     this.bindInteraction();
+    return true;
   }
 
   fitToViewport(box) {
@@ -783,6 +810,8 @@ export class EuropeMap {
   }
 
   bindInteraction() {
+    if (this.interactionBound) return;
+    this.interactionBound = true;
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       this.zoomBy(e.deltaY > 0 ? 1.16 : 0.86, e.clientX, e.clientY);
