@@ -11,21 +11,46 @@ const (
 	MethodHare        AllocationMethod = "hare"
 )
 
-// AllocateSeats distributes totalSeats among parties according to method,
-// excluding parties whose vote share is below threshold (in [0, 1]).
-func AllocateSeats(votes map[string]int, totalSeats int, method AllocationMethod, threshold float64) map[string]int {
+type SeatAllocator interface {
+	Allocate(votes map[string]int, r Region, parties []Party) map[string]int
+}
+type hareAllocator struct{}
+
+func (hareAllocator) Allocate(votes map[string]int, r Region, _ []Party) map[string]int {
+	return allocateHare(votes, r.Seats, r.Threshold)
+}
+
+type dHondtAllocator struct{}
+
+func (dHondtAllocator) Allocate(votes map[string]int, r Region, _ []Party) map[string]int {
+	return allocateHighestAverages(votes, r.Seats, r.Threshold, func(seats int) float64 {
+		return float64(seats + 1)
+	})
+}
+
+type sainteLagueAllocator struct{}
+
+func (sainteLagueAllocator) Allocate(votes map[string]int, r Region, _ []Party) map[string]int {
+	return allocateHighestAverages(votes, r.Seats, r.Threshold, func(seats int) float64 {
+		return float64(2*seats + 1)
+	})
+}
+
+func NewAllocator(method AllocationMethod) SeatAllocator {
 	switch method {
 	case MethodDHondt:
-		return allocateHighestAverages(votes, totalSeats, threshold, func(seats int) float64 {
-			return float64(seats + 1)
-		})
+		return dHondtAllocator{}
 	case MethodHare:
-		return allocateHare(votes, totalSeats, threshold)
+		return hareAllocator{}
 	default:
-		return allocateHighestAverages(votes, totalSeats, threshold, func(seats int) float64 {
-			return float64(2*seats + 1)
-		})
+		return sainteLagueAllocator{}
 	}
+}
+
+// AllocateSeats distributes totalSeats among parties according to method,
+// excluding parties whose vote share is below threshold (in [0, 1]).
+func AllocateSeats(votes map[string]int, r Region, parties []Party) map[string]int {
+	return NewAllocator(r.Method).Allocate(votes, r, parties)
 }
 
 // filterEligible filters out parties that don't meet the threshold

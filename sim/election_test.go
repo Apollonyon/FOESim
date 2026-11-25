@@ -641,7 +641,7 @@ func TestHierarchicalCorrelatedSwingsSpread(t *testing.T) {
 					votes[pid] += v
 				}
 			}
-			regionSeats[reg.ID] = AllocateSeats(votes, reg.Seats, reg.Method, reg.Threshold)
+			regionSeats[reg.ID] = AllocateSeats(votes, reg, reg.EffectiveParties(s.Parties))
 		}
 		eu := s.AggregateEUSeats(regionSeats)
 		eppSeats[i] = float64(eu["epp"])

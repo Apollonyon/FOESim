@@ -230,5 +230,5 @@ func noisyRegionSeats(reg sim.Region, parties []sim.Party, temp, swing float64, 
 			votes[pid] += v
 		}
 	}
-	return sim.AllocateSeats(votes, reg.Seats, reg.Method, reg.Threshold)
+	return sim.AllocateSeats(votes, reg, reg.EffectiveParties(parties))
 }

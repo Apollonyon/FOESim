@@ -74,7 +74,7 @@ func PrepareElection(regions []Region, parties []Party, cfg ElectionConfig) *Pre
 			defer wg.Done()
 			reports := simulatePrecincts(reg, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), euShift)
 			perRegion[ri] = reports
-			exitByIdx[ri] = computeExitPollRegionSeats(reg, reports, cfg.Seed, ri, pollSigma)
+			exitByIdx[ri] = computeExitPollRegionSeats(reg, reports, cfg.Seed, ri, pollSigma, parties)
 		}()
 	}
 	wg.Wait()
@@ -136,7 +136,7 @@ func ExitPollSeats(regions []Region, parties []Party, cfg ElectionConfig) map[st
 	return PrepareElection(regions, parties, cfg).ExitPollSeats()
 }
 
-func computeExitPollRegionSeats(reg Region, reports []PrecinctReport, seed int64, ri int, pollSigma float64) map[string]int {
+func computeExitPollRegionSeats(reg Region, reports []PrecinctReport, seed int64, ri int, pollSigma float64, parties []Party) map[string]int {
 	votes := make(map[string]int)
 	for _, rep := range reports {
 		for pid, v := range rep.Votes {
@@ -150,7 +150,7 @@ func computeExitPollRegionSeats(reg Region, reports []PrecinctReport, seed int64
 			votes[pid] = int(math.Round(float64(votes[pid]) * mult))
 		}
 	}
-	return AllocateSeats(votes, reg.Seats, reg.Method, reg.Threshold)
+	return AllocateSeats(votes, reg, reg.EffectiveParties(parties))
 }
 
 func euPolicyShock(seed int64, swing float64) PolicyVec {

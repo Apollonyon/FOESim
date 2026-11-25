@@ -51,7 +51,7 @@ func SimulateRegion(r Region, parties []Party, temperature float64) (map[string]
 		}
 	}
 
-	seats := AllocateSeats(votes, r.Seats, r.Method, r.Threshold)
+	seats := AllocateSeats(votes, r, parties)
 	return votes, seats
 }
 

@@ -89,7 +89,7 @@ func TestAllocateSeats(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := AllocateSeats(tc.votes, tc.totalSeats, tc.method, tc.threshold)
+			got := AllocateSeats(tc.votes, Region{Seats: tc.totalSeats, Method: tc.method, Threshold: tc.threshold}, nil)
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("got %v, want %v", got, tc.want)
 			}

@@ -83,7 +83,7 @@ func (e *ElectionState) Apply(rep PrecinctReport) bool {
 		}
 	}
 
-	newSeats := AllocateSeats(e.tallies[rep.RegionID], reg.Seats, reg.Method, reg.Threshold)
+	newSeats := AllocateSeats(e.tallies[rep.RegionID], reg, reg.EffectiveParties(e.scenario.Parties))
 	if e.updateRegionSeats(rep.RegionID, newSeats) {
 		e.coalitions = FindCoalitions(e.euSeats, e.euGroups, 5)
 		return true
