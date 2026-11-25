@@ -52,8 +52,8 @@ func TestServerRoutes(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		if !strings.Contains(rec.Body.String(), "ParliamentSim") {
-			t.Errorf("expected index.html body to mention ParliamentSim")
+		if !strings.Contains(rec.Body.String(), "FOES") {
+			t.Errorf("expected index.html body to mention FOES")
 		}
 	})
 
@@ -735,7 +735,7 @@ func TestServerCustomRunsValidationAndLimits(t *testing.T) {
 		t.Errorf("excessive seats status = %d, want 400", code)
 	}
 
-	oversized := bytes.Repeat([]byte("a"), maxCustomRunBodySize+1024)
+	oversized := append(append([]byte(`{"name":"`), bytes.Repeat([]byte("a"), maxCustomRunBodySize+1024)...), []byte(`"}`)...)
 	if code := postJSON(oversized); code != http.StatusRequestEntityTooLarge {
 		t.Errorf("oversized body status = %d, want 413", code)
 	}
