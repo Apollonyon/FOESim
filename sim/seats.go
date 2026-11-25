@@ -9,6 +9,7 @@ const (
 	MethodSainteLague AllocationMethod = "sainte_lague"
 	MethodDHondt      AllocationMethod = "dhondt"
 	MethodHare        AllocationMethod = "hare"
+	MethodFPTP        AllocationMethod = "fptp"
 )
 
 type SeatAllocator interface {
@@ -36,12 +37,19 @@ func (sainteLagueAllocator) Allocate(votes map[string]int, r Region, _ []Party) 
 	})
 }
 
+type fptpAllocator struct{}
+
+func (fptpAllocator) Allocate(votes map[string]int, r Region, _ []Party) map[string]int {
+	return allocateFPTP(votes, r.Seats)
+}
 func NewAllocator(method AllocationMethod) SeatAllocator {
 	switch method {
 	case MethodDHondt:
 		return dHondtAllocator{}
 	case MethodHare:
 		return hareAllocator{}
+	case MethodFPTP:
+		return fptpAllocator{}
 	default:
 		return sainteLagueAllocator{}
 	}
@@ -142,6 +150,24 @@ func allocateHare(votes map[string]int, totalSeats int, threshold float64) map[s
 		delete(remainders, bestID)
 	}
 	return seats
+}
+
+func allocateFPTP(votes map[string]int, totalSeats int) map[string]int {
+	if totalSeats <= 0 || len(votes) == 0 {
+		return map[string]int{}
+	}
+	bestID := ""
+	bestVotes := 0
+	for id, v := range votes {
+		if v > bestVotes || (v == bestVotes && id < bestID) {
+			bestVotes = v
+			bestID = id
+		}
+	}
+	if bestID == "" {
+		return map[string]int{}
+	}
+	return map[string]int{bestID: totalSeats}
 }
 
 // SumSeats aggregates per-region seat maps into parliament-wide totals keyed by Party.ID.

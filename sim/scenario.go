@@ -191,7 +191,7 @@ func (s Scenario) Validate() error {
 		}
 
 		switch r.Method {
-		case "", MethodSainteLague, MethodDHondt, MethodHare:
+		case "", MethodSainteLague, MethodDHondt, MethodHare, MethodFPTP:
 		default:
 			return fmt.Errorf("region %q has unknown allocation method %q", r.ID, r.Method)
 		}
