@@ -11,6 +11,7 @@ import (
 const (
 	GeoPackEU = "eu_nuts3"
 	GeoPackUS = "us_counties"
+	GeoPackUK = "uk_constituencies"
 )
 
 type geoPackEntry struct {

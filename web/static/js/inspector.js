@@ -73,7 +73,7 @@ export class InspectorUI {
       const reg = this.state.regionsById[geo.regionId];
       const rep = this.state.precincts[pid];
       const urbanTag = URBAN_LABELS[geo.urbanType] || unitLabel;
-      const distPart = geo.districtId ? ` · ${geo.districtId}` : '';
+      const distPart = (geo.districtId && geo.districtId !== pid) ? ` · ${geo.districtId}` : '';
 
       kickerEl.textContent = `${reg.name.toUpperCase()}${distPart} · ${urbanTag.toUpperCase()}`;
       titleEl.textContent = geo.label;
@@ -95,7 +95,7 @@ export class InspectorUI {
         const topLead = rankedProb.length ? this.state.partiesById[rankedProb[0][0]] : null;
         const topOdds = rankedProb.length ? `${topLead?.short_name || rankedProb[0][0]} ${Math.round(rankedProb[0][1] * 100)}%` : '—';
         statsEl.append(
-          statBox(geo.districtId ? `${geo.districtId} Odds` : 'Region Odds', topOdds),
+          statBox((geo.districtId && geo.districtId !== pid) ? `${geo.districtId} Odds` : `${unitLabel} Odds`, topOdds),
           statBox('Simulations', this.state.forecast.runs),
           statBox('Type', urbanTag)
         );
@@ -172,7 +172,7 @@ export class InspectorUI {
         statBox('Top Odds', topOdds)
       );
 
-      if (rf.district_win_prob && Object.keys(rf.district_win_prob).length > 0 && !this.state.methodOverride) {
+      if (rf.district_win_prob && Object.keys(rf.district_win_prob).length > 0 && Object.keys(rf.district_win_prob).length <= 12 && !this.state.methodOverride) {
         const strip = el('div', { className: 'district-badges' });
         for (const did of Object.keys(rf.district_win_prob).sort()) {
           const dRanked = rankParties(rf.district_win_prob[did]);
@@ -203,7 +203,7 @@ export class InspectorUI {
     );
 
     const dw = this.state.districtWinners?.[rid];
-    if (dw && Object.keys(dw).length > 0 && !this.state.methodOverride) {
+    if (dw && Object.keys(dw).length > 0 && Object.keys(dw).length <= 12 && !this.state.methodOverride) {
       const strip = el('div', { className: 'district-badges' });
       for (const did of Object.keys(dw).sort()) {
         const winner = this.state.partiesById[dw[did]];
@@ -338,7 +338,8 @@ export class InspectorUI {
     const rep = this.state.precincts[precinctId];
     const urbanTag = URBAN_LABELS[geo.urbanType] || '';
 
-    let sub = `${urbanTag}${geo.districtId ? ` · ${geo.districtId}` : ''} · Counting…`;
+    const distTag = (geo.districtId && geo.districtId !== precinctId) ? ` · ${geo.districtId}` : '';
+    let sub = `${urbanTag}${distTag} · Counting…`;
     if (this.state.viewMode === 'forecast' && this.state.forecast?.regions?.[regionId]) {
       const rf = this.state.forecast.regions[regionId];
       const probs = (geo.districtId && !this.state.methodOverride && rf.district_win_prob?.[geo.districtId])
@@ -347,7 +348,9 @@ export class InspectorUI {
       const ranked = rankParties(probs);
       const lead = ranked.length ? this.state.partiesById[ranked[0][0]] : null;
       const probPct = ranked.length ? `${(ranked[0][1] * 100).toFixed(0)}%` : '0%';
-      const scopeTxt = geo.districtId ? `${geo.districtId} odds` : 'Region odds';
+      const scopeTxt = geo.districtId
+        ? (geo.districtId === precinctId ? 'Seat odds' : `${geo.districtId} odds`)
+        : 'Region odds';
       sub = `${lead ? lead.short_name : '—'} ${probPct} (${scopeTxt}) · ${urbanTag}`;
     } else if (rep) {
       const total = sumVotes(rep.votes);

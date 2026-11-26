@@ -1,6 +1,9 @@
 package sim
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestGeoPackRegistryAndDefensiveCopy(t *testing.T) {
 	if !HasGeoPack(GeoPackEU) {
@@ -192,5 +195,86 @@ func TestScenarioValidateGeoPackAndChartType(t *testing.T) {
 	s.Meta.UnitsURL = "/geo/us_counties.json"
 	if err := s.Validate(); err != nil {
 		t.Errorf("expected valid /geo/*.json URLs, got %v", err)
+	}
+}
+
+func TestUK2024ScenarioAndGeoPack(t *testing.T) {
+	if !HasGeoPack(GeoPackUK) {
+		t.Fatalf("expected built-in GeoPack %q to be registered", GeoPackUK)
+	}
+
+	sc, err := LoadScenario("../scenarios/uk2024.json")
+	if err != nil {
+		t.Fatalf("LoadScenario(uk2024.json) failed: %v", err)
+	}
+	if len(sc.Regions) != 12 {
+		t.Fatalf("expected 12 UK regions/nations, got %d", len(sc.Regions))
+	}
+
+	totalSeats := 0
+	totalUnits := 0
+	for _, r := range sc.Regions {
+		totalSeats += r.Seats
+		units := GeoPackUnits(GeoPackUK, r.ID)
+		totalUnits += len(units)
+		if r.DistrictSeats != 1 {
+			t.Errorf("region %q: district_seats = %d, want 1", r.ID, r.DistrictSeats)
+		}
+		if len(units) != r.Seats {
+			t.Errorf("region %q: %d geopack units != %d seats", r.ID, len(units), r.Seats)
+		}
+	}
+	if totalSeats != 650 || totalUnits != 650 {
+		t.Fatalf("expected 650 UK seats and 650 constituencies, got seats=%d units=%d", totalSeats, totalUnits)
+	}
+
+	prep := PrepareElection(sc.Regions, sc.Parties, ElectionConfig{
+		Temperature: 0.45,
+		Swing:       0,
+		Seed:        42,
+	})
+	totals := sc.AggregateEUSeats(prep.ExitPollSeats())
+	seatSum := 0
+	for _, s := range totals {
+		seatSum += s
+	}
+	if seatSum != 650 {
+		t.Fatalf("simulated UK seat sum = %d, want 650", seatSum)
+	}
+	if totals["lab"] < 400 || totals["lab"] > 420 {
+		t.Errorf("expected calibrated Labour baseline ~411, got %d", totals["lab"])
+	}
+	if totals["con"] < 115 || totals["con"] > 130 {
+		t.Errorf("expected calibrated Conservative baseline ~121, got %d", totals["con"])
+	}
+	if totals["ld"] < 68 || totals["ld"] > 76 {
+		t.Errorf("expected calibrated Lib Dem baseline ~72, got %d", totals["ld"])
+	}
+	if totals["snp"] < 7 || totals["snp"] > 11 {
+		t.Errorf("expected calibrated SNP baseline ~9, got %d", totals["snp"])
+	}
+	if totals["sf"] != 7 || totals["dup"] != 5 || totals["apni"] != 1 {
+		t.Errorf("expected calibrated NI baseline (SF=7, DUP=5, APNI=1), got SF=%d DUP=%d APNI=%d",
+			totals["sf"], totals["dup"], totals["apni"])
+	}
+
+	fc, err := RunForecast(context.Background(), sc, ForecastConfig{
+		Runs:        20,
+		Temperature: 0.45,
+		Swing:       0.15,
+		BaseSeed:    42,
+	})
+	if err != nil {
+		t.Fatalf("RunForecast(uk2024) failed: %v", err)
+	}
+	if fc.TotalSeats != 650 || fc.Majority != 326 {
+		t.Errorf("forecast seats/majority = %d/%d, want 650/326", fc.TotalSeats, fc.Majority)
+	}
+	distCount := 0
+	for _, rf := range fc.Regions {
+		distCount += len(rf.DistrictWinProb)
+	}
+	if distCount != 650 {
+		t.Errorf("forecast district_win_prob count = %d, want 650", distCount)
 	}
 }

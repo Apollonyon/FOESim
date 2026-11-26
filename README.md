@@ -22,6 +22,7 @@ Run `go run . -h` to see all CLI flags. A `Dockerfile` is also included if you w
 
 - `eu27`: European Parliament across all 27 member states (720 seats, 154 parties, 1,152 NUTS-3 regions), calibrated to 2024 EP results and CHES-Europe.
 - `usa2024`: 2024 U.S. Presidential Election (538 EVs, 3,141 counties), including Maine and Nebraska congressional district splits.
+- `uk2024`: 2024 UK General Election across all 650 Westminster constituencies (12 regions/nations, GB & Northern Ireland parties, 326-to-win bar), calibrated to certified UK Parliament results.
 - `eu_starter`: Small synthetic 3-country scenario (DE, FR, IT) for quick local testing.
 
 ### How it Works
@@ -41,6 +42,6 @@ go test -race -count=1 ./...
 
 ### Data & License
 
-Built with Eurostat GISCO NUTS 2021 (© EuroGeographics), 2024 CHES-Europe, European Parliament Open Data, U.S. Census TIGER/Line 2023, and 2024 U.S. county presidential results.
+Built with Eurostat GISCO NUTS 2021 (© EuroGeographics), 2024 CHES-Europe, European Parliament Open Data, U.S. Census TIGER/Line 2023, 2024 U.S. county presidential results, ONS Open Geography Portal (OGL v3.0), and UK Parliament Open Data.
 
 Licensed under [AGPL-3.0](LICENSE) (see [NOTICE](NOTICE) for Section 7 additional terms).
