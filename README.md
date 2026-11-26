@@ -26,11 +26,11 @@ Run `go run . -h` to see all CLI flags. A `Dockerfile` is also included if you w
 
 ### How it Works
 
-FOES models voter groups and parties in a shared policy space, streaming precinct results over Server-Sent Events as polls close across time zones. Because `eu27` and `usa2024` are calibrated in-sample to 2024 outcomes, running at zero uncertainty closely reproduces the real 2024 results.
+### How it Works
 
-In Monte Carlo mode, the simulator runs 100 to 500 correlated draws combining hierarchical uncertainty shocks with optional directional swings to map win probabilities, P10-P90 seat distributions, and closest races. Under winner-take-all rules (like the U.S. Electoral College), symmetric noise still pulls average EV totals toward 270 because narrow swing states have more votes to lose than safe states can gain.
+FOES simulates election night county by county, streaming live results to the browser as polls close across time zones. The `eu27` and `usa2024` presets are tuned to roughly match the real 2024 results by default, so you can tweak party swings, turnout, or randomness from a realistic baseline.
 
-You can switch allocation methods (Sainte-Laguë, D'Hondt, Hare-Niemeyer, FPTP, and a party-level STV approximation) on the same underlying votes, edit scenarios live in the browser by pressing `E`, and share changes via compressed `#share=` URLs. Live runs default to seed `42` for reproducibility.
+You can also run Monte Carlo mode (100 to 500 randomized elections) to see win probabilities and close races, test different seat-allocation systems (Sainte-Laguë, D'Hondt, Hare-Niemeyer, FPTP, and an STV approximation) on the same votes, or press `E` to edit a scenario in the browser and share it via URL.
 
 ### Tests
 
