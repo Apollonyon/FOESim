@@ -307,7 +307,7 @@ function closeMobileDrawers() {
 function applyScenarioMeta(meta, hasGroups) {
   const title = meta.title || 'European Parliament';
 
-  document.title = `FOES — ${title}`;
+  document.title = `FOES - ${title}`;
   document.getElementById('hud-kicker').textContent = title.toUpperCase();
   document.getElementById('seat-unit-label').textContent = meta.seat_label || 'seats';
   document.getElementById('overview-focus-btn').textContent = meta.overview_label || 'Europe';
@@ -665,7 +665,7 @@ async function loadScenario({
   for (const g of state.orderedGroups) {
     const opt = document.createElement('option');
     opt.value = g.id;
-    opt.textContent = `${g.short_name} — ${g.name}`;
+    opt.textContent = `${g.short_name} - ${g.name}`;
     partySelect.appendChild(opt);
   }
   state.heatmapPartyId = state.orderedGroups[Math.floor(state.orderedGroups.length / 2)]?.id || groups[0]?.id || '';

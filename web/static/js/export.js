@@ -517,7 +517,7 @@ export class ScreenshotModal {
       await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': this.blob })]);
       this.#setStatus('Copied to clipboard');
     } catch {
-      this.#setStatus('Clipboard blocked — use Download PNG');
+      this.#setStatus('Clipboard blocked, use Download PNG');
     }
   }
 

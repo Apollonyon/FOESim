@@ -870,7 +870,7 @@ input:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-/* Zoom Controls — placed beside bottom-left parliament HUD so inspector never covers them */
+/* Zoom Controls: placed beside bottom-left parliament HUD so inspector never covers them */
 .zoom-controls {
   left: 404px;
   bottom: 14px;

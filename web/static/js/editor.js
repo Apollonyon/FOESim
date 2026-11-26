@@ -557,7 +557,7 @@ export class ScenarioEditor {
     const shiftChoices = [{ value: '', label: 'None' }];
     const shiftList = this.draft?.groups?.length ? this.draft.groups : (this.draft?.parties || []);
     for (const item of shiftList) {
-      shiftChoices.push({ value: item.id, label: `${item.short_name || item.id} — ${item.name || item.id}` });
+      shiftChoices.push({ value: item.id, label: `${item.short_name || item.id} - ${item.name || item.id}` });
     }
     const shiftSliderWrap = makeSliderNumRow({
       label: 'Shift Amount',

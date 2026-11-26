@@ -189,7 +189,7 @@ export class PrivacyModal {
       nodes.push(
         el('div', { className: 'privacy-notice' },
           el('strong', { text: 'Instance notice not configured: ' }),
-          'The operator of this FOES instance has not configured a privacy policy yet. The sections below describe only how the FOES software behaves as shipped — hosting, reverse proxies, and server logs are the responsibility of this instance\'s operator.'
+          'The operator of this FOES instance has not configured a privacy policy yet. The sections below describe only how the FOES software behaves as shipped. Hosting, reverse proxies, and server logs are the responsibility of this instance\'s operator.'
         )
       );
     } else {
@@ -259,7 +259,7 @@ export class PrivacyModal {
       nodes.push(
         this.#section(`${num(4)} Your Rights`, rightsItems),
         this.#section(`${num(5)} Changes & Self-Hosted Instances`, [
-          'This privacy policy may be updated if hosting or software behavior changes; the latest revision date is shown at the top of this dialog. FOES is open-source software (AGPL-3.0) — self-hosted instances are operated independently by their respective hosts.'
+          'This privacy policy may be updated if hosting or software behavior changes; the latest revision date is shown at the top of this dialog. FOES is open-source software (AGPL-3.0); self-hosted instances are operated independently by their respective hosts.'
         ])
       );
     }
