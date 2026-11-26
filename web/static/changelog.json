@@ -1,6 +1,15 @@
 {
-  "version": "0.1.1",
+  "version": "0.1.2",
   "entries": [
+    {
+      "version": "0.1.2",
+      "date": "2026-11-26",
+      "title": "Map Screenshots",
+      "notes": [
+        "Added a map screenshot tool with a live preview, Copy Image and download function.",
+        "The screenshots adapt automatically to the active theme, Electoral College bar, or Parliament hemicycle."
+      ]
+    },
     {
       "version": "0.1.1",
       "date": "2026-11-26",

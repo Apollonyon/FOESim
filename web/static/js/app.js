@@ -7,6 +7,7 @@ import { renderLegend } from './overlays.js';
 import { ScenarioEditor } from './editor.js';
 import { applyScenarioPatch, decodeSharePayload } from './share.js';
 import { ChangelogModal } from './changelog.js';
+import { ScreenshotModal } from './export.js';
 
 const state = {
   scenarioId: '',
@@ -99,6 +100,7 @@ let hemicycle;
 let inspector;
 let editor;
 let changelog;
+let screenshotModal;
 let forecastAbortCtrl = null;
 let hemiFrameQueued = false;
 let hudFrameId = 0;
@@ -196,6 +198,7 @@ async function init() {
 
   changelog = new ChangelogModal(document.getElementById('changelog-modal'));
   changelog.init(btnVersion);
+  screenshotModal = new ScreenshotModal(document.getElementById('screenshot-modal'));
 
   editor = new ScenarioEditor(document.getElementById('editor-modal'), {
     onApplied: async (runId, autoStart, modifiers) => {
@@ -1242,6 +1245,10 @@ function wireEvents() {
     loadScenario({ scenarioId: scenarioSelect.value });
   });
 
+  document.getElementById('btn-screenshot')?.addEventListener('click', () => {
+    screenshotModal?.open(map, state);
+  });
+
   document.getElementById('btn-theme').addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
@@ -1337,6 +1344,10 @@ function wireEvents() {
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (screenshotModal?.isOpen) {
+        screenshotModal.close();
+        return;
+      }
       if (changelog?.isOpen) {
         changelog.close();
         return;
@@ -1351,15 +1362,23 @@ function wireEvents() {
       }
     }
     if ((e.key === 'e' || e.key === 'E') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (changelog?.isOpen || editor?.isOpen || !state.scenario) return;
+      if (screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
       e.preventDefault();
       openScenarioEditor();
       return;
     }
+    if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
+      e.preventDefault();
+      screenshotModal?.open(map, state);
+      return;
+    }
     if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (changelog?.isOpen || editor?.isOpen) return;
+      if (screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen) return;
       if (document.activeElement?.closest('input, select, textarea, button, a, [role="button"]')) return;
       if (!state.scenario) return;
       e.preventDefault();

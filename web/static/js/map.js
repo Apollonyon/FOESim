@@ -83,6 +83,7 @@ export class EuropeMap {
     this.height = 1;
     this.dpr = window.devicePixelRatio || 1;
     this.defaultBox = [...DEFAULT_BOX];
+    this.tightBox = [...DEFAULT_BOX];
     this.viewBox = [...DEFAULT_BOX];
     this.animFrame = null;
     this.loadSeq = 0;
@@ -329,8 +330,11 @@ export class EuropeMap {
       const pad = Math.max(spanX, spanY) * 0.06;
       const rightPad = this.callouts.length > 0 ? spanX * 0.22 : pad;
       this.defaultBox = [minX - pad, minY - pad, spanX + pad + rightPad, spanY + pad * 2];
+      const exportPad = Math.max(spanX, spanY) * 0.035;
+      this.tightBox = [minX - exportPad, minY - exportPad, spanX + exportPad * 2, spanY + exportPad * 2];
     } else {
       this.defaultBox = [...DEFAULT_BOX];
+      this.tightBox = [...DEFAULT_BOX];
     }
 
     this.buildSpatialGrid();
@@ -461,6 +465,129 @@ export class EuropeMap {
     this.bufDirtyFull = true;
     this.overviewDirtyFull = true;
     this.requestRender();
+  }
+
+  renderCleanTo(ctx, targetX, targetY, targetW, targetH) {
+    if (this.pendingRecolor.size > 0) {
+      this.flushRecolor();
+    } else {
+      this.updateCalloutColors();
+    }
+
+    const baseBox = this.tightBox || this.defaultBox || DEFAULT_BOX;
+    const aspect = targetW / Math.max(1, targetH);
+    let [vx, vy, vw, vh] = baseBox;
+    if (vw / vh > aspect) {
+      const nh = vw / aspect;
+      vy -= (nh - vh) / 2;
+      vh = nh;
+    } else {
+      const nw = vh * aspect;
+      vx -= (nw - vw) / 2;
+      vw = nw;
+    }
+
+    const vx2 = vx + vw;
+    const vy2 = vy + vh;
+    const scale = targetW / vw;
+    const theme = this.theme;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(targetX, targetY, targetW, targetH);
+    ctx.clip();
+
+    // Map-space vector draw (context landmass, counties, state borders, callout badges)
+    ctx.setTransform(scale, 0, 0, scale, targetX - vx * scale, targetY - vy * scale);
+
+    ctx.fillStyle = theme.landCtx;
+    ctx.strokeStyle = theme.landCtxStroke;
+    ctx.lineWidth = 0.7 / scale;
+    for (let i = 0; i < this.ctxPaths.length; i++) {
+      const cp = this.ctxPaths[i];
+      if (cp.bbox[2] < vx || cp.bbox[0] > vx2 || cp.bbox[3] < vy || cp.bbox[1] > vy2) continue;
+      ctx.fill(cp.path);
+      ctx.stroke(cp.path);
+    }
+
+    const defaultFill = theme.unreported;
+    const showCountyBorders = this.state.viewMode !== 'forecast';
+    ctx.strokeStyle = theme.countyStroke;
+    ctx.lineWidth = 0.35 / scale;
+    for (let i = 0; i < this.counties.length; i++) {
+      const c = this.counties[i];
+      if (c.maxX < vx || c.minX > vx2 || c.maxY < vy || c.minY > vy2) continue;
+      ctx.fillStyle = c.fill || defaultFill;
+      ctx.fill(c.path);
+      if (showCountyBorders) ctx.stroke(c.path);
+    }
+
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = theme.countryBorder;
+    ctx.lineWidth = 1.25 / scale;
+    for (let i = 0; i < this.borders.length; i++) {
+      const b = this.borders[i];
+      if (b.bbox[2] < vx || b.bbox[0] > vx2 || b.bbox[3] < vy || b.bbox[1] > vy2) continue;
+      ctx.stroke(b.path);
+    }
+
+    if (this.callouts.length > 0) {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '700 9.5px ui-monospace, SFMono-Regular, Menlo, monospace';
+      for (let i = 0; i < this.callouts.length; i++) {
+        const item = this.callouts[i];
+        const { x, y, w, h, label, district_id } = item.spec;
+        if (district_id && this.state.methodOverride) continue;
+        if (x + w < vx || x > vx2 || y + h < vy || y > vy2) continue;
+        ctx.fillStyle = item.fill || theme.dotEmpty;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 3.5);
+        ctx.fill();
+        ctx.strokeStyle = theme.countryBorder;
+        ctx.lineWidth = 0.9 / scale;
+        ctx.stroke();
+
+        ctx.lineWidth = 2.2 / scale;
+        ctx.strokeStyle = 'rgba(15,23,42,0.6)';
+        ctx.strokeText(label, x + w * 0.5, y + h * 0.5 + 0.5);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(label, x + w * 0.5, y + h * 0.5 + 0.5);
+      }
+    }
+
+    // Crisp screen-space region labels
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < this.borders.length; i++) {
+      const b = this.borders[i];
+      if (b.hideLabel || !b.center) continue;
+      const [cx, cy] = b.center;
+      if (cx < vx || cx > vx2 || cy < vy || cy > vy2) continue;
+      const sx = targetX + (cx - vx) * scale;
+      const sy = targetY + (cy - vy) * scale;
+
+      ctx.font = '700 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.strokeStyle = theme.labelHalo;
+      ctx.lineWidth = 3.5;
+      ctx.strokeText(b.label, sx, sy);
+      ctx.fillStyle = theme.labelFill;
+      ctx.fillText(b.label, sx, sy);
+
+      const pct = this.state.regionPct?.[b.id] ?? 0;
+      if (this.state.viewMode !== 'forecast' && pct > 0 && pct < 100) {
+        const subText = `${pct}%`;
+        ctx.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.lineWidth = 2.8;
+        ctx.strokeText(subText, sx, sy + 13);
+        ctx.fillStyle = theme.sublabelFill;
+        ctx.fillText(subText, sx, sy + 13);
+      }
+    }
+
+    ctx.restore();
   }
 
   bakeInto(ctx, cssW, cssH, dpr, box, showCountyBorders) {
