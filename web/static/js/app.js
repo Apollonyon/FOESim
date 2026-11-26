@@ -116,16 +116,8 @@ let streamErrorWhilePaused = false;
 
 function applyScenarioMeta(meta, hasGroups) {
   const title = meta.title || 'European Parliament';
-  const initials = title
-    .replace(/[^A-Za-z0-9 ]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join('') || 'FO';
 
   document.title = `FOES — ${title}`;
-  document.getElementById('brand-mark').textContent = initials;
   document.getElementById('hud-kicker').textContent = title.toUpperCase();
   document.getElementById('seat-unit-label').textContent = meta.seat_label || 'seats';
   document.getElementById('overview-focus-btn').textContent = meta.overview_label || 'Europe';

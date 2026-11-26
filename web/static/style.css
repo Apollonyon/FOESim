@@ -168,16 +168,11 @@ html, body {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 26px;
   height: 26px;
-  background: var(--ink-bg);
-  color: var(--ink-text);
-  font-weight: 800;
-  font-size: 11px;
-  letter-spacing: 0.04em;
   border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .brand h1 {
