@@ -2,6 +2,9 @@ package sim
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -276,5 +279,126 @@ func TestUK2024ScenarioAndGeoPack(t *testing.T) {
 	}
 	if distCount != 650 {
 		t.Errorf("forecast district_win_prob count = %d, want 650", distCount)
+	}
+}
+
+func TestLoadGeoPacksDirAndValidation(t *testing.T) {
+	tmp := t.TempDir()
+
+	// Valid external pack with units.json.
+	packDir := filepath.Join(tmp, "demo_ext_pack")
+	if err := os.MkdirAll(packDir, 0o755); err != nil {
+		t.Fatalf("mkdir packDir: %v", err)
+	}
+	validUnits := `{
+		"north": [
+			{"id": "N01", "district_id": "N-1", "name": "North City", "urban_type": 1, "turnout": 0.72, "weight": 0.6},
+			{"id": "N02", "district_id": "N-2", "name": "North Valley", "urban_type": 3, "turnout": 0.65, "weight": 0.4}
+		]
+	}`
+	if err := os.WriteFile(filepath.Join(packDir, "units.json"), []byte(validUnits), 0o644); err != nil {
+		t.Fatalf("write units.json: %v", err)
+	}
+
+	// Map-only pack (no units.json) and hidden dir should be skipped cleanly.
+	if err := os.MkdirAll(filepath.Join(tmp, "map_only"), 0o755); err != nil {
+		t.Fatalf("mkdir map_only: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "map_only", "regions.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write map_only regions.json: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmp, ".hidden"), 0o755); err != nil {
+		t.Fatalf("mkdir .hidden: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, ".hidden", "units.json"), []byte(`{invalid`), 0o644); err != nil {
+		t.Fatalf("write .hidden units.json: %v", err)
+	}
+
+	t.Cleanup(func() {
+		geoPacksMu.Lock()
+		delete(geoPacks, "demo_ext_pack")
+		geoPacksMu.Unlock()
+	})
+
+	loaded, err := LoadGeoPacksDir(tmp)
+	if err != nil {
+		t.Fatalf("LoadGeoPacksDir failed: %v", err)
+	}
+	if !slices.Equal(loaded, []string{"demo_ext_pack"}) {
+		t.Fatalf("loaded = %v, want [demo_ext_pack]", loaded)
+	}
+	if !HasGeoPack("demo_ext_pack") {
+		t.Fatalf("expected demo_ext_pack to be registered")
+	}
+	if !slices.Contains(ListGeoPacks(), "demo_ext_pack") {
+		t.Errorf("ListGeoPacks() missing demo_ext_pack: %v", ListGeoPacks())
+	}
+
+	units := GeoPackUnits("demo_ext_pack", "NORTH")
+	if len(units) != 2 || units[0].ID != "N01" || units[0].Turnout != 0.72 {
+		t.Fatalf("unexpected loaded units: %+v", units)
+	}
+
+	// Scenario referencing the external pack and /geo/packs/... URLs passes Validate().
+	reg := DefaultRegions()[0]
+	reg.ID = "north"
+	reg.UseNUTS3 = false
+	reg.GeoPack = "demo_ext_pack"
+	sc := Scenario{
+		Name: "External Pack Scenario",
+		Meta: ScenarioMeta{
+			RegionsURL: "/geo/packs/demo_ext_pack/regions.json",
+			UnitsURL:   "/geo/packs/demo_ext_pack/units_map.json",
+		},
+		Parties: DefaultParties(),
+		Regions: []Region{reg},
+	}
+	if err := sc.Validate(); err != nil {
+		t.Fatalf("expected scenario with external pack to validate, got %v", err)
+	}
+
+	// Invalid pack names and malformed/invalid unit payloads are rejected.
+	badCases := []struct {
+		name string
+		pack string
+		body string
+	}{
+		{"invalid pack name", "../evil", validUnits},
+		{"empty pack name", "", validUnits},
+		{"malformed json", "bad_json", "{broken"},
+		{"empty object", "empty_obj", "{}"},
+		{"empty unit id", "empty_uid", `{"r":[{"id":"","weight":1}]}`},
+		{"duplicate unit id", "dup_uid", `{"r":[{"id":"u1","weight":0.5},{"id":"u1","weight":0.5}]}`},
+		{"negative weight", "neg_w", `{"r":[{"id":"u1","weight":-1}]}`},
+		{"zero total weight", "zero_w", `{"r":[{"id":"u1","weight":0}]}`},
+		{"turnout > 1", "bad_t", `{"r":[{"id":"u1","weight":1,"turnout":1.5}]}`},
+		{"case-insensitive dup region", "dup_reg", `{"DE":[{"id":"u1","weight":1}],"de":[{"id":"u2","weight":1}]}`},
+		{"negative population", "neg_pop", `{"r":[{"id":"u1","weight":1,"population":-10}]}`},
+		{"invalid urban_type", "bad_urban", `{"r":[{"id":"u1","weight":1,"urban_type":9}]}`},
+	}
+	for _, tc := range badCases {
+		p := filepath.Join(tmp, tc.name+".json")
+		if err := os.WriteFile(p, []byte(tc.body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", tc.name, err)
+		}
+		if err := LoadGeoPackFile(tc.pack, p); err == nil {
+			t.Errorf("case %q: expected error, got nil", tc.name)
+		}
+	}
+
+	// Symlink escaping packsDir must be rejected by LoadGeoPacksDir (os.OpenRoot).
+	outside := filepath.Join(t.TempDir(), "outside_units.json")
+	if err := os.WriteFile(outside, []byte(validUnits), 0o644); err != nil {
+		t.Fatalf("write outside_units.json: %v", err)
+	}
+	symRoot := t.TempDir()
+	symPack := filepath.Join(symRoot, "sym_pack")
+	if err := os.MkdirAll(symPack, 0o755); err != nil {
+		t.Fatalf("mkdir symPack: %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(symPack, "units.json")); err == nil {
+		if _, err := LoadGeoPacksDir(symRoot); err == nil {
+			t.Errorf("expected symlink escaping packsDir to be rejected, got nil")
+		}
 	}
 }

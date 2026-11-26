@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"runtime"
 	"slices"
 	"strconv"
@@ -36,6 +37,7 @@ const (
 	minTemperature         = 0.05
 	maxTemperature         = 10.0
 	maxSwing               = 2.0
+	maxPackGeoAssetBytes   = 32 << 20 // 32 MiB
 )
 
 //go:embed static
@@ -45,6 +47,7 @@ var staticFiles embed.FS
 type Server struct {
 	scenario        sim.Scenario
 	registry        *sim.ScenarioRegistry
+	packsDir        string
 	runs            *runStore
 	runsLimiter     *ipRateLimiter
 	streamSem       chan struct{}
@@ -129,6 +132,13 @@ func (s *Server) SetMaxRunsPerMin(n int) {
 	s.runsLimiter = newIPRateLimiter(n, time.Minute)
 }
 
+// SetPacksDir configures a filesystem directory of external GeoPacks whose
+// map JSON files (<dir>/<pack>/<file>.json) are served at /geo/packs/<pack>/<file>.json.
+// Empty disables external pack serving. Must be called before serving requests.
+func (s *Server) SetPacksDir(dir string) {
+	s.packsDir = strings.TrimSpace(dir)
+}
+
 // Handler returns the HTTP router for the dashboard and API routes.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -139,6 +149,9 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/forecast", gzipMiddleware(http.HandlerFunc(s.handleForecast)))
 	mux.HandleFunc("POST /api/runs", s.handleCreateRun)
 	mux.HandleFunc("GET /api/stream", s.handleStream)
+	if s.packsDir != "" {
+		mux.Handle("GET /geo/packs/", gzipMiddleware(http.HandlerFunc(s.handlePackGeo)))
+	}
 
 	sub, err := fs.Sub(staticFiles, "static")
 	if err != nil {
@@ -304,6 +317,64 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok\n"))
 }
 
+func isSafePackGeoFilename(name string) bool {
+	if name == "" || len(name) > 128 || strings.HasPrefix(name, ".") || !strings.HasSuffix(name, ".json") || strings.Contains(name, "..") {
+		return false
+	}
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		ok := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.'
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Server) handlePackGeo(w http.ResponseWriter, r *http.Request) {
+	rel := strings.TrimPrefix(r.URL.Path, "/geo/packs/")
+	packName, fileName, ok := strings.Cut(rel, "/")
+	if !ok || !sim.IsValidGeoPackName(packName) || !isSafePackGeoFilename(fileName) {
+		http.NotFound(w, r)
+		return
+	}
+
+	root, err := os.OpenRoot(s.packsDir)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer root.Close()
+
+	f, err := root.Open(packName + "/" + fileName)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+
+	st, err := f.Stat()
+	if err != nil || !st.Mode().IsRegular() || st.Size() > maxPackGeoAssetBytes {
+		http.NotFound(w, r)
+		return
+	}
+
+	etag := fmt.Sprintf("\"%x-%x\"", st.Size(), st.ModTime().UnixNano())
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if r.Method == http.MethodHead {
+		w.Header().Del("Content-Encoding")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	_, _ = io.Copy(w, f)
+}
+
 func (s *Server) acquireIPSlot(ip string) bool {
 	if s.maxStreamsPerIP <= 0 || ip == "" {
 		return true
@@ -333,6 +404,7 @@ func (s *Server) releaseIPSlot(ip string) {
 type scenariosListPayload struct {
 	DefaultID string                `json:"default_id"`
 	Scenarios []sim.ScenarioSummary `json:"scenarios"`
+	GeoPacks  []string              `json:"geo_packs,omitempty"`
 }
 
 func (s *Server) resolveScenario(id string) (sim.Scenario, bool) {
@@ -356,6 +428,7 @@ func (s *Server) handleScenarios(w http.ResponseWriter, r *http.Request) {
 		payload.DefaultID = "default"
 		payload.Scenarios = []sim.ScenarioSummary{s.scenario.Summary("default")}
 	}
+	payload.GeoPacks = sim.ListGeoPacks()
 	_ = json.NewEncoder(w).Encode(payload)
 }
 

@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -963,6 +966,127 @@ func TestServerTacticalParamParsingAndClamping(t *testing.T) {
 		cfg := srv.parseElectionConfig(req)
 		if cfg.Tactical != tc.want {
 			t.Errorf("query %q: Tactical = %v, want %v", tc.query, cfg.Tactical, tc.want)
+		}
+	}
+}
+
+func TestServerExternalPacksGeoServing(t *testing.T) {
+	outer := t.TempDir()
+	packsDir := filepath.Join(outer, "packs")
+	packSub := filepath.Join(packsDir, "demo_pack")
+	if err := os.MkdirAll(filepath.Join(packSub, "sub"), 0o755); err != nil {
+		t.Fatalf("mkdir packSub: %v", err)
+	}
+
+	geoBody := `{"type":"FeatureCollection","features":[]}`
+	if err := os.WriteFile(filepath.Join(packSub, "regions.json"), []byte(geoBody), 0o644); err != nil {
+		t.Fatalf("write regions.json: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(packSub, "secret.txt"), []byte("nope"), 0o644); err != nil {
+		t.Fatalf("write secret.txt: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(packSub, ".hidden.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write .hidden.json: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(packSub, "sub", "nested.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write nested.json: %v", err)
+	}
+
+	outsideFile := filepath.Join(outer, "outside.json")
+	if err := os.WriteFile(outsideFile, []byte(`{"secret":true}`), 0o644); err != nil {
+		t.Fatalf("write outside.json: %v", err)
+	}
+	_ = os.Symlink(outsideFile, filepath.Join(packSub, "escape.json"))
+
+	srv := NewServer(sim.Scenario{
+		Name:    "Packs Test",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	})
+	srv.SetPacksDir(packsDir)
+	handler := srv.Handler()
+
+	// Valid external pack JSON returns 200, ETag, Cache-Control, and supports 304 + gzip.
+	req := httptest.NewRequest(http.MethodGet, "/geo/packs/demo_pack/regions.json", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET external pack geo status = %d, want 200", rec.Code)
+	}
+	if rec.Body.String() != geoBody {
+		t.Errorf("body = %q, want %q", rec.Body.String(), geoBody)
+	}
+	etag := rec.Header().Get("ETag")
+	if etag == "" || !strings.Contains(rec.Header().Get("Cache-Control"), "must-revalidate") {
+		t.Errorf("unexpected cache headers: etag=%q cache=%q", etag, rec.Header().Get("Cache-Control"))
+	}
+
+	req304 := httptest.NewRequest(http.MethodGet, "/geo/packs/demo_pack/regions.json", nil)
+	req304.Header.Set("If-None-Match", etag)
+	rec304 := httptest.NewRecorder()
+	handler.ServeHTTP(rec304, req304)
+	if rec304.Code != http.StatusNotModified {
+		t.Errorf("conditional GET status = %d, want 304", rec304.Code)
+	}
+
+	reqGz := httptest.NewRequest(http.MethodGet, "/geo/packs/demo_pack/regions.json", nil)
+	reqGz.Header.Set("Accept-Encoding", "gzip")
+	recGz := httptest.NewRecorder()
+	handler.ServeHTTP(recGz, reqGz)
+	if recGz.Code != http.StatusOK || recGz.Header().Get("Content-Encoding") != "gzip" {
+		t.Errorf("gzip GET: status=%d encoding=%q", recGz.Code, recGz.Header().Get("Content-Encoding"))
+	}
+
+	reqHead := httptest.NewRequest(http.MethodHead, "/geo/packs/demo_pack/regions.json", nil)
+	reqHead.Header.Set("Accept-Encoding", "gzip")
+	recHead := httptest.NewRecorder()
+	handler.ServeHTTP(recHead, reqHead)
+	if recHead.Code != http.StatusOK || recHead.Body.Len() != 0 || recHead.Header().Get("ETag") != etag {
+		t.Errorf("HEAD external pack: status=%d len=%d etag=%q", recHead.Code, recHead.Body.Len(), recHead.Header().Get("ETag"))
+	}
+
+	// Non-JSON, dotfiles, nested paths, traversal, and symlinks outside packsDir must all 404.
+	blocked := []string{
+		"/geo/packs/demo_pack/secret.txt",
+		"/geo/packs/demo_pack/.hidden.json",
+		"/geo/packs/demo_pack/sub/nested.json",
+		"/geo/packs/demo_pack/escape.json",
+		"/geo/packs/missing_pack/regions.json",
+		"/geo/packs/demo_pack/..%2foutside.json",
+	}
+	for _, p := range blocked {
+		bReq := httptest.NewRequest(http.MethodGet, p, nil)
+		bRec := httptest.NewRecorder()
+		handler.ServeHTTP(bRec, bReq)
+		if bRec.Code != http.StatusNotFound {
+			t.Errorf("GET %s: status = %d, want 404", p, bRec.Code)
+		}
+	}
+
+	// ServeMux cleans raw ".." with a redirect away from /geo/packs/, and handlePackGeo also rejects it directly.
+	travReq := httptest.NewRequest(http.MethodGet, "/geo/packs/../outside.json", nil)
+	travRec := httptest.NewRecorder()
+	handler.ServeHTTP(travRec, travReq)
+	if travRec.Code == http.StatusOK {
+		t.Errorf("GET /geo/packs/../outside.json unexpectedly succeeded with 200")
+	}
+	directRec := httptest.NewRecorder()
+	srv.handlePackGeo(directRec, travReq)
+	if directRec.Code != http.StatusNotFound {
+		t.Errorf("direct handlePackGeo traversal status = %d, want 404", directRec.Code)
+	}
+
+	// /api/scenarios includes registered geo_packs.
+	scReq := httptest.NewRequest(http.MethodGet, "/api/scenarios", nil)
+	scRec := httptest.NewRecorder()
+	handler.ServeHTTP(scRec, scReq)
+	var listResp scenariosListPayload
+	if err := json.Unmarshal(scRec.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("decode /api/scenarios: %v", err)
+	}
+	for _, want := range []string{sim.GeoPackEU, sim.GeoPackUS, sim.GeoPackUK} {
+		if !slices.Contains(listResp.GeoPacks, want) {
+			t.Errorf("/api/scenarios geo_packs missing %q: %v", want, listResp.GeoPacks)
 		}
 	}
 }

@@ -172,6 +172,7 @@ export class ScenarioEditor {
 
     this.baseScenario = null;
     this.draft = null;
+    this.availableGeoPacks = [];
     this.baseModifiers = { ...DEFAULT_MODIFIERS };
     this.modifiers = { ...DEFAULT_MODIFIERS };
 
@@ -203,6 +204,11 @@ export class ScenarioEditor {
 
   get isOpen() {
     return !this.modalEl.classList.contains('hidden');
+  }
+
+  setAvailableGeoPacks(packs) {
+    if (!Array.isArray(packs)) return;
+    this.availableGeoPacks = packs.filter((p) => typeof p === 'string' && p.length > 0);
   }
 
   open(baseScenario, currentScenario = null, modifiers = null, opts = {}) {
@@ -729,7 +735,7 @@ export class ScenarioEditor {
 
     const geoDetails = el('details', { className: 'editor-details' },
       el('summary', { text: 'Map & Geometry Paths (Advanced)' }),
-      el('div', { className: 'editor-hint', text: 'Paths must start with /geo/ and end with .json (server validation enforced).' }),
+      el('div', { className: 'editor-hint', text: 'Paths must start with /geo/ and end with .json (use /geo/packs/<pack>/<file>.json for external packs).' }),
       el('div', { className: 'editor-grid-3' },
         el('label', { className: 'editor-field' },
           el('span', { text: 'Regions URL' }),
@@ -1253,6 +1259,11 @@ export class ScenarioEditor {
 
     for (const r of regions) {
       const geoOpts = [...GEOPACK_OPTIONS];
+      for (const pack of this.availableGeoPacks) {
+        if (!geoOpts.some((o) => o.value === pack)) {
+          geoOpts.push({ value: pack, label: `${pack} (external)` });
+        }
+      }
       if (r.geo_pack && !geoOpts.some((o) => o.value === r.geo_pack)) {
         geoOpts.push({ value: r.geo_pack, label: r.geo_pack });
       }

@@ -450,6 +450,7 @@ async function init() {
     const listRes = await fetch('/api/scenarios');
     if (listRes.ok) {
       const catalog = await listRes.json();
+      editor.setAvailableGeoPacks(catalog.geo_packs);
       const items = catalog.scenarios || [];
       scenarioCatalog = items;
       if (items.length > 1) {

@@ -22,6 +22,7 @@ import (
 func main() {
 	scenarioPath := flag.String("scenario", "scenarios/eu27.json", "path to default JSON scenario file")
 	scenariosDir := flag.String("scenarios-dir", "scenarios", "directory of JSON scenarios for the web switcher (empty disables directory scan)")
+	packsDir := flag.String("packs-dir", "packs", "directory of external GeoPacks (<dir>/<pack>/units.json + map JSONs; empty disables external packs)")
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	cliMode := flag.Bool("cli", false, "run live election night in the terminal instead of starting the web server")
 	maxStreams := flag.Int("max-streams", 256, "maximum concurrent SSE election streams (0 = unlimited)")
@@ -30,6 +31,17 @@ func main() {
 	proxyHeader := flag.String("proxy-header", "", "trusted client IP proxy header mode: xff, cf, or fly (overrides -trust-proxy)")
 	shutdownTimeout := flag.Duration("shutdown-timeout", 30*time.Second, "graceful drain timeout on SIGINT/SIGTERM")
 	flag.Parse()
+
+	packsDirExplicit := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "packs-dir" {
+			packsDirExplicit = true
+		}
+	})
+
+	if err := loadExternalPacks(*packsDir, packsDirExplicit); err != nil {
+		log.Fatal(err)
+	}
 
 	scenario, err := sim.LoadScenario(*scenarioPath)
 	if err != nil {
@@ -50,6 +62,7 @@ func main() {
 	defer stop()
 
 	srv := web.NewServerWithRegistry(reg)
+	srv.SetPacksDir(*packsDir)
 	srv.SetMaxStreams(*maxStreams)
 	srv.SetMaxStreamsPerIP(*maxStreamsPerIP)
 	if *proxyHeader != "" {
@@ -144,6 +157,23 @@ func runCLI(scenario sim.Scenario) {
 	for _, g := range euGroups {
 		fmt.Printf("  %-8s %3d %s\n", g.ShortName, totalSeats[g.ID], meta.SeatLabel)
 	}
+}
+
+func loadExternalPacks(dir string, explicit bool) error {
+	if dir == "" {
+		return nil
+	}
+	loaded, err := sim.LoadGeoPacksDir(dir)
+	if err != nil {
+		if !explicit && errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if len(loaded) > 0 {
+		log.Printf("Loaded %d external GeoPack(s) from %s: %s", len(loaded), dir, strings.Join(loaded, ", "))
+	}
+	return nil
 }
 
 func buildScenarioRegistry(dir, primaryPath string, primary sim.Scenario) (*sim.ScenarioRegistry, error) {

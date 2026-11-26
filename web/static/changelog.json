@@ -1,6 +1,16 @@
 {
-  "version": "0.2.1",
+  "version": "0.2.2",
   "entries": [
+    {
+      "version": "0.2.2",
+      "date": "2026-11-27",
+      "title": "Switched to VCS package, own geopacks",
+      "notes": [
+        "doesnt really affect the public user",
+        "lets people import the sim library and use it for other stuff",
+        "Lets your own json geopacks be added without having to recompile or edit the source code"
+      ]
+    },
     {
       "version": "0.2.1",
       "date": "2026-11-27",

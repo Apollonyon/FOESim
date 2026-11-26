@@ -27,11 +27,23 @@ Run `go run . -h` to see all CLI flags. A `Dockerfile` is also included if you w
 
 ### How it Works
 
-### How it Works
-
 FOES simulates election night county by county, streaming live results to the browser as polls close across time zones. The `eu27` and `usa2024` presets are tuned to roughly match the real 2024 results by default, so you can tweak party swings, turnout, or randomness from a realistic baseline.
 
 You can also run Monte Carlo mode (100 to 500 randomized elections) to see win probabilities and close races, test different seat-allocation systems (Sainte-Laguë, D'Hondt, Hare-Niemeyer, FPTP, and an STV approximation) on the same votes, or press `E` to edit a scenario in the browser and share it via URL.
+
+### External GeoPacks
+
+You can add custom countries or maps without editing Go code by placing pack folders in `packs/` (or passing `-packs-dir <dir>`):
+
+```text
+packs/
+  my_country/
+    units.json       # regionID -> []PrecinctUnit (registered as geo_pack "my_country")
+    regions.json     # served at /geo/packs/my_country/regions.json
+    units_map.json   # served at /geo/packs/my_country/units_map.json
+```
+
+Reference `"geo_pack": "my_country"` in your scenario regions and `/geo/packs/my_country/*.json` in `meta.regions_url` / `meta.units_url`. The `sim` package can also be imported directly in Go projects via `github.com/Apollonyon/FOESim/sim`.
 
 ### Tests
 
