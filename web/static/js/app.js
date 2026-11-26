@@ -90,7 +90,9 @@ const partyPickerWrap = document.getElementById('party-picker-wrap');
 const colorModeRow = document.getElementById('color-mode-row');
 const partySelect = document.getElementById('party-select');
 const countrySelect = document.getElementById('country-select');
-const scenarioSelect = document.getElementById('scenario-select');
+const scenarioTrigger = document.getElementById('scenario-trigger');
+const scenarioTriggerLabel = document.getElementById('scenario-trigger-label');
+const scenarioMenu = document.getElementById('scenario-menu');
 const scenarioSubtitle = document.getElementById('scenario-subtitle');
 const scenarioNoteEl = document.getElementById('scenario-note');
 const seatLedgerEl = document.getElementById('seat-ledger');
@@ -129,6 +131,8 @@ let queueHead = 0;
 let drainRafId = 0;
 let streamErrorWhilePaused = false;
 const mobileMQ = window.matchMedia('(max-width: 820px)');
+let scenarioCatalog = [];
+let scenarioMenuOpen = false;
 let desktopHemiCollapsed = true;
 let userToggledHemi = false;
 
@@ -211,7 +215,86 @@ function setMobileBattlegroundsOpen(open) {
   }
 }
 
+function splitScenarioTitle(name) {
+  const raw = String(name || '').trim();
+  const idx = raw.indexOf(' — ');
+  if (idx > 0) {
+    return { title: raw.slice(0, idx).trim(), sub: raw.slice(idx + 3).trim() };
+  }
+  return { title: raw, sub: '' };
+}
+
+function setScenarioMenuOpen(open) {
+  if (!scenarioTrigger || !scenarioMenu) return;
+  const next = Boolean(open && scenarioCatalog.length > 1);
+  scenarioMenuOpen = next;
+  scenarioMenu.classList.toggle('hidden', !next);
+  scenarioTrigger.setAttribute('aria-expanded', String(next));
+  topLeftHudEl?.classList.toggle('scenario-open', next);
+  if (next) {
+    setMobileControlsOpen(false);
+    setMobileLayersOpen(false);
+    setMobileBattlegroundsOpen(false);
+    if (isMobileViewport()) setHemicycleCollapsed(true);
+  }
+}
+
+function renderScenarioMenu(activeId, customName = '') {
+  if (!scenarioTrigger || !scenarioMenu || !scenarioTriggerLabel) return;
+  if (scenarioCatalog.length <= 1) {
+    scenarioTrigger.classList.add('hidden');
+    setScenarioMenuOpen(false);
+    return;
+  }
+
+  const activeItem = scenarioCatalog.find((item) => item.id === activeId);
+  if (customName) {
+    const { title } = splitScenarioTitle(customName);
+    scenarioTriggerLabel.textContent = `Custom · ${title}`;
+    scenarioTrigger.title = `Custom · ${customName}`;
+  } else if (activeItem) {
+    const { title } = splitScenarioTitle(activeItem.name);
+    scenarioTriggerLabel.textContent = title;
+    scenarioTrigger.title = `${activeItem.name} (${activeItem.seats} ${activeItem.seat_label})`;
+  }
+
+  clearEl(scenarioMenu);
+  for (const item of scenarioCatalog) {
+    const isActive = !customName && item.id === activeId;
+    const { title, sub } = splitScenarioTitle(item.name);
+    const metaNodes = [
+      el('span', { className: 'scenario-opt-badge mono', text: `${item.seats} ${item.seat_label}` })
+    ];
+    if (isActive) {
+      metaNodes.push(el('span', { className: 'scenario-opt-check', 'aria-hidden': 'true', text: '✓' }));
+    }
+    const opt = el(
+      'button',
+      {
+        type: 'button',
+        role: 'option',
+        className: `scenario-opt${isActive ? ' is-active' : ''}`,
+        'aria-selected': String(isActive),
+        onClick: () => {
+          setScenarioMenuOpen(false);
+          if (item.id === state.scenarioId && !state.customRunId) return;
+          loadScenario({ scenarioId: item.id });
+        }
+      },
+      el(
+        'div',
+        { className: 'scenario-opt-head' },
+        el('span', { className: 'scenario-opt-title', text: title }),
+        el('div', { className: 'scenario-opt-meta' }, ...metaNodes)
+      ),
+      sub ? el('div', { className: 'scenario-opt-sub', text: sub }) : null
+    );
+    scenarioMenu.appendChild(opt);
+  }
+}
+
 function closeMobileDrawers() {
+  setScenarioMenuOpen(false);
   setMobileControlsOpen(false);
   setMobileLayersOpen(false);
   setMobileBattlegroundsOpen(false);
@@ -368,19 +451,16 @@ async function init() {
     if (listRes.ok) {
       const catalog = await listRes.json();
       const items = catalog.scenarios || [];
+      scenarioCatalog = items;
       if (items.length > 1) {
-        clearEl(scenarioSelect);
-        for (const item of items) {
-          const opt = document.createElement('option');
-          opt.value = item.id;
-          opt.textContent = `${item.name} (${item.seats} ${item.seat_label})`;
-          scenarioSelect.appendChild(opt);
-        }
         scenarioSubtitle.classList.add('hidden');
-        scenarioSelect.classList.remove('hidden');
+        scenarioTrigger?.classList.remove('hidden');
       }
       const validIds = new Set(items.map((item) => item.id));
       initialId = validIds.has(urlScenario) ? urlScenario : (catalog.default_id || items[0]?.id || '');
+      if (items.length > 1) {
+        renderScenarioMenu(initialId);
+      }
     }
   } catch {
     // Fallback to single-scenario /api/scenario when /api/scenarios is unavailable.
@@ -509,21 +589,10 @@ async function loadScenario({
   scenarioNoteEl.title = desc;
   scenarioNoteEl.classList.toggle('hidden', !desc);
   scenarioSubtitle.textContent = runId ? `Custom · ${loaded.name}` : loaded.name;
-  const oldCustomOpt = scenarioSelect.querySelector('option[value="__custom__"]');
-  if (oldCustomOpt) oldCustomOpt.remove();
-  if (scenarioSelect.options.length > 1) {
+  if (scenarioCatalog.length > 1) {
     scenarioSubtitle.classList.add('hidden');
-    scenarioSelect.classList.remove('hidden');
-    if (runId) {
-      const customOpt = document.createElement('option');
-      customOpt.value = '__custom__';
-      customOpt.textContent = `Custom · ${loaded.name}`;
-      customOpt.disabled = true;
-      scenarioSelect.prepend(customOpt);
-      scenarioSelect.value = '__custom__';
-    } else if (scenarioId) {
-      scenarioSelect.value = scenarioId;
-    }
+    scenarioTrigger?.classList.remove('hidden');
+    renderScenarioMenu(scenarioId, runId ? loaded.name : '');
   } else {
     scenarioSubtitle.classList.remove('hidden');
   }
@@ -1428,9 +1497,26 @@ function wireEvents() {
     if (isMobileViewport()) closeMobileDrawers();
     openScenarioEditor();
   });
-  scenarioSelect.addEventListener('change', () => {
-    if (scenarioSelect.value === '__custom__') return;
-    loadScenario({ scenarioId: scenarioSelect.value });
+  scenarioTrigger?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setScenarioMenuOpen(!scenarioMenuOpen);
+  });
+  scenarioMenu?.addEventListener('keydown', (e) => {
+    const opts = Array.from(scenarioMenu.querySelectorAll('.scenario-opt'));
+    if (!opts.length) return;
+    const idx = opts.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      opts[(idx + 1) % opts.length].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      opts[(idx - 1 + opts.length) % opts.length].focus();
+    }
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (!scenarioMenuOpen) return;
+    if (scenarioTrigger?.contains(e.target) || scenarioMenu?.contains(e.target)) return;
+    setScenarioMenuOpen(false);
   });
 
   document.getElementById('btn-screenshot')?.addEventListener('click', () => {
@@ -1580,6 +1666,11 @@ function wireEvents() {
       }
       if (editor?.isOpen) {
         editor.close();
+        return;
+      }
+      if (scenarioMenuOpen) {
+        setScenarioMenuOpen(false);
+        scenarioTrigger?.focus();
         return;
       }
       if (state.selection) {

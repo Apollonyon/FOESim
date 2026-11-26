@@ -29,7 +29,12 @@
           <div>
             <h1 title="Free Open Election Simulator">FOES</h1>
             <div id="scenario-subtitle" class="subtitle">Loading election atlas…</div>
-            <select id="scenario-select" class="scenario-select hidden" aria-label="Select election scenario"></select>
+            <button id="scenario-trigger" class="scenario-trigger hidden" type="button"
+              aria-haspopup="listbox" aria-expanded="false" aria-controls="scenario-menu"
+              aria-label="Select election scenario">
+              <span id="scenario-trigger-label" class="scenario-trigger-label"></span>
+              <span class="scenario-trigger-caret" aria-hidden="true">▾</span>
+            </button>
             <div id="scenario-note" class="scenario-note hidden"></div>
           </div>
         </div>
@@ -50,6 +55,7 @@
             </svg>
           </button>
         </div>
+        <div id="scenario-menu" class="scenario-menu hidden" role="listbox" aria-label="Election scenarios"></div>
       </div>
 
       <div class="controls-row">
