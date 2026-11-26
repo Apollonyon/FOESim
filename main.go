@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"parliamentsim/sim"
-	"parliamentsim/web"
+	"github.com/Apollonyon/FOESim/sim"
+	"github.com/Apollonyon/FOESim/web"
 )
 
 func main() {

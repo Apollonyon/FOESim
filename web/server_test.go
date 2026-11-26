@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"parliamentsim/sim"
+	"github.com/Apollonyon/FOESim/sim"
 )
 
 func TestServerRoutes(t *testing.T) {

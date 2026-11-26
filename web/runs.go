@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"parliamentsim/sim"
+	"github.com/Apollonyon/FOESim/sim"
 )
 
 const (
