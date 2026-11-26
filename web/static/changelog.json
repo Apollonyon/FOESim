@@ -1,6 +1,17 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "entries": [
+    {
+      "version": "0.1.1",
+      "date": "2026-11-26",
+      "title": "UI & Simulation Polish",
+      "notes": [
+        "Fixed the Closest Races panel overlapping the top-right controls in Forecast mode.",
+        "Replaced the placeholder in the top-left HUD with the FOES hemicycle logo.",
+        "Fixed the GitHub repository link in the bottom-right pill.",
+        "Added Docker image publishing for self-hosting."
+      ]
+    },
     {
       "version": "0.1.0",
       "date": "2026-11-26",
