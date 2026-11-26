@@ -40,6 +40,14 @@
         </div>
         <div class="brand-right">
           <span id="sim-clock" class="sim-clock mono" title="Simulated Election Night Clock">--:--</span>
+          <button id="btn-tour" class="icon-btn" type="button" title="Quick tour (?)" aria-label="Quick tour">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </button>
           <button id="btn-screenshot" class="icon-btn" type="button" title="Map screenshot (S)" aria-label="Map screenshot">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -262,6 +270,7 @@
     <div id="editor-modal" class="editor-modal hidden" aria-hidden="true"></div>
     <div id="changelog-modal" class="editor-modal hidden" aria-hidden="true"></div>
     <div id="screenshot-modal" class="editor-modal hidden" aria-hidden="true"></div>
+    <div id="tour-overlay" class="tour-overlay hidden" aria-hidden="true"></div>
   </main>
 
   <script type="module" src="js/app.js"></script>

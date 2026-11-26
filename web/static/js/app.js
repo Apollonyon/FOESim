@@ -8,6 +8,7 @@ import { ScenarioEditor } from './editor.js';
 import { applyScenarioPatch, decodeSharePayload } from './share.js';
 import { ChangelogModal } from './changelog.js';
 import { ScreenshotModal } from './export.js';
+import { TourGuide } from './tour.js';
 
 const state = {
   scenarioId: '',
@@ -116,6 +117,7 @@ let inspector;
 let editor;
 let changelog;
 let screenshotModal;
+let tour;
 let forecastAbortCtrl = null;
 let hemiFrameQueued = false;
 let hudFrameId = 0;
@@ -412,8 +414,34 @@ async function init() {
   );
 
   changelog = new ChangelogModal(document.getElementById('changelog-modal'));
-  changelog.init(btnVersion);
+  const changelogReady = changelog.init(btnVersion);
   screenshotModal = new ScreenshotModal(document.getElementById('screenshot-modal'));
+  tour = new TourGuide(document.getElementById('tour-overlay'), {
+    getContext: () => ({
+      scenarioNames: scenarioCatalog.map((item) => {
+        const name = splitScenarioTitle(item.name).title;
+        const title = (item.title || '').trim();
+        if (title && !/election|parliament|congress|senate|presidential/i.test(name)) {
+          return title;
+        }
+        return name || title;
+      }).filter(Boolean),
+      canStartLive: state.viewMode === 'live' && state.runPhase === 'ready'
+    }),
+    onBeforeOpen: () => {
+      closeMobileDrawers();
+      if (isMobileViewport()) {
+        setHemicycleCollapsed(true);
+        inspector.clear();
+      }
+    },
+    onStartElection: () => {
+      if (state.viewMode !== 'live') {
+        setViewMode('live', { skipReset: true });
+      }
+      startStream();
+    }
+  });
 
   editor = new ScenarioEditor(document.getElementById('editor-modal'), {
     onApplied: async (runId, autoStart, modifiers) => {
@@ -503,7 +531,11 @@ async function init() {
     const ok = await loadScenario({ runId: urlRun, suppressError: true });
     if (ok) return;
   }
-  await loadScenario({ scenarioId: initialId });
+  const loaded = await loadScenario({ scenarioId: initialId });
+  await changelogReady;
+  if (loaded && !changelog?.isOpen && !editor?.isOpen && !screenshotModal?.isOpen) {
+    tour?.maybeAutoOpen();
+  }
 }
 
 async function loadScenario({
@@ -1520,6 +1552,11 @@ function wireEvents() {
     setScenarioMenuOpen(false);
   });
 
+  document.getElementById('btn-tour')?.addEventListener('click', (e) => {
+    closeMobileDrawers();
+    tour?.open({ triggerEl: e.currentTarget });
+  });
+
   document.getElementById('btn-screenshot')?.addEventListener('click', () => {
     if (isMobileViewport()) closeMobileDrawers();
     screenshotModal?.open(map, state);
@@ -1657,6 +1694,10 @@ function wireEvents() {
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (tour?.isOpen) {
+        tour.close();
+        return;
+      }
       if (screenshotModal?.isOpen) {
         screenshotModal.close();
         return;
@@ -1695,8 +1736,17 @@ function wireEvents() {
         return;
       }
     }
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (tour?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      closeMobileDrawers();
+      tour?.open({ triggerEl: document.getElementById('btn-tour') });
+      return;
+    }
     if ((e.key === 'e' || e.key === 'E') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
+      if (tour?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
       e.preventDefault();
@@ -1704,7 +1754,7 @@ function wireEvents() {
       return;
     }
     if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
+      if (tour?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
       e.preventDefault();
@@ -1712,7 +1762,7 @@ function wireEvents() {
       return;
     }
     if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen) return;
+      if (tour?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen) return;
       if (document.activeElement?.closest('input, select, textarea, button, a, [role="button"]')) return;
       if (!state.scenario) return;
       e.preventDefault();
