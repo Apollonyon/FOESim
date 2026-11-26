@@ -26,3 +26,10 @@ Third-Party Data Attribution:
 - U.S. boundaries & 2024 county results: U.S. Census Bureau TIGER/Line 2023
   Cartographic Boundaries (cb_2023_us_state_20m, cb_2023_us_county_20m,
   cb_2023_us_cd118_20m) and certified 2024 county presidential election totals.
+- U.S. state & county map geometry: us-atlas@3 (counties-albers-10m.json,
+  ISC License, derived from U.S. Census cartographic boundaries).
+- U.S. county land area & ME/NE congressional districts: U.S. Census Bureau
+  TIGER/Line 2023 Cartographic Boundaries (cb_2023_us_county_20m,
+  cb_2023_us_cd118_20m).
+- 2024 U.S. county presidential results: tonmcg/US_County_Level_Election_Results_08-24
+  and certified 2024 state totals.
