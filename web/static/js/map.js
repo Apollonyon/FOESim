@@ -88,9 +88,13 @@ export class EuropeMap {
     this.animFrame = null;
     this.loadSeq = 0;
     this.interactionBound = false;
+    this.activePointers = new Map();
     this.dragging = false;
+    this.pinching = false;
     this.didDrag = false;
     this.dragStart = null;
+    this.pinchStart = null;
+    this.suppressClickUntil = 0;
 
     this.theme = {};
     this.refreshTheme();
@@ -224,6 +228,13 @@ export class EuropeMap {
     this.borderById.clear();
     this.callouts = [];
     this.pendingRecolor.clear();
+    this.activePointers.clear();
+    this.dragging = false;
+    this.pinching = false;
+    this.didDrag = false;
+    this.dragStart = null;
+    this.pinchStart = null;
+    this.canvas.classList.remove('dragging');
     this.hoveredCounty = null;
     this.hoveredCallout = null;
     this.lastPointerEvent = null;
@@ -731,7 +742,7 @@ export class EuropeMap {
 
   render(skipBake = false) {
     const perfT0 = this.perfEnabled ? performance.now() : 0;
-    const interacting = skipBake || this.dragging || this.animFrame !== null || this.bakeTimer !== null;
+    const interacting = skipBake || this.dragging || this.pinching || this.animFrame !== null || this.bakeTimer !== null;
 
     // 1. Update county colors incrementally
     let dirtyCounties = null;
@@ -818,7 +829,7 @@ export class EuropeMap {
         }
       }
     }
-    if (this.hoveredCounty && !this.dragging) {
+    if (this.hoveredCounty && !this.dragging && !this.pinching) {
       ctx.strokeStyle = theme.borderActive;
       ctx.lineWidth = 1.4 / scale;
       ctx.stroke(this.hoveredCounty.path);
@@ -950,7 +961,7 @@ export class EuropeMap {
   }
 
   refreshHoverTooltip() {
-    if (!this.lastPointerEvent || this.dragging) return;
+    if (!this.lastPointerEvent || this.dragging || this.pinching) return;
     if (this.hoveredCounty) {
       this.cb.onHoverStart(this.lastPointerEvent, this.hoveredCounty.regionId, this.hoveredCounty.id);
     } else if (this.hoveredCallout) {
@@ -994,13 +1005,123 @@ export class EuropeMap {
   bindInteraction() {
     if (this.interactionBound) return;
     this.interactionBound = true;
+
+    const clearHover = () => {
+      this.lastPointerEvent = null;
+      if (this.hoveredCounty || this.hoveredCallout) {
+        this.hoveredCounty = null;
+        this.hoveredCallout = null;
+        this.canvas.classList.remove('hovering');
+        this.cb.onHoverEnd();
+      }
+    };
+
+    const startPan = (pointerId, pt, preserveDidDrag = false) => {
+      this.dragging = true;
+      this.pinching = false;
+      this.pinchStart = null;
+      if (!preserveDidDrag) this.didDrag = false;
+      this.dragStart = {
+        pointerId,
+        x: pt.x,
+        y: pt.y,
+        vb: [...this.viewBox],
+        sx: this.viewBox[2] / (this.width || 1),
+        sy: this.viewBox[3] / (this.height || 1),
+        isTouch: pt.type !== 'mouse',
+        movedPastSlop: preserveDidDrag
+      };
+      this.canvas.classList.add('dragging');
+    };
+
+    const startPinch = () => {
+      const entries = [...this.activePointers.entries()];
+      if (entries.length < 2) return;
+      const [[id1, p1], [id2, p2]] = entries;
+      const dist = Math.max(10, Math.hypot(p2.x - p1.x, p2.y - p1.y));
+      const midX = (p1.x + p2.x) * 0.5;
+      const midY = (p1.y + p2.y) * 0.5;
+      const rect = this.canvas.getBoundingClientRect();
+      const rx = (midX - rect.left) / (rect.width || 1);
+      const ry = (midY - rect.top) / (rect.height || 1);
+      this.dragging = false;
+      this.dragStart = null;
+      this.pinching = true;
+      this.didDrag = true;
+      this.suppressClickUntil = performance.now() + 400;
+      this.pinchStart = {
+        id1,
+        id2,
+        dist,
+        vb: [...this.viewBox],
+        anchorMapX: this.viewBox[0] + rx * this.viewBox[2],
+        anchorMapY: this.viewBox[1] + ry * this.viewBox[3]
+      };
+      this.canvas.classList.add('dragging');
+    };
+
+    const resetPointers = () => {
+      const moved = this.didDrag || this.pinching;
+      this.activePointers.clear();
+      this.dragging = false;
+      this.pinching = false;
+      this.dragStart = null;
+      this.pinchStart = null;
+      this.canvas.classList.remove('dragging');
+      if (moved) {
+        this.bufDirtyFull = true;
+        this.requestRender();
+      }
+    };
+
+    const endPointer = (e) => {
+      if (!this.activePointers.has(e.pointerId)) return;
+      this.activePointers.delete(e.pointerId);
+      try {
+        if (this.canvas.hasPointerCapture?.(e.pointerId)) {
+          this.canvas.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        // Ignore browsers that already released capture on cancel.
+      }
+
+      if (this.activePointers.size >= 2) {
+        if (this.pinchStart && (e.pointerId === this.pinchStart.id1 || e.pointerId === this.pinchStart.id2)) {
+          startPinch();
+        }
+        return;
+      }
+
+      if (this.activePointers.size === 1) {
+        const [[remId, remPt]] = this.activePointers.entries();
+        this.suppressClickUntil = performance.now() + 400;
+        startPan(remId, remPt, true);
+        return;
+      }
+
+      const moved = this.didDrag || this.pinching;
+      this.dragging = false;
+      this.pinching = false;
+      this.dragStart = null;
+      this.pinchStart = null;
+      this.canvas.classList.remove('dragging');
+      if (moved) {
+        this.bufDirtyFull = true;
+        this.requestRender();
+      }
+    };
+
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       this.zoomBy(e.deltaY > 0 ? 1.16 : 0.86, e.clientX, e.clientY);
     }, { passive: false });
 
+    const blockGesture = (e) => e.preventDefault();
+    this.canvas.addEventListener('gesturestart', blockGesture, { passive: false });
+    this.canvas.addEventListener('gesturechange', blockGesture, { passive: false });
+
     this.canvas.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (this.animFrame) {
         cancelAnimationFrame(this.animFrame);
         this.animFrame = null;
@@ -1009,30 +1130,79 @@ export class EuropeMap {
         clearTimeout(this.bakeTimer);
         this.bakeTimer = null;
       }
-      this.dragging = true;
-      this.didDrag = false;
-      this.dragStart = {
-        x: e.clientX,
-        y: e.clientY,
-        vb: [...this.viewBox],
-        sx: this.viewBox[2] / (this.width || 1),
-        sy: this.viewBox[3] / (this.height || 1)
-      };
-      this.canvas.classList.add('dragging');
-      this.cb.onHoverEnd();
+
+      const pt = { x: e.clientX, y: e.clientY, type: e.pointerType || 'mouse' };
+      this.activePointers.set(e.pointerId, pt);
+      try {
+        this.canvas.setPointerCapture?.(e.pointerId);
+      } catch {
+        // Synthetic pointer events may not support capture.
+      }
+      clearHover();
+
+      if (this.activePointers.size === 1) {
+        startPan(e.pointerId, pt, false);
+      } else if (this.activePointers.size === 2) {
+        startPinch();
+      }
     });
 
     window.addEventListener('pointermove', (e) => {
-      if (this.dragging) {
+      const tracked = this.activePointers.get(e.pointerId);
+      if (tracked) {
+        tracked.x = e.clientX;
+        tracked.y = e.clientY;
+      }
+
+      if (this.pinching && this.pinchStart) {
+        const p1 = this.activePointers.get(this.pinchStart.id1);
+        const p2 = this.activePointers.get(this.pinchStart.id2);
+        if (p1 && p2) {
+          const curDist = Math.max(10, Math.hypot(p2.x - p1.x, p2.y - p1.y));
+          const curMidX = (p1.x + p2.x) * 0.5;
+          const curMidY = (p1.y + p2.y) * 0.5;
+          const rect = this.canvas.getBoundingClientRect();
+          const maxW = Math.max(1450, this.defaultBox[2] * 2.2);
+          const nw = Math.max(45, Math.min(maxW, this.pinchStart.vb[2] * (this.pinchStart.dist / curDist)));
+          const nh = (nw / this.pinchStart.vb[2]) * this.pinchStart.vb[3];
+          const rx = (curMidX - rect.left) / (rect.width || 1);
+          const ry = (curMidY - rect.top) / (rect.height || 1);
+          this.viewBox = [
+            this.pinchStart.anchorMapX - rx * nw,
+            this.pinchStart.anchorMapY - ry * nh,
+            nw,
+            nh
+          ];
+          this.syncZoomThreshold();
+          this.requestRender();
+        }
+        return;
+      }
+
+      if (this.dragging && this.dragStart && e.pointerId === this.dragStart.pointerId) {
         const dx = e.clientX - this.dragStart.x;
         const dy = e.clientY - this.dragStart.y;
-        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) this.didDrag = true;
+        const slop = this.dragStart.isTouch ? 8 : 4;
+        if (!this.dragStart.movedPastSlop) {
+          if (Math.hypot(dx, dy) <= slop) return;
+          this.dragStart.movedPastSlop = true;
+          this.didDrag = true;
+          if (this.dragStart.isTouch) {
+            this.dragStart.x = e.clientX;
+            this.dragStart.y = e.clientY;
+            this.dragStart.vb = [...this.viewBox];
+            return;
+          }
+        }
         this.viewBox[0] = this.dragStart.vb[0] - dx * this.dragStart.sx;
         this.viewBox[1] = this.dragStart.vb[1] - dy * this.dragStart.sy;
         this.syncZoomThreshold();
         this.requestRender();
         return;
       }
+
+      if (this.dragging || this.pinching || e.pointerType === 'touch') return;
+
       if (e.target !== this.canvas) {
         this.lastPointerEvent = null;
         if (this.hoveredCounty || this.hoveredCallout) {
@@ -1050,26 +1220,22 @@ export class EuropeMap {
         this.hoverFrameQueued = true;
         requestAnimationFrame(() => {
           this.hoverFrameQueued = false;
-          if (this.lastPointerEvent && !this.dragging) {
+          if (this.lastPointerEvent && !this.dragging && !this.pinching) {
             this.processHover(this.lastPointerEvent);
           }
         });
       }
     });
 
-    window.addEventListener('pointerup', () => {
-      if (!this.dragging) return;
-      const moved = this.didDrag;
-      this.dragging = false;
-      this.canvas.classList.remove('dragging');
-      if (moved) {
-        this.bufDirtyFull = true;
-        this.requestRender();
-      }
-    });
+    window.addEventListener('pointerup', endPointer);
+    window.addEventListener('pointercancel', endPointer);
+    window.addEventListener('blur', resetPointers);
 
     this.canvas.addEventListener('click', (e) => {
-      if (this.didDrag) return;
+      if (this.didDrag || performance.now() < this.suppressClickUntil) {
+        this.didDrag = false;
+        return;
+      }
       const hit = this.hitTest(e.clientX, e.clientY);
       if (hit?.kind === 'callout') {
         this.focusRegion(hit.item.spec.region_id);

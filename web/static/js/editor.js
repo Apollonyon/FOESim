@@ -360,7 +360,7 @@ export class ScenarioEditor {
       onClick: () => {
         if (this.isSubmitting || !this.baseScenario) return;
         this.#clearError();
-        this.modifiers = { ...this.baseModifiers };
+        this.modifiers = { ...DEFAULT_MODIFIERS };
         this.#loadDraftFrom(this.baseScenario);
         this.#render();
       }

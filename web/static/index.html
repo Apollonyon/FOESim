@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>FOES — Free Open Election Simulator</title>
   <meta name="description"
     content="FOES (Free Open Election Simulator) is a free, open-source election-night simulator and forecast map for European Parliament, U.S., and custom elections." />
@@ -72,48 +72,52 @@
           </label>
           <button id="btn-run-forecast" class="btn btn-ink">↻ Re-run</button>
         </div>
-        <div class="mini-field"
-          title="Directional national appeal shift applied to the selected party/group across all regions">
-          <span>Shift</span>
-          <select id="shift-party" aria-label="Party or group to shift">
-            <option value="">None</option>
-          </select>
-          <input id="input-shift" type="range" min="-0.40" max="0.40" step="0.02" value="0"
-            aria-label="National appeal shift magnitude" disabled />
-          <output id="shift-val">0.00</output>
+        <button id="btn-editor" class="btn btn-accent" title="Open Scenario Editor (E)">✎ Editor</button>
+        <button id="btn-mobile-controls" class="btn controls-toggle-btn" type="button" aria-expanded="false"
+          aria-controls="secondary-controls" aria-label="Toggle simulation settings" title="Simulation settings">⚙ ▾</button>
+        <div id="secondary-controls" class="secondary-controls">
+          <div class="mini-field"
+            title="Directional national appeal shift applied to the selected party/group across all regions">
+            <span>Shift</span>
+            <select id="shift-party" aria-label="Party or group to shift">
+              <option value="">None</option>
+            </select>
+            <input id="input-shift" type="range" min="-0.40" max="0.40" step="0.02" value="0"
+              aria-label="National appeal shift magnitude" disabled />
+            <output id="shift-val">0.00</output>
+          </div>
+          <div id="speed-group" class="segmented" role="group" aria-label="Broadcast speed">
+            <button class="seg-btn active" data-duration="45000">1×</button>
+            <button class="seg-btn" data-duration="22000">2×</button>
+            <button class="seg-btn" data-duration="9000">5×</button>
+            <button class="seg-btn" data-duration="0">Instant</button>
+          </div>
+
+          <label class="mini-field" title="Reproducible random seed">
+            <span>Seed</span>
+            <input id="input-seed" type="number" value="42" />
+            <button id="btn-rand-seed" class="icon-btn" title="Randomize seed">↻</button>
+          </label>
+
+          <label class="mini-field" title="Voter choice temperature">
+            <span>Temp</span>
+            <input id="input-temp" type="range" min="0.25" max="1.50" step="0.05" value="0.45" />
+            <output id="temp-val">0.45</output>
+          </label>
+
+          <label class="mini-field"
+            title="Override seat allocation rule across all regions (drops two-tier district splits; STV is a party-level approximation)">
+            <span>System</span>
+            <select id="method-select" aria-label="Electoral system override">
+              <option value="">Native</option>
+              <option value="sainte_lague">Sainte-Laguë</option>
+              <option value="dhondt">D'Hondt</option>
+              <option value="hare">Hare</option>
+              <option value="stv">STV (approx)</option>
+              <option value="fptp">FPTP</option>
+            </select>
+          </label>
         </div>
-        <button id="btn-editor" class="btn btn-accent" title="Open Scenario Editor (E)">✎ Scenario Editor</button>
-        <div id="speed-group" class="segmented" role="group" aria-label="Broadcast speed">
-          <button class="seg-btn active" data-duration="45000">1×</button>
-          <button class="seg-btn" data-duration="22000">2×</button>
-          <button class="seg-btn" data-duration="9000">5×</button>
-          <button class="seg-btn" data-duration="0">Instant</button>
-        </div>
-
-        <label class="mini-field" title="Reproducible random seed">
-          <span>Seed</span>
-          <input id="input-seed" type="number" value="42" />
-          <button id="btn-rand-seed" class="icon-btn" title="Randomize seed">↻</button>
-        </label>
-
-        <label class="mini-field" title="Voter choice temperature">
-          <span>Temp</span>
-          <input id="input-temp" type="range" min="0.25" max="1.50" step="0.05" value="0.45" />
-          <output id="temp-val">0.45</output>
-        </label>
-
-        <label class="mini-field"
-          title="Override seat allocation rule across all regions (drops two-tier district splits; STV is a party-level approximation)">
-          <span>System</span>
-          <select id="method-select" aria-label="Electoral system override">
-            <option value="">Native</option>
-            <option value="sainte_lague">Sainte-Laguë</option>
-            <option value="dhondt">D'Hondt</option>
-            <option value="hare">Hare</option>
-            <option value="stv">STV (approx)</option>
-            <option value="fptp">FPTP</option>
-          </select>
-        </label>
       </div>
 
       <div class="nav-row">
@@ -132,38 +136,48 @@
 
     <!-- Right rail: top-right overlay switcher stacked cleanly above slide-in inspector -->
     <div class="right-rail">
-      <aside class="hud hud-top-right">
-        <div class="overlay-bar" role="group" aria-label="Map overlay">
-          <button class="ov-btn active" data-overlay="winner" aria-pressed="true">Winner</button>
-          <button id="ov-party-btn" class="ov-btn" data-overlay="party" aria-pressed="false">Group %</button>
-          <button class="ov-btn" data-overlay="turnout" aria-pressed="false">Turnout</button>
-          <button id="ov-eu-axis" class="ov-btn" data-overlay="eu_axis" aria-pressed="false">Pro-EU</button>
-          <button class="ov-btn" data-overlay="econ_axis" aria-pressed="false">Econ</button>
-          <button class="ov-btn" data-overlay="mig_axis" aria-pressed="false">Migration</button>
-        </div>
-
-        <div id="color-mode-row" class="sub-control-row">
-          <span class="sub-label">Colors</span>
-          <div class="segmented" role="group" aria-label="Party color mode">
-            <button class="cm-btn active" data-colormode="auto"
-              title="Groups when zoomed out, regional parties when zoomed in">Auto</button>
-            <button class="cm-btn" data-colormode="group">Groups</button>
-            <button class="cm-btn" data-colormode="national">National</button>
+      <aside id="layers-hud" class="hud hud-top-right">
+        <button id="btn-mobile-layers" class="layers-toggle" type="button" aria-expanded="false"
+          aria-controls="layers-body">
+          <span>Layers</span>
+          <span id="mobile-layers-active" class="layers-toggle-active">Winner</span>
+          <span id="mobile-layers-caret" aria-hidden="true">▾</span>
+        </button>
+        <div id="layers-body" class="layers-body">
+          <div class="overlay-bar" role="group" aria-label="Map overlay">
+            <button class="ov-btn active" data-overlay="winner" aria-pressed="true">Winner</button>
+            <button id="ov-party-btn" class="ov-btn" data-overlay="party" aria-pressed="false">Group %</button>
+            <button class="ov-btn" data-overlay="turnout" aria-pressed="false">Turnout</button>
+            <button id="ov-eu-axis" class="ov-btn" data-overlay="eu_axis" aria-pressed="false">Pro-EU</button>
+            <button class="ov-btn" data-overlay="econ_axis" aria-pressed="false">Econ</button>
+            <button class="ov-btn" data-overlay="mig_axis" aria-pressed="false">Migration</button>
           </div>
-        </div>
 
-        <div id="party-picker-wrap" class="sub-control-row hidden">
-          <label id="party-select-label" class="sub-label" for="party-select">Group</label>
-          <select id="party-select"></select>
-        </div>
+          <div id="color-mode-row" class="sub-control-row">
+            <span class="sub-label">Colors</span>
+            <div class="segmented" role="group" aria-label="Party color mode">
+              <button class="cm-btn active" data-colormode="auto"
+                title="Groups when zoomed out, regional parties when zoomed in">Auto</button>
+              <button class="cm-btn" data-colormode="group">Groups</button>
+              <button class="cm-btn" data-colormode="national">National</button>
+            </div>
+          </div>
 
-        <div id="map-legend" class="legend"></div>
+          <div id="party-picker-wrap" class="sub-control-row hidden">
+            <label id="party-select-label" class="sub-label" for="party-select">Group</label>
+            <select id="party-select"></select>
+          </div>
+
+          <div id="map-legend" class="legend"></div>
+        </div>
       </aside>
 
       <aside id="battlegrounds" class="hud battlegrounds hidden" aria-label="Closest races">
-        <div class="hud-header">
+        <div class="hud-header battlegrounds-head">
           <span class="hud-kicker">CLOSEST RACES</span>
           <span id="battlegrounds-sub" class="hud-sub mono"></span>
+          <button id="btn-mobile-bg" class="icon-btn mobile-only mobile-bg-toggle" type="button" aria-expanded="false"
+            aria-controls="battlegrounds-list" aria-label="Toggle closest races">▾</button>
         </div>
         <div id="battlegrounds-list" class="battlegrounds-list"></div>
       </aside>
@@ -190,7 +204,7 @@
     </div>
 
     <!-- Bottom-left collapsible Parliament Hemicycle / Electoral Bar & Coalition Finder HUD -->
-    <section id="hemicycle-hud" class="hud hud-bottom-left">
+    <section id="hemicycle-hud" class="hud hud-bottom-left is-collapsed">
       <div class="hud-header">
         <div>
           <span id="hud-kicker" class="hud-kicker">PARLIAMENT</span>
@@ -202,11 +216,11 @@
             <button class="htab-btn active" data-htab="seats">Seats</button>
             <button class="htab-btn" data-htab="coalitions">Coalitions</button>
           </div>
-          <button id="btn-toggle-hemi" class="icon-btn" title="Collapse/Expand" aria-expanded="true"
-            aria-label="Toggle parliament panel">▾</button>
+          <button id="btn-toggle-hemi" class="icon-btn" title="Collapse/Expand" aria-expanded="false"
+            aria-label="Toggle parliament panel">▴</button>
         </div>
       </div>
-      <div id="hemicycle-body" class="hemicycle-body">
+      <div id="hemicycle-body" class="hemicycle-body hidden">
         <svg id="hemicycle-svg" viewBox="0 0 360 195" aria-label="Seat distribution chart"></svg>
         <div id="forecast-summary" class="forecast-summary hidden"></div>
         <div id="seat-ledger" class="seat-ledger"></div>

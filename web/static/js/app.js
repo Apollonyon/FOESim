@@ -92,6 +92,17 @@ const scenarioNoteEl = document.getElementById('scenario-note');
 const seatLedgerEl = document.getElementById('seat-ledger');
 const coalitionListEl = document.getElementById('coalition-list');
 const legendEl = document.getElementById('map-legend');
+const mapStageEl = document.getElementById('map-stage');
+const topLeftHudEl = document.querySelector('.hud-top-left');
+const layersHudEl = document.getElementById('layers-hud');
+const hemicycleHudEl = document.getElementById('hemicycle-hud');
+const hemicycleBodyEl = document.getElementById('hemicycle-body');
+const btnToggleHemi = document.getElementById('btn-toggle-hemi');
+const btnMobileControls = document.getElementById('btn-mobile-controls');
+const btnMobileLayers = document.getElementById('btn-mobile-layers');
+const btnMobileBg = document.getElementById('btn-mobile-bg');
+const mobileLayersActiveEl = document.getElementById('mobile-layers-active');
+const mobileLayersCaretEl = document.getElementById('mobile-layers-caret');
 
 let map;
 let hemicycle;
@@ -113,6 +124,93 @@ let eventQueue = [];
 let queueHead = 0;
 let drainRafId = 0;
 let streamErrorWhilePaused = false;
+const mobileMQ = window.matchMedia('(max-width: 820px)');
+let desktopHemiCollapsed = true;
+let userToggledHemi = false;
+
+function isMobileViewport() {
+  return mobileMQ.matches;
+}
+
+function syncMobileLayersLabel() {
+  if (!mobileLayersActiveEl) return;
+  const activeBtn = document.querySelector('.ov-btn.active');
+  mobileLayersActiveEl.textContent = activeBtn?.textContent?.trim() || 'Winner';
+}
+
+function syncTuneIndicator() {
+  if (!btnMobileControls) return;
+  const hasOverrides = Boolean(
+    (state.shiftParty && Math.abs(state.shiftVal) > 1e-6) ||
+    state.methodOverride ||
+    Math.abs(state.temp - 0.45) > 1e-3 ||
+    Math.abs(state.swing - 0.15) > 1e-3 ||
+    state.durationMs !== 45000 ||
+    state.forecastRuns !== 200 ||
+    state.customRunId
+  );
+  btnMobileControls.classList.toggle('has-overrides', hasOverrides);
+}
+
+function setHemicycleCollapsed(collapsed) {
+  if (!hemicycleBodyEl || !hemicycleHudEl || !btnToggleHemi) return;
+  hemicycleBodyEl.classList.toggle('hidden', collapsed);
+  hemicycleHudEl.classList.toggle('is-collapsed', collapsed);
+  hemicycleHudEl.classList.toggle('mobile-hemi-open', !collapsed && isMobileViewport());
+  btnToggleHemi.textContent = collapsed ? '▴' : '▾';
+  btnToggleHemi.setAttribute('aria-expanded', String(!collapsed));
+  if (!collapsed && isMobileViewport()) {
+    closeMobileDrawers();
+  }
+}
+
+function maybeAutoExpandDesktopHemicycle() {
+  if (isMobileViewport() || userToggledHemi) return;
+  desktopHemiCollapsed = false;
+  setHemicycleCollapsed(false);
+}
+
+function setMobileControlsOpen(open) {
+  if (!topLeftHudEl || !btnMobileControls) return;
+  topLeftHudEl.classList.toggle('controls-open', open);
+  btnMobileControls.setAttribute('aria-expanded', String(open));
+  btnMobileControls.textContent = open ? '⚙ ▴' : '⚙ ▾';
+  if (open && isMobileViewport()) {
+    setMobileLayersOpen(false);
+    setMobileBattlegroundsOpen(false);
+    setHemicycleCollapsed(true);
+  }
+}
+
+function setMobileLayersOpen(open) {
+  if (!layersHudEl || !btnMobileLayers) return;
+  layersHudEl.classList.toggle('layers-open', open);
+  btnMobileLayers.setAttribute('aria-expanded', String(open));
+  if (mobileLayersCaretEl) mobileLayersCaretEl.textContent = open ? '▴' : '▾';
+  if (open && isMobileViewport()) {
+    setMobileControlsOpen(false);
+    setMobileBattlegroundsOpen(false);
+    setHemicycleCollapsed(true);
+  }
+}
+
+function setMobileBattlegroundsOpen(open) {
+  if (!battlegroundsEl || !btnMobileBg) return;
+  battlegroundsEl.classList.toggle('mobile-bg-open', open);
+  btnMobileBg.setAttribute('aria-expanded', String(open));
+  btnMobileBg.textContent = open ? '▴' : '▾';
+  if (open) {
+    setMobileControlsOpen(false);
+    setMobileLayersOpen(false);
+    if (isMobileViewport()) setHemicycleCollapsed(true);
+  }
+}
+
+function closeMobileDrawers() {
+  setMobileControlsOpen(false);
+  setMobileLayersOpen(false);
+  setMobileBattlegroundsOpen(false);
+}
 
 function applyScenarioMeta(meta, hasGroups) {
   const title = meta.title || 'European Parliament';
@@ -126,6 +224,7 @@ function applyScenarioMeta(meta, hasGroups) {
   document.getElementById('ov-party-btn').textContent = hasGroups ? 'Group %' : 'Party %';
   document.getElementById('party-select-label').textContent = hasGroups ? 'Group' : 'Party';
   document.getElementById('ov-eu-axis').textContent = meta.axis2_label || 'Pro-EU';
+  syncMobileLayersLabel();
 }
 
 function syncShiftControls() {
@@ -160,7 +259,21 @@ function applyModifiersToHUD(modifiers) {
   }
   if (Number.isFinite(modifiers.seed)) {
     inputSeed.value = String(modifiers.seed);
+    state.appliedSeed = modifiers.seed;
   }
+  syncTuneIndicator();
+}
+
+function resetModifiersToDefaults() {
+  applyModifiersToHUD({
+    swing: 0.15,
+    uncertainty: 0.15,
+    shiftParty: '',
+    shiftVal: 0,
+    temp: 0.45,
+    seed: 42,
+    wavesOverride: 0
+  });
 }
 
 async function init() {
@@ -178,8 +291,17 @@ async function init() {
     onHoverCallout: (e, spec) => inspector.showCalloutTooltip(e, spec),
     onHoverMove: (e) => inspector.moveTooltip(e),
     onHoverEnd: () => inspector.hideTooltip(),
-    onSelect: (type, id) => inspector.select(type, id),
-    onClearSelection: () => inspector.clear(),
+    onSelect: (type, id) => {
+      if (isMobileViewport()) {
+        closeMobileDrawers();
+        setHemicycleCollapsed(true);
+      }
+      inspector.select(type, id);
+    },
+    onClearSelection: () => {
+      if (isMobileViewport()) closeMobileDrawers();
+      inspector.clear();
+    },
     onZoomThresholdChange: () => {
       if (state.overlay === 'winner' && state.colorMode === 'auto') {
         refreshLegend();
@@ -214,12 +336,16 @@ async function init() {
 
   wireEvents();
   document.fonts?.ready?.then(() => map?.requestRender());
-  if (window.innerWidth <= 820) {
-    document.getElementById('hemicycle-body').classList.add('hidden');
-    const toggleBtn = document.getElementById('btn-toggle-hemi');
-    toggleBtn.textContent = '▴';
-    toggleBtn.setAttribute('aria-expanded', 'false');
-  }
+  setHemicycleCollapsed(true);
+  syncTuneIndicator();
+  mobileMQ.addEventListener('change', (e) => {
+    closeMobileDrawers();
+    if (e.matches) {
+      setHemicycleCollapsed(true);
+    } else {
+      setHemicycleCollapsed(desktopHemiCollapsed);
+    }
+  });
 
   let initialId = '';
   const searchParams = new URLSearchParams(window.location.search);
@@ -321,9 +447,6 @@ async function loadScenario({
   inspector.hideTooltip();
   inspector.clear();
 
-  state.methodOverride = initialMethodOverride;
-  methodSelect.value = initialMethodOverride;
-
   const query = runId
     ? `?run=${encodeURIComponent(runId)}`
     : (scenarioId ? `?scenario=${encodeURIComponent(scenarioId)}` : '');
@@ -344,6 +467,11 @@ async function loadScenario({
 
   state.customRunId = runId;
   btnEditor.classList.toggle('is-custom', Boolean(runId));
+  if (!runId) {
+    resetModifiersToDefaults();
+  }
+  state.methodOverride = initialMethodOverride;
+  methodSelect.value = initialMethodOverride;
   if (baseScenarioOverride) {
     state.baseScenario = structuredClone(baseScenarioOverride);
   } else if (!runId) {
@@ -433,6 +561,7 @@ async function loadScenario({
     if (!hasMatch) state.shiftVal = 0;
     syncShiftControls();
   }
+  syncTuneIndicator();
 
   for (const p of (loaded.parties || [])) state.partiesById[p.id] = p;
 
@@ -889,6 +1018,7 @@ function toggleRunPause() {
 }
 
 function onSettingChanged(fromSpeed = false) {
+  syncTuneIndicator();
   if (state.viewMode === 'forecast') {
     if (!fromSpeed) runForecast();
     return;
@@ -913,6 +1043,7 @@ function setViewMode(mode, { skipReset = false } = {}) {
   forecastControls.classList.toggle('hidden', !isForecast);
 
   if (isForecast) {
+    maybeAutoExpandDesktopHemicycle();
     runForecast();
   } else {
     if (forecastAbortCtrl) {
@@ -993,6 +1124,10 @@ function renderBattlegrounds() {
       type: 'button',
       className: 'bg-row',
       onClick: () => {
+        if (isMobileViewport()) {
+          closeMobileDrawers();
+          setHemicycleCollapsed(true);
+        }
         focusRegion(race.rid);
         inspector.select('country', race.rid);
       }
@@ -1098,6 +1233,7 @@ async function runForecast(retried = false) {
 }
 
 function startStream(retried = false) {
+  maybeAutoExpandDesktopHemicycle();
   if (state.source) {
     state.source.close();
     state.source = null;
@@ -1203,6 +1339,7 @@ function wireEvents() {
   });
   forecastRunsSelect.addEventListener('change', () => {
     state.forecastRuns = parseInt(forecastRunsSelect.value, 10) || 200;
+    syncTuneIndicator();
     if (state.viewMode === 'forecast') runForecast();
   });
   inputSwing.addEventListener('input', () => {
@@ -1234,13 +1371,17 @@ function wireEvents() {
 
   btnRun.addEventListener('click', toggleRunPause);
   btnReset.addEventListener('click', resetToReady);
-  btnEditor.addEventListener('click', openScenarioEditor);
+  btnEditor.addEventListener('click', () => {
+    if (isMobileViewport()) closeMobileDrawers();
+    openScenarioEditor();
+  });
   scenarioSelect.addEventListener('change', () => {
     if (scenarioSelect.value === '__custom__') return;
     loadScenario({ scenarioId: scenarioSelect.value });
   });
 
   document.getElementById('btn-screenshot')?.addEventListener('click', () => {
+    if (isMobileViewport()) closeMobileDrawers();
     screenshotModal?.open(map, state);
   });
 
@@ -1307,6 +1448,7 @@ function wireEvents() {
   document.getElementById('focus-pills').addEventListener('click', (e) => {
     const btn = e.target.closest('.focus-btn');
     if (!btn) return;
+    if (isMobileViewport()) closeMobileDrawers();
     focusRegion(btn.dataset.focus);
     if (btn.dataset.focus !== 'eu') inspector.select('country', btn.dataset.focus);
     else inspector.clear();
@@ -1321,10 +1463,38 @@ function wireEvents() {
       btn.classList.add('active');
       btn.setAttribute('aria-pressed', 'true');
       state.overlay = btn.dataset.overlay;
+      syncMobileLayersLabel();
       refreshLegend();
       map.recolorAll();
     });
   });
+
+  btnMobileControls?.addEventListener('click', () => {
+    const isOpen = topLeftHudEl?.classList.contains('controls-open');
+    setMobileControlsOpen(!isOpen);
+  });
+
+  btnMobileLayers?.addEventListener('click', () => {
+    const isOpen = layersHudEl?.classList.contains('layers-open');
+    setMobileLayersOpen(!isOpen);
+  });
+
+  battlegroundsEl?.querySelector('.battlegrounds-head')?.addEventListener('click', () => {
+    if (!isMobileViewport()) return;
+    const isOpen = battlegroundsEl.classList.contains('mobile-bg-open');
+    setMobileBattlegroundsOpen(!isOpen);
+  });
+
+  if (typeof ResizeObserver !== 'undefined' && topLeftHudEl && mapStageEl) {
+    const syncMobileTopHud = () => {
+      if (topLeftHudEl.classList.contains('controls-open')) return;
+      const h = Math.ceil(topLeftHudEl.getBoundingClientRect().height);
+      if (h > 0) mapStageEl.style.setProperty('--mobile-top-hud', `${h}px`);
+    };
+    const ro = new ResizeObserver(syncMobileTopHud);
+    ro.observe(topLeftHudEl);
+    syncMobileTopHud();
+  }
 
   partySelect.addEventListener('change', () => {
     state.heatmapPartyId = partySelect.value;
@@ -1353,6 +1523,22 @@ function wireEvents() {
       }
       if (state.selection) {
         inspector.clear();
+        return;
+      }
+      if (topLeftHudEl?.classList.contains('controls-open')) {
+        setMobileControlsOpen(false);
+        return;
+      }
+      if (layersHudEl?.classList.contains('layers-open')) {
+        setMobileLayersOpen(false);
+        return;
+      }
+      if (battlegroundsEl?.classList.contains('mobile-bg-open')) {
+        setMobileBattlegroundsOpen(false);
+        return;
+      }
+      if (isMobileViewport() && hemicycleHudEl?.classList.contains('mobile-hemi-open')) {
+        setHemicycleCollapsed(true);
         return;
       }
     }
@@ -1384,6 +1570,7 @@ function wireEvents() {
 
   countrySelect.addEventListener('change', () => {
     const rid = countrySelect.value;
+    if (isMobileViewport()) closeMobileDrawers();
     focusRegion(rid);
     if (rid !== 'eu') inspector.select('country', rid);
     else inspector.clear();
@@ -1402,12 +1589,24 @@ function wireEvents() {
     });
   });
 
-  const hemiBody = document.getElementById('hemicycle-body');
-  const btnToggleHemi = document.getElementById('btn-toggle-hemi');
-  btnToggleHemi.addEventListener('click', () => {
-    const collapsed = hemiBody.classList.toggle('hidden');
-    btnToggleHemi.textContent = collapsed ? '▴' : '▾';
-    btnToggleHemi.setAttribute('aria-expanded', String(!collapsed));
+  btnToggleHemi?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const collapsed = !hemicycleBodyEl.classList.contains('hidden');
+    if (!isMobileViewport()) {
+      desktopHemiCollapsed = collapsed;
+      userToggledHemi = true;
+    }
+    setHemicycleCollapsed(collapsed);
+  });
+
+  hemicycleHudEl?.querySelector('.hud-header')?.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    const collapsed = !hemicycleBodyEl.classList.contains('hidden');
+    if (!isMobileViewport()) {
+      desktopHemiCollapsed = collapsed;
+      userToggledHemi = true;
+    }
+    setHemicycleCollapsed(collapsed);
   });
 }
 
