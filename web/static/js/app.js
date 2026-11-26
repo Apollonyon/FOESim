@@ -1,4 +1,4 @@
-// Main controller: scenario loading, SSE stream lifecycle, theme toggle, and HUD events.
+  // Main controller: scenario loading, SSE stream lifecycle, theme toggle, and HUD events.
 import { clearEl, el, safeColor, swatch } from './dom.js';
 import { EuropeMap } from './map.js';
 import { Hemicycle } from './hemicycle.js';
@@ -59,8 +59,6 @@ const state = {
   selection: null
 };
 
-const statusBadge = document.getElementById('status-badge');
-const statusText = document.getElementById('status-text');
 const simClockEl = document.getElementById('sim-clock');
 const btnRun = document.getElementById('btn-run');
 const btnReset = document.getElementById('btn-reset');
@@ -215,6 +213,7 @@ async function init() {
   });
 
   wireEvents();
+  document.fonts?.ready?.then(() => map?.requestRender());
   if (window.innerWidth <= 820) {
     document.getElementById('hemicycle-body').classList.add('hidden');
     const toggleBtn = document.getElementById('btn-toggle-hemi');
@@ -300,6 +299,8 @@ async function loadScenario({
   if (forecastAbortCtrl) {
     forecastAbortCtrl.abort();
     forecastAbortCtrl = null;
+    btnRunForecast.disabled = false;
+    btnRunForecast.textContent = '↻ Re-run';
   }
   state.forecast = null;
   renderBattlegrounds();
@@ -322,7 +323,6 @@ async function loadScenario({
 
   state.methodOverride = initialMethodOverride;
   methodSelect.value = initialMethodOverride;
-  setStatus('live', 'LOADING');
 
   const query = runId
     ? `?run=${encodeURIComponent(runId)}`
@@ -337,7 +337,6 @@ async function loadScenario({
     if (!suppressError) {
       scenarioSubtitle.classList.remove('hidden');
       scenarioSubtitle.textContent = `Failed to load scenario (${err.message})`;
-      setStatus('idle', 'ERROR');
     }
     return false;
   }
@@ -484,7 +483,6 @@ async function loadScenario({
     if (seq !== scenarioLoadSeq) return false;
     scenarioSubtitle.classList.remove('hidden');
     scenarioSubtitle.textContent = `Failed to load map geometry (${err.message})`;
-    setStatus('idle', 'ERROR');
     return false;
   }
 
@@ -610,11 +608,6 @@ function updateClock(pct, finished = false) {
   simClockEl.textContent = `${String(hh).padStart(2, '0')}:${mm} ${tz}`;
 }
 
-function setStatus(kind, label) {
-  statusBadge.className = `status-badge status-${kind}`;
-  statusText.textContent = label;
-}
-
 function syncRunControls() {
   if (state.runPhase === 'running') {
     btnRun.textContent = '⏸ Pause';
@@ -640,7 +633,6 @@ function scheduleHudFlush() {
   hudFrameId = requestAnimationFrame((now) => {
     hudFrameId = 0;
     if (state.runPhase !== 'running') return;
-    setStatus('live', `LIVE · ${Math.round(state.countedPct || 0)}%`);
     updateProgress();
 
     if (now - lastSlowHudMs >= 120) {
@@ -776,7 +768,6 @@ function applyComplete() {
     pendingTickerRep = null;
   }
   inspectorDirty = false;
-  setStatus('done', 'FINAL');
   syncRunControls();
   updateProgress();
   updateClock(100, true);
@@ -825,7 +816,6 @@ function drainQueue(now) {
     if (streamErrorWhilePaused && state.runPhase === 'running') {
       streamErrorWhilePaused = false;
       state.runPhase = 'ready';
-      setStatus('idle', 'DISCONNECTED');
       syncRunControls();
     }
   } else if (state.runPhase === 'running') {
@@ -859,7 +849,6 @@ function resetToReady() {
   pausedAt = 0;
   state.runPhase = 'ready';
   resetStreamState();
-  setStatus('idle', 'READY');
   syncRunControls();
 }
 
@@ -875,7 +864,6 @@ function pauseStream() {
     cancelAnimationFrame(hudFrameId);
     hudFrameId = 0;
   }
-  setStatus('paused', `PAUSED · ${Math.round(state.countedPct || 0)}%`);
   syncRunControls();
 }
 
@@ -886,12 +874,10 @@ function resumeStream() {
   if (queueHead >= eventQueue.length && streamErrorWhilePaused) {
     streamErrorWhilePaused = false;
     state.runPhase = 'ready';
-    setStatus('idle', 'DISCONNECTED');
     syncRunControls();
     return;
   }
   state.runPhase = 'running';
-  setStatus('live', `LIVE · ${Math.round(state.countedPct || 0)}%`);
   syncRunControls();
   scheduleQueueDrain();
 }
@@ -932,6 +918,8 @@ function setViewMode(mode, { skipReset = false } = {}) {
     if (forecastAbortCtrl) {
       forecastAbortCtrl.abort();
       forecastAbortCtrl = null;
+      btnRunForecast.disabled = false;
+      btnRunForecast.textContent = '↻ Re-run';
     }
     state.forecast = null;
     renderBattlegrounds();
@@ -1058,7 +1046,8 @@ async function runForecast(retried = false) {
     resetStreamState();
     renderBattlegrounds();
   }
-  setStatus('live', 'FORECASTING…');
+  btnRunForecast.disabled = true;
+  btnRunForecast.textContent = 'Running…';
   refreshLegend();
 
   const parsedSeed = parseInt(inputSeed.value, 10);
@@ -1087,7 +1076,8 @@ async function runForecast(retried = false) {
     if (reqSeq !== scenarioLoadSeq || state.viewMode !== 'forecast' || forecastAbortCtrl !== ctrl) return;
     forecastAbortCtrl = null;
     state.forecast = fc;
-    setStatus('done', `FORECAST · ${fc.runs} RUNS`);
+    btnRunForecast.disabled = false;
+    btnRunForecast.textContent = '↻ Re-run';
     refreshLegend();
     map.recolorAll();
     scheduleHemicycleRender();
@@ -1095,8 +1085,15 @@ async function runForecast(retried = false) {
     inspector.render();
     map.refreshHoverTooltip();
   } catch (err) {
-    if (err.name === 'AbortError' || reqSeq !== scenarioLoadSeq || state.viewMode !== 'forecast') return;
-    setStatus('idle', 'FORECAST ERR');
+    if (err.name === 'AbortError' || reqSeq !== scenarioLoadSeq || state.viewMode !== 'forecast') {
+      if (forecastAbortCtrl === ctrl) {
+        btnRunForecast.disabled = false;
+        btnRunForecast.textContent = '↻ Re-run';
+      }
+      return;
+    }
+    btnRunForecast.disabled = false;
+    btnRunForecast.textContent = '↻ Re-run';
   }
 }
 
@@ -1131,7 +1128,6 @@ function startStream(retried = false) {
     : '';
   const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&uncertainty=${swing}${shiftParam}${targetParam}${methodParam}`;
 
-  setStatus('live', 'EXIT POLLS');
   syncRunControls();
 
   const es = new EventSource(url);
@@ -1174,7 +1170,6 @@ function startStream(retried = false) {
     }
     if (state.runPhase === 'running' && queueHead >= eventQueue.length) {
       state.runPhase = 'ready';
-      setStatus('idle', 'DISCONNECTED');
       syncRunControls();
     } else if (state.runPhase !== 'done') {
       streamErrorWhilePaused = true;

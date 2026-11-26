@@ -3,8 +3,8 @@ import { clearEl, el, safeColor } from './dom.js';
 
 const EXPORT_W = 1920;
 const EXPORT_H = 1080;
-const FONT_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif';
-const FONT_MONO = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
+const FONT_SANS = '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const FONT_MONO = '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 function readableColor(hex, isDark) {
   const clean = safeColor(hex);
@@ -298,13 +298,14 @@ function drawHemicyclePanel(ctx, state, seats, totalSeats, theme) {
 function drawFooter(ctx, state, theme) {
   const footY = EXPORT_H - 22;
 
+  // Subtle site watermark (bottom-left)
   ctx.save();
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.font = `800 14px ${FONT_SANS}`;
+  ctx.font = `700 14px ${FONT_SANS}`;
   ctx.fillStyle = theme.muted;
   ctx.globalAlpha = 0.85;
-  ctx.fillText('FOES', 44, footY);
+  ctx.fillText('foesim.xyz', 44, footY);
 
   const attr = state.scenario?.meta?.attribution || '';
   if (attr) {

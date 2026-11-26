@@ -534,7 +534,7 @@ export class EuropeMap {
     if (this.callouts.length > 0) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = '700 9.5px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.font = '700 9.5px "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       for (let i = 0; i < this.callouts.length; i++) {
         const item = this.callouts[i];
         const { x, y, w, h, label, district_id } = item.spec;
@@ -569,7 +569,7 @@ export class EuropeMap {
       const sx = targetX + (cx - vx) * scale;
       const sy = targetY + (cy - vy) * scale;
 
-      ctx.font = '700 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.font = '700 13px "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       ctx.strokeStyle = theme.labelHalo;
       ctx.lineWidth = 3.5;
       ctx.strokeText(b.label, sx, sy);
@@ -579,7 +579,7 @@ export class EuropeMap {
       const pct = this.state.regionPct?.[b.id] ?? 0;
       if (this.state.viewMode !== 'forecast' && pct > 0 && pct < 100) {
         const subText = `${pct}%`;
-        ctx.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.font = '600 10px "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
         ctx.lineWidth = 2.8;
         ctx.strokeText(subText, sx, sy + 13);
         ctx.fillStyle = theme.sublabelFill;
@@ -828,7 +828,7 @@ export class EuropeMap {
     if (this.callouts.length > 0) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = '700 9.5px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.font = '700 9.5px "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       for (let i = 0; i < this.callouts.length; i++) {
         const item = this.callouts[i];
         const { x, y, w, h, label, district_id } = item.spec;
@@ -866,7 +866,7 @@ export class EuropeMap {
       const sx = (cx - vx) * scale;
       const sy = (cy - vy) * scale;
 
-      ctx.font = '700 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.font = '700 10.5px "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       ctx.strokeStyle = theme.labelHalo;
       ctx.lineWidth = 3;
       ctx.strokeText(b.label, sx, sy);
@@ -875,7 +875,7 @@ export class EuropeMap {
 
       const pct = this.state.regionPct?.[b.id] ?? 0;
       const subText = `${pct}%`;
-      ctx.font = '600 8.5px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.font = '600 8.5px "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       ctx.lineWidth = 2.5;
       ctx.strokeText(subText, sx, sy + 11);
       ctx.fillStyle = theme.sublabelFill;
@@ -889,7 +889,7 @@ export class EuropeMap {
       this.perfDrawSum += drawMs;
       if (drawMs > this.perfMaxMs) this.perfMaxMs = drawMs;
       if (this.perfLabel) {
-        ctx.font = '700 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.font = '700 11px "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
         const tw = ctx.measureText(this.perfLabel).width + 16;
         const px = this.width * 0.5 - tw * 0.5;
         const py = 12;

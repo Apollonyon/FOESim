@@ -174,7 +174,7 @@ export class Hemicycle {
     if (leftGroup) {
       const leftTxt = svgEl('text', {
         x: barX, y: 26, fill: readableScoreColor(leftGroup.color),
-        'font-size': 15, 'font-weight': 700, 'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace'
+        'font-size': 15, 'font-weight': 700, 'font-family': '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
       });
       leftTxt.textContent = `${leftGroup.short_name} ${leftSeats}`;
       this.svg.appendChild(leftTxt);
@@ -182,7 +182,7 @@ export class Hemicycle {
     if (rightGroup) {
       const rightTxt = svgEl('text', {
         x: barX + barW, y: 26, 'text-anchor': 'end', fill: readableScoreColor(rightGroup.color),
-        'font-size': 15, 'font-weight': 700, 'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace'
+        'font-size': 15, 'font-weight': 700, 'font-family': '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
       });
       rightTxt.textContent = `${rightSeats} ${rightGroup.short_name}`;
       this.svg.appendChild(rightTxt);
@@ -196,7 +196,7 @@ export class Hemicycle {
     const majLabel = svgEl('text', {
       x: midLineX, y: barY + barH + 19, 'text-anchor': 'middle',
       fill: 'var(--muted)', 'font-size': 10, 'font-weight': 600,
-      'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace'
+      'font-family': '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     });
     majLabel.textContent = `${maj} TO WIN`;
     this.svg.appendChild(majLabel);
@@ -344,7 +344,7 @@ export class Hemicycle {
       }));
       const singleLbl = svgEl('text', {
         x: 170, y: 66, 'text-anchor': 'middle', fill: 'var(--muted)',
-        'font-size': 9, 'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace'
+        'font-size': 9, 'font-family': '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
       });
       singleLbl.textContent = `${bins[0].start} ${this.seatLabel} (100%)`;
       svg.appendChild(singleLbl);
@@ -380,7 +380,7 @@ export class Hemicycle {
         const majTxt = svgEl('text', {
           x: Math.min(314, Math.max(26, majX)).toFixed(1), y: 10, 'text-anchor': 'middle',
           fill: 'var(--muted)', 'font-size': 8.5, 'font-weight': 700,
-          'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace'
+          'font-family': '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
         });
         majTxt.textContent = `Maj ${forecast.majority}`;
         svg.appendChild(majTxt);
@@ -389,7 +389,7 @@ export class Hemicycle {
       const addTick = (x, anchor, label) => {
         const t = svgEl('text', {
           x, y: 66, 'text-anchor': anchor, fill: 'var(--muted)',
-          'font-size': 9, 'font-family': 'ui-monospace, SFMono-Regular, Menlo, monospace'
+          'font-size': 9, 'font-family': '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
         });
         t.textContent = label;
         svg.appendChild(t);
