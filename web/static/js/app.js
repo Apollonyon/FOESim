@@ -56,6 +56,7 @@ const state = {
   precinctGeo: {},
   reportedPrecincts: 0,
   totalPrecincts: 0,
+  countedEligible: 0,
   ticker: [],
   selection: null
 };
@@ -323,7 +324,8 @@ async function init() {
   hemicycle = new Hemicycle(
     document.getElementById('hemicycle-svg'),
     document.getElementById('seat-ledger'),
-    document.getElementById('forecast-summary')
+    document.getElementById('forecast-summary'),
+    document.getElementById('vote-totals')
   );
 
   changelog = new ChangelogModal(document.getElementById('changelog-modal'));
@@ -701,6 +703,24 @@ function renderCoalitions() {
   });
 }
 
+function computeVoteSummary() {
+  const useGroups = Boolean(state.scenario?.groups?.length);
+  const groupVotes = {};
+  let totalVotes = 0;
+  for (const regVotes of Object.values(state.regionVotes)) {
+    if (!regVotes) continue;
+    for (const [pid, v] of Object.entries(regVotes)) {
+      if (v <= 0) continue;
+      const gid = useGroups ? (state.partiesById[pid]?.group_id || pid) : pid;
+      groupVotes[gid] = (groupVotes[gid] || 0) + v;
+      totalVotes += v;
+    }
+  }
+  const countedEligible = Math.round(state.countedEligible || 0);
+  const turnoutPct = countedEligible > 0 ? Math.min(100, (totalVotes / countedEligible) * 100) : 0;
+  return { totalVotes, countedEligible, turnoutPct, groupVotes };
+}
+
 function scheduleHemicycleRender() {
   if (hemiFrameQueued) return;
   hemiFrameQueued = true;
@@ -713,7 +733,7 @@ function scheduleHemicycleRender() {
     if (state.viewMode === 'forecast' && state.forecast) {
       hemicycle.renderForecast(state.orderedGroups, state.forecast, highlight);
     } else {
-      hemicycle.render(state.orderedGroups, state.euSeats, state.prevEUSeats, highlight);
+      hemicycle.render(state.orderedGroups, state.euSeats, state.prevEUSeats, highlight, computeVoteSummary());
     }
     if (state.hemiTab === 'coalitions') renderCoalitions();
   });
@@ -784,6 +804,9 @@ function scheduleHudFlush() {
         inspector.render();
         inspectorDirty = false;
       }
+      if (state.viewMode === 'live') {
+        hemicycle.updateVoteSummary(state.orderedGroups, computeVoteSummary());
+      }
       map?.refreshHoverTooltip();
     }
   });
@@ -803,6 +826,7 @@ function resetStreamState() {
   state.precincts = {};
   state.reportedPrecincts = 0;
   state.countedPct = 0;
+  state.countedEligible = 0;
   state.ticker = [];
   if (hudFrameId) {
     cancelAnimationFrame(hudFrameId);
@@ -878,7 +902,9 @@ function applyPrecinct(data) {
 
   const reg = state.regionsById[rep.region_id];
   const totalCount = state.regionTotalCount[rep.region_id] || reg?.precincts || 1;
-  state.regionPctSum[rep.region_id] = (state.regionPctSum[rep.region_id] || 0) + Math.max(0, curPct - prevPct);
+  const deltaPct = Math.max(0, curPct - prevPct);
+  state.countedEligible += (rep.eligible_voters || 0) * deltaPct;
+  state.regionPctSum[rep.region_id] = (state.regionPctSum[rep.region_id] || 0) + deltaPct;
   state.regionPct[rep.region_id] = Math.min(100, Math.round((state.regionPctSum[rep.region_id] / Math.max(1, totalCount)) * 100));
 
   map.queueRecolor(rep.precinct_id);

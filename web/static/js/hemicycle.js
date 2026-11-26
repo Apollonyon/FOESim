@@ -30,10 +30,11 @@ function readableScoreColor(hex) {
 }
 
 export class Hemicycle {
-  constructor(svgElRef, ledgerEl, forecastSummaryEl = null) {
+  constructor(svgElRef, ledgerEl, forecastSummaryEl = null, voteTotalsEl = null) {
     this.svg = svgElRef;
     this.ledger = ledgerEl;
     this.forecastSummary = forecastSummaryEl;
+    this.voteTotals = voteTotalsEl;
     this.dots = [];
     this.ledgerRows = new Map();
     this.selectedForecastGroupId = '';
@@ -53,6 +54,10 @@ export class Hemicycle {
     if (this.forecastSummary) {
       clearEl(this.forecastSummary);
       this.forecastSummary.classList.add('hidden');
+    }
+    if (this.voteTotals) {
+      clearEl(this.voteTotals);
+      this.voteTotals.classList.add('hidden');
     }
     this.svg.classList.toggle('bar-mode', this.chartType === 'bar');
 
@@ -209,20 +214,61 @@ export class Hemicycle {
     this.ledgerRows.clear();
     clearEl(this.ledger);
     for (const g of orderedGroups) {
+      const shareEl = el('span', { className: 'ledger-share mono' });
       const seatsEl = el('span', { className: 'ledger-seats', text: '0' });
       const deltaEl = el('span', { className: 'ledger-delta delta-flat', text: '0' });
       const item = el(
         'div',
         { className: 'ledger-item' },
-        el('div', { className: 'ledger-top' }, swatch(g.color), el('span', { text: g.short_name })),
+        el('div', { className: 'ledger-top' }, swatch(g.color), el('span', { text: g.short_name }), shareEl),
         el('div', { className: 'ledger-nums' }, seatsEl, deltaEl)
       );
       this.ledger.appendChild(item);
-      this.ledgerRows.set(g.id, { seatsEl, deltaEl });
+      this.ledgerRows.set(g.id, { item, seatsEl, deltaEl, shareEl });
     }
   }
 
-  render(orderedGroups, euSeats, prevEUSeats, highlightGroupIds = null) {
+  updateVoteSummary(orderedGroups, voteSummary) {
+    const hasVotes = Boolean(voteSummary && voteSummary.totalVotes > 0);
+    if (this.voteTotals) {
+      clearEl(this.voteTotals);
+      if (hasVotes) {
+        this.voteTotals.classList.remove('hidden');
+        const fmtVotes = voteSummary.totalVotes.toLocaleString('en-US');
+        this.voteTotals.appendChild(
+          el('span', {}, el('strong', { text: fmtVotes }), ' votes')
+        );
+        if (voteSummary.countedEligible > 0) {
+          this.voteTotals.appendChild(
+            el('span', {}, el('strong', { text: `${voteSummary.turnoutPct.toFixed(1)}%` }), ' turnout')
+          );
+          this.voteTotals.title = `${fmtVotes} votes cast out of ${voteSummary.countedEligible.toLocaleString('en-US')} reported eligible voters`;
+        } else {
+          this.voteTotals.title = `${fmtVotes} votes cast`;
+        }
+      } else {
+        this.voteTotals.classList.add('hidden');
+        this.voteTotals.title = '';
+      }
+    }
+
+    if (this.ledgerRows.size === 0) return;
+    for (const g of orderedGroups) {
+      const row = this.ledgerRows.get(g.id);
+      if (!row) continue;
+      if (hasVotes) {
+        const v = voteSummary.groupVotes[g.id] || 0;
+        const pct = (v / voteSummary.totalVotes) * 100;
+        row.shareEl.textContent = v > 0 ? `${pct.toFixed(1)}%` : '';
+        row.item.title = `${g.name || g.short_name}: ${v.toLocaleString('en-US')} votes (${pct.toFixed(2)}%)`;
+      } else {
+        row.shareEl.textContent = '';
+        row.item.title = '';
+      }
+    }
+  }
+
+  render(orderedGroups, euSeats, prevEUSeats, highlightGroupIds = null, voteSummary = null) {
     if (this.forecastSummary) {
       clearEl(this.forecastSummary);
       this.forecastSummary.classList.add('hidden');
@@ -249,6 +295,7 @@ export class Hemicycle {
         }
       }
     }
+    this.updateVoteSummary(orderedGroups, voteSummary);
   }
 
   #resolveForecastGroup(orderedGroups, forecast) {
@@ -403,6 +450,10 @@ export class Hemicycle {
   }
 
   renderForecast(orderedGroups, forecast, highlightGroupIds = null) {
+    if (this.voteTotals) {
+      clearEl(this.voteTotals);
+      this.voteTotals.classList.add('hidden');
+    }
     const selectedGroup = this.#resolveForecastGroup(orderedGroups, forecast);
     const p50Seats = {};
     let maxP90 = 1;
