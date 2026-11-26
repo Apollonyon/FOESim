@@ -1,0 +1,10 @@
+{
+  "operator": "[Your Name]",
+  "postal_address": "",
+  "contact_email": "[privacy@example.com]",
+  "hosting_provider": "[Your Hosting Provider, e.g. IONOS SE, Montabaur, Germany]",
+  "hosting_log_retention": "[e.g. Server access logs are kept for 7 days for security and reliability. A data processing agreement (Art. 28 GDPR) is in place with the hosting provider.]",
+  "data_transfer_note": "[e.g. Data is processed only by the hosting provider and is not transferred outside the EU/EEA.]",
+  "supervisory_authority": "[e.g. LDI NRW, Kavalleriestraße 2-4, 40213 Düsseldorf, Germany]",
+  "last_updated": "2026-11-26"
+}

@@ -1090,3 +1090,89 @@ func TestServerExternalPacksGeoServing(t *testing.T) {
 		}
 	}
 }
+
+func TestPrivacyEndpointAndConfigLoading(t *testing.T) {
+	scenario := sim.Scenario{
+		Name:    "Test EU",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	}
+
+	t.Run("unconfigured default returns configured=false", func(t *testing.T) {
+		srv := NewServer(scenario)
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/privacy", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		var got privacyPayload
+		if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+			t.Fatalf("decode /api/privacy: %v", err)
+		}
+		if got.Configured || got.Operator != "" || got.ContactEmail != "" {
+			t.Errorf("unconfigured /api/privacy = %+v, want configured=false and empty fields", got)
+		}
+	})
+
+	t.Run("placeholder values are treated as unconfigured", func(t *testing.T) {
+		cfg := PrivacyConfig{
+			Operator:            "[Your Name]",
+			ContactEmail:        "[privacy@example.com]",
+			HostingProvider:     "IONOS SE",
+			HostingLogRetention: "[7 days]",
+		}
+		if cfg.IsConfigured() {
+			t.Fatal("expected bracketed placeholder config to report IsConfigured() == false")
+		}
+		san := cfg.sanitized()
+		if san.Operator != "" || san.ContactEmail != "" || san.HostingLogRetention != "" || san.HostingProvider != "IONOS SE" {
+			t.Errorf("sanitized() = %+v", san)
+		}
+	})
+
+	t.Run("JSON file load and FOES_PRIVACY_* env overrides", func(t *testing.T) {
+		tmp := t.TempDir()
+		cfgPath := filepath.Join(tmp, "privacy.json")
+		raw := `{"operator":"Jane Doe","contact_email":"privacy@example.org","hosting_provider":"IONOS SE, Montabaur, Germany","hosting_log_retention":"Logs kept for 7 days.","last_updated":"2026-11-26"}`
+		if err := os.WriteFile(cfgPath, []byte(raw), 0o600); err != nil {
+			t.Fatalf("write temp privacy.json: %v", err)
+		}
+
+		t.Setenv("FOES_PRIVACY_SUPERVISORY_AUTHORITY", "LDI NRW, Düsseldorf")
+		cfg, err := LoadPrivacyConfig(cfgPath, true)
+		if err != nil {
+			t.Fatalf("LoadPrivacyConfig: %v", err)
+		}
+		if !cfg.IsConfigured() {
+			t.Fatalf("expected configured=true, got %+v", cfg)
+		}
+		if cfg.SupervisoryAuthority != "LDI NRW, Düsseldorf" {
+			t.Errorf("SupervisoryAuthority = %q, want env override", cfg.SupervisoryAuthority)
+		}
+
+		srv := NewServer(scenario)
+		srv.SetPrivacyConfig(cfg)
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/privacy", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		var got privacyPayload
+		if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+			t.Fatalf("decode /api/privacy: %v", err)
+		}
+		if !got.Configured || got.Operator != "Jane Doe" || got.ContactEmail != "privacy@example.org" {
+			t.Errorf("configured /api/privacy = %+v", got)
+		}
+	})
+
+	t.Run("missing default file is allowed when not explicit, errors when explicit", func(t *testing.T) {
+		missing := filepath.Join(t.TempDir(), "missing.json")
+		if _, err := LoadPrivacyConfig(missing, false); err != nil {
+			t.Errorf("expected nil error for missing non-explicit file, got %v", err)
+		}
+		if _, err := LoadPrivacyConfig(missing, true); err == nil {
+			t.Errorf("expected error for missing explicit file, got nil")
+		}
+	})
+}

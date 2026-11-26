@@ -20,3 +20,6 @@ calibrate_eu27.py
 # Local assistant & planning notes
 AGENTS.md
 PROGRESS.md
+
+# Local deployment privacy config (use privacy.example.json as a template)
+privacy.json

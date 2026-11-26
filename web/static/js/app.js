@@ -8,6 +8,7 @@ import { ScenarioEditor } from './editor.js';
 import { applyScenarioPatch, decodeSharePayload } from './share.js';
 import { ChangelogModal } from './changelog.js';
 import { ScreenshotModal } from './export.js';
+import { PrivacyModal } from './privacy.js';
 import { TourGuide } from './tour.js';
 
 const state = {
@@ -117,6 +118,7 @@ let inspector;
 let editor;
 let changelog;
 let screenshotModal;
+let privacyModal;
 let tour;
 let forecastAbortCtrl = null;
 let hemiFrameQueued = false;
@@ -416,6 +418,7 @@ async function init() {
   changelog = new ChangelogModal(document.getElementById('changelog-modal'));
   const changelogReady = changelog.init(btnVersion);
   screenshotModal = new ScreenshotModal(document.getElementById('screenshot-modal'));
+  privacyModal = new PrivacyModal(document.getElementById('privacy-modal'));
   tour = new TourGuide(document.getElementById('tour-overlay'), {
     getContext: () => ({
       scenarioNames: scenarioCatalog.map((item) => {
@@ -531,9 +534,14 @@ async function init() {
     const ok = await loadScenario({ runId: urlRun, suppressError: true });
     if (ok) return;
   }
+  const wantsPrivacy = window.location.hash === '#privacy';
   const loaded = await loadScenario({ scenarioId: initialId });
   await changelogReady;
-  if (loaded && !changelog?.isOpen && !editor?.isOpen && !screenshotModal?.isOpen) {
+  if (wantsPrivacy) {
+    privacyModal?.open();
+    return;
+  }
+  if (loaded && !changelog?.isOpen && !editor?.isOpen && !screenshotModal?.isOpen && !privacyModal?.isOpen) {
     tour?.maybeAutoOpen();
   }
 }
@@ -1523,6 +1531,13 @@ function wireEvents() {
   }
   btnRunForecast.addEventListener('click', () => runForecast());
   btnVersion.addEventListener('click', () => changelog?.open());
+  document.getElementById('btn-privacy')?.addEventListener('click', (e) => {
+    privacyModal?.open({ triggerEl: e.currentTarget });
+  });
+  document.getElementById('btn-mobile-privacy')?.addEventListener('click', () => {
+    closeMobileDrawers();
+    privacyModal?.open({ triggerEl: btnMobileControls });
+  });
 
   btnRun.addEventListener('click', toggleRunPause);
   btnReset.addEventListener('click', resetToReady);
@@ -1698,6 +1713,10 @@ function wireEvents() {
         tour.close();
         return;
       }
+      if (privacyModal?.isOpen) {
+        privacyModal.close();
+        return;
+      }
       if (screenshotModal?.isOpen) {
         screenshotModal.close();
         return;
@@ -1737,7 +1756,7 @@ function wireEvents() {
       }
     }
     if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (tour?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen) return;
+      if (tour?.isOpen || privacyModal?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen) return;
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       e.preventDefault();
@@ -1746,7 +1765,7 @@ function wireEvents() {
       return;
     }
     if ((e.key === 'e' || e.key === 'E') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (tour?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
+      if (tour?.isOpen || privacyModal?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
       e.preventDefault();
@@ -1754,7 +1773,7 @@ function wireEvents() {
       return;
     }
     if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (tour?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
+      if (tour?.isOpen || privacyModal?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen || !state.scenario) return;
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
       e.preventDefault();
@@ -1762,7 +1781,7 @@ function wireEvents() {
       return;
     }
     if (e.code === 'Space' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      if (tour?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen) return;
+      if (tour?.isOpen || privacyModal?.isOpen || screenshotModal?.isOpen || changelog?.isOpen || editor?.isOpen) return;
       if (document.activeElement?.closest('input, select, textarea, button, a, [role="button"]')) return;
       if (!state.scenario) return;
       e.preventDefault();

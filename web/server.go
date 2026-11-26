@@ -48,6 +48,7 @@ type Server struct {
 	scenario        sim.Scenario
 	registry        *sim.ScenarioRegistry
 	packsDir        string
+	privacy         PrivacyConfig
 	runs            *runStore
 	runsLimiter     *ipRateLimiter
 	streamSem       chan struct{}
@@ -144,6 +145,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
+	mux.Handle("GET /api/privacy", gzipMiddleware(http.HandlerFunc(s.handlePrivacy)))
 	mux.Handle("GET /api/scenarios", gzipMiddleware(http.HandlerFunc(s.handleScenarios)))
 	mux.Handle("GET /api/scenario", gzipMiddleware(http.HandlerFunc(s.handleScenario)))
 	mux.Handle("GET /api/forecast", gzipMiddleware(http.HandlerFunc(s.handleForecast)))

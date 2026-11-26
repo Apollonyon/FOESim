@@ -23,6 +23,7 @@ func main() {
 	scenarioPath := flag.String("scenario", "scenarios/eu27.json", "path to default JSON scenario file")
 	scenariosDir := flag.String("scenarios-dir", "scenarios", "directory of JSON scenarios for the web switcher (empty disables directory scan)")
 	packsDir := flag.String("packs-dir", "packs", "directory of external GeoPacks (<dir>/<pack>/units.json + map JSONs; empty disables external packs)")
+	privacyFile := flag.String("privacy-file", "privacy.json", "path to optional operator privacy policy JSON file (overridden by FOES_PRIVACY_* env vars)")
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	cliMode := flag.Bool("cli", false, "run live election night in the terminal instead of starting the web server")
 	maxStreams := flag.Int("max-streams", 256, "maximum concurrent SSE election streams (0 = unlimited)")
@@ -33,9 +34,13 @@ func main() {
 	flag.Parse()
 
 	packsDirExplicit := false
+	privacyFileExplicit := false
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "packs-dir" {
 			packsDirExplicit = true
+		}
+		if f.Name == "privacy-file" {
+			privacyFileExplicit = true
 		}
 	})
 
@@ -53,6 +58,11 @@ func main() {
 		return
 	}
 
+	privacyCfg, err := web.LoadPrivacyConfig(*privacyFile, privacyFileExplicit)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	reg, err := buildScenarioRegistry(*scenariosDir, *scenarioPath, scenario)
 	if err != nil {
 		log.Fatal(err)
@@ -63,6 +73,7 @@ func main() {
 
 	srv := web.NewServerWithRegistry(reg)
 	srv.SetPacksDir(*packsDir)
+	srv.SetPrivacyConfig(privacyCfg)
 	srv.SetMaxStreams(*maxStreams)
 	srv.SetMaxStreamsPerIP(*maxStreamsPerIP)
 	if *proxyHeader != "" {
