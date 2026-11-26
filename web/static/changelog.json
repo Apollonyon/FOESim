@@ -1,6 +1,30 @@
 {
-  "version": "0.1.2",
+  "version": "0.2.1",
   "entries": [
+    {
+      "version": "0.2.1",
+      "date": "2026-11-27",
+      "title": "Refined Simulation",
+      "notes": [
+        "Added Blocs",
+        "Added per unit turnout",
+        "Added differential turnout",
+        "added other small tweaks and QOL changes"
+      ]
+    },
+    {
+      "version": "0.2.0",
+      "date": "2026-11-27",
+      "title": "Added UK Elections, added Mobile Layout and decluttered UI",
+      "notes": [
+        "Added UK elections support",
+        "Added mobile layout for map",
+        "Fixed couple of UI issues (states carrying over on scenario switch)",
+        "Fixed Scenario Editor carrying over changes to another scenario",
+        "Fixed Forecast changes carrying over to Live Elections",
+        "Made a lot of small QOL changes"
+      ]
+    },
     {
       "version": "0.1.2",
       "date": "2026-11-26",
