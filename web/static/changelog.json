@@ -1,6 +1,16 @@
 {
-  "version": "0.2.2",
+  "version": "0.2.3",
   "entries": [
+    {
+      "version": "0.2.3",
+      "date": "2026-11-27",
+      "title": "Guided Tour & Privacy Policy",
+      "notes": [
+        "Added a quick interactive spotlight tour for first-time visitors",
+        "Added a Privacy Policy modal accessible from the Settings menu or /#privacy.",
+        "Made the privacy notice configurable at runtime via privacy.json or FOES_PRIVACY_* environment variables for self-hosted instances."
+      ]
+    },
     {
       "version": "0.2.2",
       "date": "2026-11-27",
