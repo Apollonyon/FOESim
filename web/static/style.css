@@ -1748,6 +1748,9 @@ html[data-theme="dark"] .editor-error {
 }
 
 .battlegrounds {
+  position: static;
+  pointer-events: auto;
+  flex-shrink: 0;
   padding: 9px 12px;
   width: 315px;
   max-width: 100%;
