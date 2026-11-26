@@ -254,13 +254,14 @@ func TestUSA2024BaselineShiftAndCorrelation(t *testing.T) {
 		sumIndepVar += float64(r.Seats*r.Seats) * p * (1 - p)
 	}
 	shockKeys := collectNationalShockKeys(sc.Regions, sc.Parties)
+	blocs := collectBlocs(sc.Regions)
 	preRegions := buildPrecomputedRegions(sc)
 	for i := range runs {
 		runSeed := int64(42 + i*forecastSeedStride)
-		shock := computeNationalShock(runSeed, 0.15, shockKeys)
+		shock := computeNationalShock(runSeed, 0.15, shockKeys, blocs)
 		regSeats := make(map[string]map[string]int, len(preRegions))
 		for ri, pre := range preRegions {
-			_, seats, _ := simulateRegionForecastRun(pre, 0.45, 0.15, runSeed+int64(ri), shock, nil)
+			_, seats, _ := simulateRegionForecastRun(pre, 0.45, 0.15, 0, runSeed+int64(ri), shock, nil)
 			regSeats[pre.region.ID] = seats
 		}
 		repTotal[i] = float64(sc.AggregateEUSeats(regSeats)["rep"])

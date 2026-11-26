@@ -14,7 +14,8 @@ const METHOD_OPTIONS = [
 const GEOPACK_OPTIONS = [
   { value: '', label: 'None (Synthetic Precincts)' },
   { value: 'eu_nuts3', label: 'EU NUTS-3 (eu_nuts3)' },
-  { value: 'us_counties', label: 'US Counties (us_counties)' }
+  { value: 'us_counties', label: 'US Counties (us_counties)' },
+  { value: 'uk_constituencies', label: 'UK Constituencies (uk_constituencies)' }
 ];
 
 const CHART_OPTIONS = [
@@ -35,6 +36,7 @@ const BASE_AXIS_LABELS = ['Economic', 'Social', 'EU / Axis 2', 'Defense', 'Envir
 const DEFAULT_MODIFIERS = {
   swing: 0.15,
   uncertainty: 0.15,
+  tactical: 0,
   shiftParty: '',
   shiftVal: 0,
   temp: 0.45,
@@ -600,6 +602,20 @@ export class ScenarioEditor {
         ariaLabel: 'Voter temperature',
         onChange: (val) => {
           this.modifiers.temp = val;
+          this.#updateStatsBar();
+        }
+      }),
+      makeSliderNumRow({
+        label: 'Tactical Voting',
+        help: 'Strategic voting squeeze (0 = calibrated baseline). Under FPTP, trailing 3rd+ parties shift toward the closer top-2 contender; under PR thresholds, sub-threshold parties shift toward the closest viable party.',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        decimals: 2,
+        value: this.modifiers.tactical || 0,
+        ariaLabel: 'Tactical voting squeeze strength',
+        onChange: (val) => {
+          this.modifiers.tactical = val;
           this.#updateStatsBar();
         }
       }),

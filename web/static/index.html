@@ -35,14 +35,20 @@
         </div>
         <div class="brand-right">
           <span id="sim-clock" class="sim-clock mono" title="Simulated Election Night Clock">--:--</span>
-          <button id="btn-screenshot" class="icon-btn" title="Map screenshot (S)" aria-label="Map screenshot">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          <button id="btn-screenshot" class="icon-btn" type="button" title="Map screenshot (S)" aria-label="Map screenshot">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
               <circle cx="12" cy="13" r="4"></circle>
             </svg>
           </button>
-          <button id="btn-theme" class="icon-btn" title="Switch Light / Dark theme" aria-label="Toggle theme">◐</button>
+          <button id="btn-theme" class="icon-btn" type="button" title="Switch Light / Dark theme" aria-label="Toggle theme">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"></path>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -103,6 +109,13 @@
             <span>Temp</span>
             <input id="input-temp" type="range" min="0.25" max="1.50" step="0.05" value="0.45" />
             <output id="temp-val">0.45</output>
+          </label>
+
+          <label class="mini-field"
+            title="Strategic voting squeeze: supporters of unviable FPTP 3rd parties or sub-threshold PR parties shift toward their closest viable contender (0 = calibrated baseline)">
+            <span>Tactical</span>
+            <input id="input-tactical" type="range" min="0" max="0.80" step="0.10" value="0" />
+            <output id="tactical-val">0.00</output>
           </label>
 
           <label class="mini-field"

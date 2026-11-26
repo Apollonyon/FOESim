@@ -96,6 +96,7 @@
     {
       "id": "al",
       "name": "Alabama",
+      "bloc": "deep_south",
       "seats": 9,
       "precincts": 67,
       "method": "fptp",
@@ -468,6 +469,7 @@
     {
       "id": "ak",
       "name": "Alaska",
+      "bloc": "plains_mountain",
       "seats": 3,
       "precincts": 29,
       "method": "fptp",
@@ -588,6 +590,7 @@
     {
       "id": "az",
       "name": "Arizona",
+      "bloc": "sun_belt",
       "seats": 11,
       "precincts": 15,
       "method": "fptp",
@@ -752,6 +755,7 @@
     {
       "id": "ar",
       "name": "Arkansas",
+      "bloc": "deep_south",
       "seats": 6,
       "precincts": 75,
       "method": "fptp",
@@ -1136,6 +1140,7 @@
     {
       "id": "ca",
       "name": "California",
+      "bloc": "west_coast",
       "seats": 54,
       "precincts": 58,
       "method": "fptp",
@@ -1464,6 +1469,7 @@
     {
       "id": "co",
       "name": "Colorado",
+      "bloc": "plains_mountain",
       "seats": 10,
       "precincts": 64,
       "method": "fptp",
@@ -1816,6 +1822,7 @@
     {
       "id": "ct",
       "name": "Connecticut",
+      "bloc": "northeast",
       "seats": 7,
       "precincts": 8,
       "method": "fptp",
@@ -1922,6 +1929,7 @@
     {
       "id": "de",
       "name": "Delaware",
+      "bloc": "northeast",
       "seats": 3,
       "precincts": 3,
       "method": "fptp",
@@ -2042,6 +2050,7 @@
     {
       "id": "dc",
       "name": "District of Columbia",
+      "bloc": "northeast",
       "seats": 3,
       "precincts": 1,
       "method": "fptp",
@@ -2148,6 +2157,7 @@
     {
       "id": "fl",
       "name": "Florida",
+      "bloc": "sun_belt",
       "seats": 30,
       "precincts": 67,
       "method": "fptp",
@@ -2520,6 +2530,7 @@
     {
       "id": "ga",
       "name": "Georgia",
+      "bloc": "sun_belt",
       "seats": 16,
       "precincts": 159,
       "method": "fptp",
@@ -3248,6 +3259,7 @@
     {
       "id": "hi",
       "name": "Hawaii",
+      "bloc": "west_coast",
       "seats": 4,
       "precincts": 5,
       "method": "fptp",
@@ -3364,6 +3376,7 @@
     {
       "id": "id",
       "name": "Idaho",
+      "bloc": "plains_mountain",
       "seats": 4,
       "precincts": 44,
       "method": "fptp",
@@ -3644,6 +3657,7 @@
     {
       "id": "il",
       "name": "Illinois",
+      "bloc": "rust_belt",
       "seats": 19,
       "precincts": 102,
       "method": "fptp",
@@ -4148,6 +4162,7 @@
     {
       "id": "in",
       "name": "Indiana",
+      "bloc": "rust_belt",
       "seats": 11,
       "precincts": 92,
       "method": "fptp",
@@ -4608,6 +4623,7 @@
     {
       "id": "ia",
       "name": "Iowa",
+      "bloc": "rust_belt",
       "seats": 6,
       "precincts": 99,
       "method": "fptp",
@@ -5096,6 +5112,7 @@
     {
       "id": "ks",
       "name": "Kansas",
+      "bloc": "plains_mountain",
       "seats": 6,
       "precincts": 105,
       "method": "fptp",
@@ -5612,6 +5629,7 @@
     {
       "id": "ky",
       "name": "Kentucky",
+      "bloc": "deep_south",
       "seats": 8,
       "precincts": 120,
       "method": "fptp",
@@ -6164,6 +6182,7 @@
     {
       "id": "la",
       "name": "Louisiana",
+      "bloc": "deep_south",
       "seats": 8,
       "precincts": 64,
       "method": "fptp",
@@ -6512,6 +6531,7 @@
     {
       "id": "me",
       "name": "Maine",
+      "bloc": "northeast",
       "seats": 4,
       "precincts": 16,
       "method": "fptp",
@@ -6685,6 +6705,7 @@
     {
       "id": "md",
       "name": "Maryland",
+      "bloc": "northeast",
       "seats": 10,
       "precincts": 24,
       "method": "fptp",
@@ -6889,6 +6910,7 @@
     {
       "id": "ma",
       "name": "Massachusetts",
+      "bloc": "northeast",
       "seats": 11,
       "precincts": 14,
       "method": "fptp",
@@ -7053,6 +7075,7 @@
     {
       "id": "mi",
       "name": "Michigan",
+      "bloc": "rust_belt",
       "seats": 15,
       "precincts": 83,
       "method": "fptp",
@@ -7477,6 +7500,7 @@
     {
       "id": "mn",
       "name": "Minnesota",
+      "bloc": "rust_belt",
       "seats": 10,
       "precincts": 87,
       "method": "fptp",
@@ -7929,6 +7953,7 @@
     {
       "id": "ms",
       "name": "Mississippi",
+      "bloc": "deep_south",
       "seats": 6,
       "precincts": 82,
       "method": "fptp",
@@ -8333,6 +8358,7 @@
     {
       "id": "mo",
       "name": "Missouri",
+      "bloc": "rust_belt",
       "seats": 10,
       "precincts": 115,
       "method": "fptp",
@@ -8893,6 +8919,7 @@
     {
       "id": "mt",
       "name": "Montana",
+      "bloc": "plains_mountain",
       "seats": 4,
       "precincts": 56,
       "method": "fptp",
@@ -9213,6 +9240,7 @@
     {
       "id": "ne",
       "name": "Nebraska",
+      "bloc": "plains_mountain",
       "seats": 5,
       "precincts": 93,
       "method": "fptp",
@@ -9694,6 +9722,7 @@
     {
       "id": "nv",
       "name": "Nevada",
+      "bloc": "sun_belt",
       "seats": 6,
       "precincts": 17,
       "method": "fptp",
@@ -9870,6 +9899,7 @@
     {
       "id": "nh",
       "name": "New Hampshire",
+      "bloc": "northeast",
       "seats": 4,
       "precincts": 10,
       "method": "fptp",
@@ -10010,6 +10040,7 @@
     {
       "id": "nj",
       "name": "New Jersey",
+      "bloc": "northeast",
       "seats": 14,
       "precincts": 21,
       "method": "fptp",
@@ -10194,6 +10225,7 @@
     {
       "id": "nm",
       "name": "New Mexico",
+      "bloc": "sun_belt",
       "seats": 5,
       "precincts": 33,
       "method": "fptp",
@@ -10426,6 +10458,7 @@
     {
       "id": "ny",
       "name": "New York",
+      "bloc": "northeast",
       "seats": 28,
       "precincts": 62,
       "method": "fptp",
@@ -10770,6 +10803,7 @@
     {
       "id": "nc",
       "name": "North Carolina",
+      "bloc": "sun_belt",
       "seats": 16,
       "precincts": 100,
       "method": "fptp",
@@ -11266,6 +11300,7 @@
     {
       "id": "nd",
       "name": "North Dakota",
+      "bloc": "plains_mountain",
       "seats": 3,
       "precincts": 53,
       "method": "fptp",
@@ -11578,6 +11613,7 @@
     {
       "id": "oh",
       "name": "Ohio",
+      "bloc": "rust_belt",
       "seats": 17,
       "precincts": 88,
       "method": "fptp",
@@ -12026,6 +12062,7 @@
     {
       "id": "ok",
       "name": "Oklahoma",
+      "bloc": "deep_south",
       "seats": 7,
       "precincts": 77,
       "method": "fptp",
@@ -12438,6 +12475,7 @@
     {
       "id": "or",
       "name": "Oregon",
+      "bloc": "west_coast",
       "seats": 8,
       "precincts": 36,
       "method": "fptp",
@@ -12686,6 +12724,7 @@
     {
       "id": "pa",
       "name": "Pennsylvania",
+      "bloc": "rust_belt",
       "seats": 19,
       "precincts": 67,
       "method": "fptp",
@@ -13046,6 +13085,7 @@
     {
       "id": "ri",
       "name": "Rhode Island",
+      "bloc": "northeast",
       "seats": 4,
       "precincts": 5,
       "method": "fptp",
@@ -13166,6 +13206,7 @@
     {
       "id": "sc",
       "name": "South Carolina",
+      "bloc": "deep_south",
       "seats": 9,
       "precincts": 46,
       "method": "fptp",
@@ -13430,6 +13471,7 @@
     {
       "id": "sd",
       "name": "South Dakota",
+      "bloc": "plains_mountain",
       "seats": 3,
       "precincts": 66,
       "method": "fptp",
@@ -13766,6 +13808,7 @@
     {
       "id": "tn",
       "name": "Tennessee",
+      "bloc": "deep_south",
       "seats": 11,
       "precincts": 95,
       "method": "fptp",
@@ -14250,6 +14293,7 @@
     {
       "id": "tx",
       "name": "Texas",
+      "bloc": "sun_belt",
       "seats": 40,
       "precincts": 254,
       "method": "fptp",
@@ -15338,6 +15382,7 @@
     {
       "id": "ut",
       "name": "Utah",
+      "bloc": "plains_mountain",
       "seats": 6,
       "precincts": 29,
       "method": "fptp",
@@ -15558,6 +15603,7 @@
     {
       "id": "vt",
       "name": "Vermont",
+      "bloc": "northeast",
       "seats": 3,
       "precincts": 14,
       "method": "fptp",
@@ -15722,6 +15768,7 @@
     {
       "id": "va",
       "name": "Virginia",
+      "bloc": "northeast",
       "seats": 13,
       "precincts": 132,
       "method": "fptp",
@@ -16334,6 +16381,7 @@
     {
       "id": "wa",
       "name": "Washington",
+      "bloc": "west_coast",
       "seats": 12,
       "precincts": 39,
       "method": "fptp",
@@ -16582,6 +16630,7 @@
     {
       "id": "wv",
       "name": "West Virginia",
+      "bloc": "rust_belt",
       "seats": 4,
       "precincts": 55,
       "method": "fptp",
@@ -16890,6 +16939,7 @@
     {
       "id": "wi",
       "name": "Wisconsin",
+      "bloc": "rust_belt",
       "seats": 10,
       "precincts": 72,
       "method": "fptp",
@@ -17274,6 +17324,7 @@
     {
       "id": "wy",
       "name": "Wyoming",
+      "bloc": "plains_mountain",
       "seats": 3,
       "precincts": 23,
       "method": "fptp",

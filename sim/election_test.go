@@ -662,6 +662,7 @@ func TestHierarchicalCorrelatedSwingsSpread(t *testing.T) {
 
 	const runs = 30
 	shockKeys := collectNationalShockKeys(s.Regions, s.Parties)
+	blocs := collectBlocs(s.Regions)
 	eppSeats := make([]float64, runs)
 	pfeSeats := make([]float64, runs)
 	for i := range runs {
@@ -670,11 +671,11 @@ func TestHierarchicalCorrelatedSwingsSpread(t *testing.T) {
 			Swing:       0.15,
 			Seed:        int64(100 + i),
 		}
-		shock := computeNationalShock(cfg.Seed, cfg.Swing, shockKeys)
+		shock := computeNationalShock(cfg.Seed, cfg.Swing, shockKeys, blocs)
 		regionSeats := make(map[string]map[string]int, len(s.Regions))
 		for ri, reg := range s.Regions {
 			votes := make(map[string]int)
-			for _, rep := range simulatePrecincts(reg, s.Parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), shock, nil) {
+			for _, rep := range simulatePrecincts(reg, s.Parties, cfg.Temperature, cfg.Swing, 0, cfg.Seed+int64(ri), shock, nil) {
 				for pid, v := range rep.Votes {
 					votes[pid] += v
 				}

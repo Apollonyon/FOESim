@@ -30,6 +30,7 @@ const state = {
   appliedSeed: 42,
   temp: 0.45,
   swing: 0.15,
+  tactical: 0,
   shiftParty: '',
   shiftVal: 0,
   wavesOverride: 0,
@@ -75,6 +76,8 @@ const shiftValEl = document.getElementById('shift-val');
 const inputSeed = document.getElementById('input-seed');
 const inputTemp = document.getElementById('input-temp');
 const tempVal = document.getElementById('temp-val');
+const inputTactical = document.getElementById('input-tactical');
+const tacticalVal = document.getElementById('tactical-val');
 const methodSelect = document.getElementById('method-select');
 const btnVersion = document.getElementById('btn-version');
 const battlegroundsEl = document.getElementById('battlegrounds');
@@ -145,8 +148,9 @@ function syncTuneIndicator() {
     state.methodOverride ||
     Math.abs(state.temp - 0.45) > 1e-3 ||
     Math.abs(state.swing - 0.15) > 1e-3 ||
-    state.durationMs !== 45000 ||
-    state.forecastRuns !== 200 ||
+    state.tactical > 1e-3 ||
+    (state.viewMode === 'live' && state.durationMs !== 45000) ||
+    (state.viewMode === 'forecast' && state.forecastRuns !== 200) ||
     state.customRunId
   );
   btnMobileControls.classList.toggle('has-overrides', hasOverrides);
@@ -257,6 +261,11 @@ function applyModifiersToHUD(modifiers) {
     inputTemp.value = String(Math.min(1.5, Math.max(0.25, state.temp)));
     tempVal.textContent = state.temp.toFixed(2);
   }
+  state.tactical = Number.isFinite(modifiers.tactical) && modifiers.tactical >= 0
+    ? Math.min(1, modifiers.tactical)
+    : 0;
+  if (inputTactical) inputTactical.value = String(Math.min(0.8, Math.max(0, state.tactical)));
+  if (tacticalVal) tacticalVal.textContent = state.tactical.toFixed(2);
   if (Number.isFinite(modifiers.seed)) {
     inputSeed.value = String(modifiers.seed);
     state.appliedSeed = modifiers.seed;
@@ -268,6 +277,7 @@ function resetModifiersToDefaults() {
   applyModifiersToHUD({
     swing: 0.15,
     uncertainty: 0.15,
+    tactical: 0,
     shiftParty: '',
     shiftVal: 0,
     temp: 0.45,
@@ -1043,6 +1053,7 @@ function setViewMode(mode, { skipReset = false } = {}) {
   forecastControls.classList.toggle('hidden', !isForecast);
 
   if (isForecast) {
+    syncTuneIndicator();
     maybeAutoExpandDesktopHemicycle();
     runForecast();
   } else {
@@ -1055,7 +1066,13 @@ function setViewMode(mode, { skipReset = false } = {}) {
     state.forecast = null;
     renderBattlegrounds();
     refreshLegend();
-    if (!skipReset) resetToReady();
+    if (!skipReset) {
+      state.swing = 0.15;
+      inputSwing.value = '0.15';
+      swingVal.textContent = '0.15';
+      resetToReady();
+    }
+    syncTuneIndicator();
   }
 }
 
@@ -1071,11 +1088,17 @@ function renderBattlegrounds() {
   for (const r of state.scenario.regions) {
     const rf = state.forecast.regions?.[r.id];
     if (!rf) continue;
-    races.push({ rid: r.id, label: r.name, seats: r.seats, probs: rf.win_prob || {} });
-    if (r.district_seats > 0 && !state.methodOverride && rf.district_win_prob) {
-      for (const [did, probs] of Object.entries(rf.district_win_prob)) {
-        races.push({ rid: r.id, label: `${did} (${r.name})`, seats: r.district_seats, probs });
-      }
+    const distEntries = (r.district_seats > 0 && !state.methodOverride && rf.district_win_prob)
+      ? Object.entries(rf.district_win_prob)
+      : [];
+    const allSeatsAreDistricts = distEntries.length > 0 && distEntries.length * r.district_seats >= r.seats;
+    if (!allSeatsAreDistricts) {
+      races.push({ rid: r.id, pid: '', label: r.name, seats: r.seats, probs: rf.win_prob || {} });
+    }
+    for (const [did, probs] of distEntries) {
+      const unitGeo = state.precinctGeo[did];
+      const dLabel = unitGeo?.label || did;
+      races.push({ rid: r.id, pid: unitGeo ? did : '', label: `${dLabel} (${r.name})`, seats: r.district_seats, probs });
     }
   }
 
@@ -1129,7 +1152,8 @@ function renderBattlegrounds() {
           setHemicycleCollapsed(true);
         }
         focusRegion(race.rid);
-        inspector.select('country', race.rid);
+        if (race.pid) inspector.select('precinct', race.pid);
+        else inspector.select('country', race.rid);
       }
     },
       el('div', { className: 'bg-row-head' },
@@ -1193,10 +1217,11 @@ async function runForecast(retried = false) {
     ? `&run=${encodeURIComponent(state.customRunId)}`
     : (state.scenarioId ? `&scenario=${encodeURIComponent(state.scenarioId)}` : '');
   const methodParam = state.methodOverride ? `&method=${encodeURIComponent(state.methodOverride)}` : '';
+  const tacticalParam = state.tactical > 0 ? `&tactical=${state.tactical}` : '';
   const shiftParam = (state.shiftParty && state.shiftVal !== 0)
     ? `&shift=${encodeURIComponent(state.shiftParty)}:${state.shiftVal}`
     : '';
-  const url = `/api/forecast?runs=${state.forecastRuns}&seed=${seed}&temp=${temp}&uncertainty=${swing}${shiftParam}${targetParam}${methodParam}`;
+  const url = `/api/forecast?runs=${state.forecastRuns}&seed=${seed}&temp=${temp}&uncertainty=${swing}${tacticalParam}${shiftParam}${targetParam}${methodParam}`;
 
   try {
     const res = await fetch(url, { signal: ctrl.signal });
@@ -1259,10 +1284,11 @@ function startStream(retried = false) {
     ? `&run=${encodeURIComponent(state.customRunId)}`
     : (state.scenarioId ? `&scenario=${encodeURIComponent(state.scenarioId)}` : '');
   const methodParam = state.methodOverride ? `&method=${encodeURIComponent(state.methodOverride)}` : '';
+  const tacticalParam = state.tactical > 0 ? `&tactical=${state.tactical}` : '';
   const shiftParam = (state.shiftParty && state.shiftVal !== 0)
     ? `&shift=${encodeURIComponent(state.shiftParty)}:${state.shiftVal}`
     : '';
-  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&uncertainty=${swing}${shiftParam}${targetParam}${methodParam}`;
+  const url = `/api/stream?duration_ms=${state.durationMs}&waves=${waves}&seed=${seed}&temp=${temp}&uncertainty=${swing}${tacticalParam}${shiftParam}${targetParam}${methodParam}`;
 
   syncRunControls();
 
@@ -1322,6 +1348,7 @@ function openScenarioEditor() {
     {
       swing: state.swing,
       uncertainty: state.swing,
+      tactical: state.tactical,
       shiftParty: state.shiftParty,
       shiftVal: state.shiftVal,
       temp: state.temp,
@@ -1439,6 +1466,14 @@ function wireEvents() {
     tempVal.textContent = state.temp.toFixed(2);
   });
   inputTemp.addEventListener('change', onSettingChanged);
+
+  if (inputTactical && tacticalVal) {
+    inputTactical.addEventListener('input', () => {
+      state.tactical = parseFloat(inputTactical.value) || 0;
+      tacticalVal.textContent = state.tactical.toFixed(2);
+    });
+    inputTactical.addEventListener('change', () => onSettingChanged());
+  }
 
   methodSelect.addEventListener('change', () => {
     state.methodOverride = methodSelect.value;

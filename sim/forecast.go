@@ -22,6 +22,7 @@ type ForecastConfig struct {
 	Runs          int
 	Temperature   float64
 	Swing         float64
+	Tactical      float64
 	NationalShift map[string]float64
 	BaseSeed      int64
 	Workers       int
@@ -74,6 +75,7 @@ type precomputedRegion struct {
 	partiesWithBonus  []Party
 	effectiveParties  []Party
 	totalPop          float64
+	baseTurnout       float64
 	sortedDistrictIDs []string
 	unitGroupTilts    [][]float64
 }
@@ -154,6 +156,7 @@ func buildPrecomputedRegions(sc Scenario) []precomputedRegion {
 			partiesWithBonus:  withBonus,
 			effectiveParties:  effParties,
 			totalPop:          float64(r.TotalPopulation()),
+			baseTurnout:       unitAverageTurnout(units),
 			sortedDistrictIDs: sortedDists,
 			unitGroupTilts:    unitTilts,
 		}
@@ -165,17 +168,23 @@ func simulateRegionForecastRun(
 	pre precomputedRegion,
 	temperature float64,
 	swing float64,
+	tactical float64,
 	seed int64,
 	shock nationalRunShock,
 	nationalShift map[string]float64,
 ) (votes map[string]int, seats map[string]int, districtWinners map[string]string) {
 	r := pre.region
-	parties := applyNationalAppealShifts(pre.partiesWithBonus, shock, nationalShift, swing)
+	parties := applyNationalAppealShifts(pre.partiesWithBonus, r.Bloc, shock, nationalShift, swing)
 	units := pre.units
 	rng := rand.New(rand.NewPCG(uint64(seed), 0))
+	bShock := shock.blocShocks[r.Bloc]
 
 	var countryShift PolicyVec
 	countryTurnoutNoise := 0.0
+	groupTurnoutMult := make([]float64, len(r.Groups))
+	for gi := range groupTurnoutMult {
+		groupTurnoutMult[gi] = 1.0
+	}
 	if swing > 0 {
 		policySigma := swing * 0.50
 		for ax := range countryShift {
@@ -186,13 +195,22 @@ func simulateRegionForecastRun(
 			parties[i].Appeal += rng.NormFloat64() * appealSigma
 		}
 		countryTurnoutNoise = rng.NormFloat64() * math.Min(0.03, swing*0.18)
+
+		countryTurnoutTilt := rng.NormFloat64() * math.Min(0.06, swing*0.25)
+		totalTilt := shock.turnoutTilt + countryTurnoutTilt
+		groupSigma := math.Min(0.06, swing*0.25)
+		for gi, g := range r.Groups {
+			lean := (g.Ideal[AxisEcon] + g.Ideal[AxisSocial] - g.Ideal[AxisEnv] + g.Ideal[AxisMigration]) * 0.25
+			m := 1.0 + totalTilt*lean + rng.NormFloat64()*groupSigma
+			groupTurnoutMult[gi] = math.Max(0.78, math.Min(1.22, m))
+		}
 	}
 
 	groupShares := make([]map[string]float64, len(r.Groups))
 	for gi, g := range r.Groups {
 		if swing > 0 {
 			for ax := range g.Ideal {
-				g.Ideal[ax] = math.Max(-1.0, math.Min(1.0, g.Ideal[ax]+shock.policyShift[ax]+countryShift[ax]))
+				g.Ideal[ax] = math.Max(-1.0, math.Min(1.0, g.Ideal[ax]+shock.policyShift[ax]+bShock.policyShift[ax]+countryShift[ax]))
 			}
 		}
 		groupShares[gi] = VoteShares(g, parties, temperature)
@@ -216,6 +234,7 @@ func simulateRegionForecastRun(
 	if r.DistrictSeats > 0 {
 		districtVotes = make(map[string]map[string]int, len(pre.sortedDistrictIDs))
 	}
+	var nonDistrictVotes map[string]int
 
 	tilts := make([]float64, len(r.Groups))
 	for ui, u := range units {
@@ -246,7 +265,11 @@ func simulateRegionForecastRun(
 		turnoutNoise := 1.0
 		if swing > 0 {
 			localTurnout := rng.NormFloat64() * math.Min(0.03, swing*0.18)
-			turnoutNoise = math.Max(0.75, math.Min(1.25, 1.0+countryTurnoutNoise+localTurnout))
+			turnoutNoise = math.Max(0.75, math.Min(1.25, 1.0+bShock.turnoutBias+countryTurnoutNoise+localTurnout))
+		}
+		unitTurnoutMult := 1.0
+		if u.Turnout > 0 && pre.baseTurnout > 0 {
+			unitTurnoutMult = u.Turnout / pre.baseTurnout
 		}
 
 		var dVotes map[string]int
@@ -260,14 +283,51 @@ func simulateRegionForecastRun(
 
 		for gi, g := range r.Groups {
 			pop := float64(g.Population) * tilts[gi] * norm * u.Weight
-			voters := pop * math.Min(1.0, g.Turnout*turnoutNoise)
+			effTurnout := math.Max(0.0, math.Min(1.0, g.Turnout*unitTurnoutMult*turnoutNoise*groupTurnoutMult[gi]))
+			voters := pop * effTurnout
 			for partyID, share := range groupShares[gi] {
 				v := int(math.Round(voters * share))
 				votes[partyID] += v
 				if dVotes != nil {
 					dVotes[partyID] += v
+				} else if r.DistrictSeats > 0 && tactical > 0 {
+					if nonDistrictVotes == nil {
+						nonDistrictVotes = make(map[string]int, len(parties))
+					}
+					nonDistrictVotes[partyID] += v
 				}
 			}
+		}
+	}
+
+	if tactical > 0 && !isNonFinite(tactical) {
+		if r.DistrictSeats > 0 {
+			var fallback []tacticalTransfer
+			if len(nonDistrictVotes) > 0 && (r.Method == MethodFPTP || r.Threshold > 0) {
+				fallback = computeTacticalTransfers(votes, parties, r.Method, r.Threshold, tactical)
+			}
+			votes = make(map[string]int, len(parties))
+			for _, did := range pre.sortedDistrictIDs {
+				dv := districtVotes[did]
+				if len(dv) == 0 {
+					continue
+				}
+				squeezed := ApplyTacticalSqueeze(dv, parties, MethodFPTP, 0, tactical)
+				districtVotes[did] = squeezed
+				for pid, v := range squeezed {
+					votes[pid] += v
+				}
+			}
+			if len(nonDistrictVotes) > 0 {
+				if len(fallback) > 0 {
+					nonDistrictVotes = applyTacticalTransfers(nonDistrictVotes, fallback)
+				}
+				for pid, v := range nonDistrictVotes {
+					votes[pid] += v
+				}
+			}
+		} else if r.Method == MethodFPTP || r.Threshold > 0 {
+			votes = ApplyTacticalSqueeze(votes, parties, r.Method, r.Threshold, tactical)
 		}
 	}
 
@@ -334,10 +394,11 @@ func RunForecast(ctx context.Context, sc Scenario, cfg ForecastConfig) (Forecast
 	start := time.Now()
 	preRegions := buildPrecomputedRegions(sc)
 	shockKeys := collectNationalShockKeys(sc.Regions, sc.Parties)
+	blocs := collectBlocs(sc.Regions)
 
 	baseRegSeats := make(map[string]map[string]int, len(preRegions))
 	for ri, pre := range preRegions {
-		_, seats, _ := simulateRegionForecastRun(pre, cfg.Temperature, 0, cfg.BaseSeed+int64(ri), nationalRunShock{}, cfg.NationalShift)
+		_, seats, _ := simulateRegionForecastRun(pre, cfg.Temperature, 0, cfg.Tactical, cfg.BaseSeed+int64(ri), nationalRunShock{}, cfg.NationalShift)
 		baseRegSeats[pre.region.ID] = seats
 	}
 	baseline := sc.AggregateEUSeats(baseRegSeats)
@@ -359,7 +420,7 @@ func RunForecast(ctx context.Context, sc Scenario, cfg ForecastConfig) (Forecast
 					return
 				}
 				runSeed := cfg.BaseSeed + int64(idx)*forecastSeedStride
-				shock := computeNationalShock(runSeed, cfg.Swing, shockKeys)
+				shock := computeNationalShock(runSeed, cfg.Swing, shockKeys, blocs)
 
 				regSeatsMap := make(map[string]map[string]int, len(preRegions))
 				regSeatsSlice := make([]map[string]int, len(preRegions))
@@ -370,7 +431,7 @@ func RunForecast(ctx context.Context, sc Scenario, cfg ForecastConfig) (Forecast
 					if ctx.Err() != nil {
 						return
 					}
-					votes, seats, distW := simulateRegionForecastRun(pre, cfg.Temperature, cfg.Swing, runSeed+int64(ri), shock, cfg.NationalShift)
+					votes, seats, distW := simulateRegionForecastRun(pre, cfg.Temperature, cfg.Swing, cfg.Tactical, runSeed+int64(ri), shock, cfg.NationalShift)
 					regSeatsMap[pre.region.ID] = seats
 					regSeatsSlice[ri] = seats
 					regWinnersSlice[ri] = winningParties(votes, seats, pre.effectiveParties)

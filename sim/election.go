@@ -30,6 +30,7 @@ type PrecinctReport struct {
 type ElectionConfig struct {
 	Temperature    float64
 	Swing          float64
+	Tactical       float64
 	NationalShift  map[string]float64
 	Seed           int64
 	Waves          int           // partial reporting waves per precinct (<= 1 emits one 100% report)
@@ -37,9 +38,17 @@ type ElectionConfig struct {
 	TargetDuration time.Duration // optional total stream duration per region (scales cleanly for NUTS-3)
 }
 
+type blocShock struct {
+	policyShift PolicyVec
+	partyAppeal map[string]float64
+	turnoutBias float64
+}
+
 type nationalRunShock struct {
 	policyShift PolicyVec
 	partyAppeal map[string]float64
+	turnoutTilt float64
+	blocShocks  map[string]blocShock
 }
 
 // SimulatePrecincts splits r into reporting batches with a seeded hierarchical swing
@@ -48,7 +57,7 @@ type nationalRunShock struct {
 // When r.UseNUTS3 is true and embedded Eurostat NUTS-3 units exist for r.ID,
 // those units (with urban/rural demographic tilt) are simulated instead of synthetic batches.
 func SimulatePrecincts(r Region, parties []Party, temperature, swing float64, seed int64) []PrecinctReport {
-	return simulatePrecincts(r, parties, temperature, swing, seed, nationalRunShock{}, nil)
+	return simulatePrecincts(r, parties, temperature, swing, 0, seed, nationalRunShock{}, nil)
 }
 
 // PreparedElection holds concurrently simulated region reports and correlated
@@ -66,7 +75,8 @@ type PreparedElection struct {
 // stream the same precinct reports via Stream without simulating twice.
 func PrepareElection(regions []Region, parties []Party, cfg ElectionConfig) *PreparedElection {
 	shockKeys := collectNationalShockKeys(regions, parties)
-	shock := computeNationalShock(cfg.Seed, cfg.Swing, shockKeys)
+	blocs := collectBlocs(regions)
+	shock := computeNationalShock(cfg.Seed, cfg.Swing, shockKeys, blocs)
 	pollSigma := 0.0
 	if cfg.Swing > 0 {
 		pollSigma = math.Min(0.06, 0.02+cfg.Swing*0.20)
@@ -81,7 +91,7 @@ func PrepareElection(regions []Region, parties []Party, cfg ElectionConfig) *Pre
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			reports := simulatePrecincts(reg, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), shock, cfg.NationalShift)
+			reports := simulatePrecincts(reg, parties, cfg.Temperature, cfg.Swing, cfg.Tactical, cfg.Seed+int64(ri), shock, cfg.NationalShift)
 			perRegion[ri] = reports
 			exitByIdx[ri], exitWinnersByIdx[ri] = computeExitPollRegionSeats(reg, reports, cfg.Seed, ri, pollSigma, parties)
 		}()
@@ -228,7 +238,53 @@ func collectNationalShockKeys(regions []Region, topParties []Party) []string {
 	return slices.Sorted(maps.Keys(seen))
 }
 
-func computeNationalShock(seed int64, swing float64, keys []string) nationalRunShock {
+const studentTNormScale = 1.2909944487358056 // math.Sqrt(5.0 / 3.0)
+
+// unitStudentT returns a Student-t(df=5) draw normalized to unit variance and
+// clamped to [-4.5, 4.5], producing realistic heavy-tailed election shocks.
+func unitStudentT(rng *rand.Rand) float64 {
+	z := rng.NormFloat64()
+	chi2 := 0.0
+	for range 5 {
+		x := rng.NormFloat64()
+		chi2 += x * x
+	}
+	if chi2 < 1e-9 {
+		chi2 = 1e-9
+	}
+	t := z / math.Sqrt(chi2/5.0) / studentTNormScale
+	return math.Max(-4.5, math.Min(4.5, t))
+}
+
+func collectBlocs(regions []Region) []string {
+	seen := make(map[string]struct{})
+	for _, r := range regions {
+		if r.Bloc != "" {
+			seen[r.Bloc] = struct{}{}
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	return slices.Sorted(maps.Keys(seen))
+}
+
+func unitAverageTurnout(units []PrecinctUnit) float64 {
+	totalW := 0.0
+	weighted := 0.0
+	for _, u := range units {
+		if u.Turnout > 0 && u.Weight > 0 {
+			totalW += u.Weight
+			weighted += u.Weight * u.Turnout
+		}
+	}
+	if totalW <= 0 {
+		return 0
+	}
+	return weighted / totalW
+}
+
+func computeNationalShock(seed int64, swing float64, keys, blocs []string) nationalRunShock {
 	if swing <= 0 {
 		return nationalRunShock{}
 	}
@@ -236,23 +292,49 @@ func computeNationalShock(seed int64, swing float64, keys []string) nationalRunS
 	var policyShift PolicyVec
 	sigma := swing * 0.40
 	for ax := range policyShift {
-		policyShift[ax] = rng.NormFloat64() * sigma
+		policyShift[ax] = unitStudentT(rng) * sigma
 	}
 	partyAppeal := make(map[string]float64, len(keys))
 	appealSigma := swing * 0.45
 	for _, k := range keys {
-		partyAppeal[k] = rng.NormFloat64() * appealSigma
+		partyAppeal[k] = unitStudentT(rng) * appealSigma
 	}
+	turnoutTilt := unitStudentT(rng) * math.Min(0.08, swing*0.35)
+
+	var blocShocks map[string]blocShock
+	if len(blocs) > 0 {
+		blocShocks = make(map[string]blocShock, len(blocs))
+		bPolicySigma := swing * 0.25
+		bAppealSigma := swing * 0.28
+		bTurnoutSigma := math.Min(0.02, swing*0.10)
+		for _, b := range blocs {
+			var bs blocShock
+			for ax := range bs.policyShift {
+				bs.policyShift[ax] = unitStudentT(rng) * bPolicySigma
+			}
+			bs.partyAppeal = make(map[string]float64, len(keys))
+			for _, k := range keys {
+				bs.partyAppeal[k] = unitStudentT(rng) * bAppealSigma
+			}
+			bs.turnoutBias = unitStudentT(rng) * bTurnoutSigma
+			blocShocks[b] = bs
+		}
+	}
+
 	return nationalRunShock{
 		policyShift: policyShift,
 		partyAppeal: partyAppeal,
+		turnoutTilt: turnoutTilt,
+		blocShocks:  blocShocks,
 	}
 }
 
-func applyNationalAppealShifts(parties []Party, shock nationalRunShock, nationalShift map[string]float64, swing float64) []Party {
+func applyNationalAppealShifts(parties []Party, bloc string, shock nationalRunShock, nationalShift map[string]float64, swing float64) []Party {
 	hasShift := len(nationalShift) > 0
 	hasShock := swing > 0 && len(shock.partyAppeal) > 0
-	if !hasShift && !hasShock && swing <= 0 {
+	bShock, hasBlocShock := shock.blocShocks[bloc]
+	hasBlocAppeal := swing > 0 && hasBlocShock && len(bShock.partyAppeal) > 0
+	if !hasShift && !hasShock && !hasBlocAppeal && swing <= 0 {
 		return parties
 	}
 	out := slices.Clone(parties)
@@ -271,21 +353,29 @@ func applyNationalAppealShifts(parties []Party, shock nationalRunShock, national
 		if hasShock {
 			out[i].Appeal += shock.partyAppeal[nationalShockKey(out[i])]
 		}
+		if hasBlocAppeal {
+			out[i].Appeal += bShock.partyAppeal[nationalShockKey(out[i])]
+		}
 	}
 	return out
 }
 
-func simulatePrecincts(r Region, parties []Party, temperature, swing float64, seed int64, shock nationalRunShock, nationalShift map[string]float64) []PrecinctReport {
+func simulatePrecincts(r Region, parties []Party, temperature, swing, tactical float64, seed int64, shock nationalRunShock, nationalShift map[string]float64) []PrecinctReport {
 	parties = applyPartyBonus(r.EffectiveParties(parties), r.PartyBonus)
-	parties = applyNationalAppealShifts(parties, shock, nationalShift, swing)
+	parties = applyNationalAppealShifts(parties, r.Bloc, shock, nationalShift, swing)
 	units := resolveUnits(r)
 	n := len(units)
 
 	rng := rand.New(rand.NewPCG(uint64(seed), 0))
+	bShock := shock.blocShocks[r.Bloc]
 
-	// Hierarchical Level 2: country-wide policy shift and per-region party valence shock.
+	// Hierarchical Level 2: country/region policy shift, party valence shock, and differential turnout.
 	var countryShift PolicyVec
 	countryTurnoutNoise := 0.0
+	groupTurnoutMult := make([]float64, len(r.Groups))
+	for gi := range groupTurnoutMult {
+		groupTurnoutMult[gi] = 1.0
+	}
 	if swing > 0 {
 		policySigma := swing * 0.50
 		for ax := range countryShift {
@@ -296,14 +386,23 @@ func simulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 			parties[i].Appeal += rng.NormFloat64() * appealSigma
 		}
 		countryTurnoutNoise = rng.NormFloat64() * math.Min(0.03, swing*0.18)
+
+		countryTurnoutTilt := rng.NormFloat64() * math.Min(0.06, swing*0.25)
+		totalTilt := shock.turnoutTilt + countryTurnoutTilt
+		groupSigma := math.Min(0.06, swing*0.25)
+		for gi, g := range r.Groups {
+			lean := (g.Ideal[AxisEcon] + g.Ideal[AxisSocial] - g.Ideal[AxisEnv] + g.Ideal[AxisMigration]) * 0.25
+			m := 1.0 + totalTilt*lean + rng.NormFloat64()*groupSigma
+			groupTurnoutMult[gi] = math.Max(0.78, math.Min(1.22, m))
+		}
 	}
 
-	// Precompute per-group party vote shares under combined national + region policy shift.
+	// Precompute per-group party vote shares under combined national + bloc + region policy shift.
 	groupShares := make([]map[string]float64, len(r.Groups))
 	for gi, g := range r.Groups {
 		if swing > 0 {
 			for ax := range g.Ideal {
-				g.Ideal[ax] = math.Max(-1.0, math.Min(1.0, g.Ideal[ax]+shock.policyShift[ax]+countryShift[ax]))
+				g.Ideal[ax] = math.Max(-1.0, math.Min(1.0, g.Ideal[ax]+shock.policyShift[ax]+bShock.policyShift[ax]+countryShift[ax]))
 			}
 		}
 		groupShares[gi] = VoteShares(g, parties, temperature)
@@ -331,6 +430,7 @@ func simulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 	reports := make([]PrecinctReport, 0, n)
 
 	totalPop := float64(r.TotalPopulation())
+	unitBaseTurnout := unitAverageTurnout(units)
 	for i, u := range units {
 		votes := make(map[string]int, len(parties))
 		eligibleVoters := 0
@@ -359,14 +459,19 @@ func simulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 		turnoutNoise := 1.0
 		if swing > 0 {
 			localTurnout := rng.NormFloat64() * math.Min(0.03, swing*0.18)
-			turnoutNoise = math.Max(0.75, math.Min(1.25, 1.0+countryTurnoutNoise+localTurnout))
+			turnoutNoise = math.Max(0.75, math.Min(1.25, 1.0+bShock.turnoutBias+countryTurnoutNoise+localTurnout))
+		}
+		unitTurnoutMult := 1.0
+		if u.Turnout > 0 && unitBaseTurnout > 0 {
+			unitTurnoutMult = u.Turnout / unitBaseTurnout
 		}
 
 		for gi, g := range r.Groups {
 			pop := float64(g.Population) * tilts[gi] * norm * u.Weight
 			eligibleVoters += int(math.Round(pop))
 
-			voters := pop * math.Min(1.0, g.Turnout*turnoutNoise)
+			effTurnout := math.Max(0.0, math.Min(1.0, g.Turnout*unitTurnoutMult*turnoutNoise*groupTurnoutMult[gi]))
+			voters := pop * effTurnout
 			for partyID, share := range groupShares[gi] {
 				votes[partyID] += int(math.Round(voters * share))
 			}
@@ -384,6 +489,10 @@ func simulatePrecincts(r Region, parties []Party, temperature, swing float64, se
 			EligibleVoters: eligibleVoters,
 			Votes:          votes,
 		})
+	}
+
+	if tactical > 0 {
+		applyTacticalToReports(reports, r, parties, tactical)
 	}
 
 	return reports
@@ -493,7 +602,8 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 	var wg sync.WaitGroup
 	minClose, closeSpan := pollCloseWindow(regions)
 	shockKeys := collectNationalShockKeys(regions, parties)
-	shock := computeNationalShock(cfg.Seed, cfg.Swing, shockKeys)
+	blocs := collectBlocs(regions)
+	shock := computeNationalShock(cfg.Seed, cfg.Swing, shockKeys, blocs)
 
 	for ri, r := range regions {
 		wg.Add(1)
@@ -503,7 +613,7 @@ func StreamElection(ctx context.Context, regions []Region, parties []Party, cfg 
 			if !ok {
 				return
 			}
-			reports := simulatePrecincts(r, parties, cfg.Temperature, cfg.Swing, cfg.Seed+int64(ri), shock, cfg.NationalShift)
+			reports := simulatePrecincts(r, parties, cfg.Temperature, cfg.Swing, cfg.Tactical, cfg.Seed+int64(ri), shock, cfg.NationalShift)
 			streamRegionReports(ctx, out, ri, r, reports, cfg, regionDuration)
 		}()
 	}

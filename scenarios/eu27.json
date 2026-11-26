@@ -143,6 +143,7 @@
     {
       "id": "de",
       "name": "Germany",
+      "bloc": "dach",
       "seats": 96,
       "precincts": 16,
       "use_nuts3": true,
@@ -501,6 +502,7 @@
     {
       "id": "fr",
       "name": "France",
+      "bloc": "west",
       "seats": 81,
       "precincts": 14,
       "use_nuts3": true,
@@ -799,6 +801,7 @@
     {
       "id": "it",
       "name": "Italy",
+      "bloc": "south",
       "seats": 76,
       "precincts": 12,
       "use_nuts3": true,
@@ -1094,6 +1097,7 @@
     {
       "id": "es",
       "name": "Spain",
+      "bloc": "south",
       "seats": 61,
       "method": "dhondt",
       "threshold": 0,
@@ -1373,6 +1377,7 @@
     {
       "id": "pl",
       "name": "Poland",
+      "bloc": "visegrad",
       "seats": 53,
       "method": "dhondt",
       "threshold": 0.05,
@@ -1617,6 +1622,7 @@
     {
       "id": "ro",
       "name": "Romania",
+      "bloc": "balkans",
       "seats": 33,
       "method": "dhondt",
       "threshold": 0.05,
@@ -1870,6 +1876,7 @@
     {
       "id": "nl",
       "name": "Netherlands",
+      "bloc": "benelux",
       "seats": 31,
       "method": "dhondt",
       "threshold": 0,
@@ -2155,6 +2162,7 @@
     {
       "id": "be",
       "name": "Belgium",
+      "bloc": "benelux",
       "seats": 22,
       "method": "dhondt",
       "threshold": 0.05,
@@ -2430,6 +2438,7 @@
     {
       "id": "cz",
       "name": "Czechia",
+      "bloc": "visegrad",
       "seats": 21,
       "method": "dhondt",
       "threshold": 0.05,
@@ -2678,6 +2687,7 @@
     {
       "id": "el",
       "name": "Greece",
+      "bloc": "south",
       "seats": 21,
       "method": "hare",
       "threshold": 0.03,
@@ -2930,6 +2940,7 @@
     {
       "id": "hu",
       "name": "Hungary",
+      "bloc": "visegrad",
       "seats": 21,
       "method": "dhondt",
       "threshold": 0.05,
@@ -3167,6 +3178,7 @@
     {
       "id": "pt",
       "name": "Portugal",
+      "bloc": "south",
       "seats": 21,
       "method": "dhondt",
       "threshold": 0,
@@ -3409,6 +3421,7 @@
     {
       "id": "se",
       "name": "Sweden",
+      "bloc": "nordic",
       "seats": 21,
       "method": "sainte_lague",
       "threshold": 0.04,
@@ -3661,6 +3674,7 @@
     {
       "id": "at",
       "name": "Austria",
+      "bloc": "dach",
       "seats": 20,
       "method": "dhondt",
       "threshold": 0.04,
@@ -3897,6 +3911,7 @@
     {
       "id": "bg",
       "name": "Bulgaria",
+      "bloc": "balkans",
       "seats": 17,
       "method": "hare",
       "threshold": 0.0588,
@@ -4139,6 +4154,7 @@
     {
       "id": "dk",
       "name": "Denmark",
+      "bloc": "nordic",
       "seats": 15,
       "method": "dhondt",
       "threshold": 0,
@@ -4381,6 +4397,7 @@
     {
       "id": "fi",
       "name": "Finland",
+      "bloc": "nordic",
       "seats": 15,
       "method": "dhondt",
       "threshold": 0,
@@ -4623,6 +4640,7 @@
     {
       "id": "sk",
       "name": "Slovakia",
+      "bloc": "visegrad",
       "seats": 15,
       "method": "hare",
       "threshold": 0.05,
@@ -4849,6 +4867,7 @@
     {
       "id": "ie",
       "name": "Ireland",
+      "bloc": "west",
       "seats": 14,
       "method": "stv",
       "threshold": 0,
@@ -5075,6 +5094,7 @@
     {
       "id": "hr",
       "name": "Croatia",
+      "bloc": "balkans",
       "seats": 12,
       "method": "dhondt",
       "threshold": 0.05,
@@ -5285,6 +5305,7 @@
     {
       "id": "lt",
       "name": "Lithuania",
+      "bloc": "baltics",
       "seats": 11,
       "method": "hare",
       "threshold": 0.05,
@@ -5511,6 +5532,7 @@
     {
       "id": "lv",
       "name": "Latvia",
+      "bloc": "baltics",
       "seats": 9,
       "method": "sainte_lague",
       "threshold": 0.05,
@@ -5737,6 +5759,7 @@
     {
       "id": "si",
       "name": "Slovenia",
+      "bloc": "balkans",
       "seats": 9,
       "method": "dhondt",
       "threshold": 0,
@@ -5963,6 +5986,7 @@
     {
       "id": "ee",
       "name": "Estonia",
+      "bloc": "baltics",
       "seats": 7,
       "method": "dhondt",
       "threshold": 0,
@@ -6189,6 +6213,7 @@
     {
       "id": "cy",
       "name": "Cyprus",
+      "bloc": "south",
       "seats": 6,
       "method": "hare",
       "threshold": 0.018,
@@ -6415,6 +6440,7 @@
     {
       "id": "lu",
       "name": "Luxembourg",
+      "bloc": "benelux",
       "seats": 6,
       "method": "dhondt",
       "threshold": 0,
@@ -6641,6 +6667,7 @@
     {
       "id": "mt",
       "name": "Malta",
+      "bloc": "south",
       "seats": 6,
       "method": "stv",
       "threshold": 0,

@@ -232,6 +232,9 @@ func (s Scenario) Validate() error {
 		if r.ID == "" {
 			return fmt.Errorf("scenario %q has a region with empty id", s.Name)
 		}
+		if len(r.Bloc) > 64 {
+			return fmt.Errorf("region %q in scenario %q has bloc name too long (%d > 64)", r.ID, s.Name, len(r.Bloc))
+		}
 		if seenRegions[r.ID] {
 			return fmt.Errorf("scenario %q has duplicate region id %q", s.Name, r.ID)
 		}

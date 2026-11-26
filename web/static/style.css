@@ -541,6 +541,20 @@ input:focus-visible {
   background: var(--surface-hover);
 }
 
+.brand-right .icon-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--text);
+  background: var(--surface-subtle);
+  border: 1px solid var(--hud-hairline);
+  border-radius: 6px;
+}
+
+.brand-right .icon-btn:hover {
+  background: var(--surface-hover);
+}
+
 .nav-row {
   display: flex;
   align-items: center;
@@ -2211,6 +2225,11 @@ html[data-theme="dark"] .editor-error {
   .htab-btn,
   .focus-btn {
     min-height: 30px;
+  }
+
+  .brand-right .icon-btn {
+    width: 34px;
+    height: 34px;
   }
 
   .bottom-right-stack {

@@ -21,6 +21,7 @@ type VoterGroup struct {
 type Region struct {
 	ID            string                        `json:"id"`
 	Name          string                        `json:"name"`
+	Bloc          string                        `json:"bloc,omitempty"` // optional macro-region tag for correlated regional shocks
 	Seats         int                           `json:"seats"`
 	Precincts     int                           `json:"precincts"`
 	Groups        []VoterGroup                  `json:"groups"`

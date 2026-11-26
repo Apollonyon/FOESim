@@ -939,3 +939,30 @@ func TestServerCustomRunsRateLimit(t *testing.T) {
 		t.Fatalf("POST from different IP = %d, want 201", code)
 	}
 }
+
+func TestServerTacticalParamParsingAndClamping(t *testing.T) {
+	srv := NewServer(sim.Scenario{
+		Name:    "Tactical Test",
+		Parties: sim.DefaultParties(),
+		Regions: sim.DefaultRegions(),
+	})
+
+	cases := []struct {
+		query string
+		want  float64
+	}{
+		{"", 0},
+		{"tactical=0.4", 0.4},
+		{"tactical=2.5", 1.0},
+		{"tactical=-0.3", 0},
+		{"tactical=NaN", 0},
+		{"tactical=Inf", 0},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(http.MethodGet, "/api/stream?"+tc.query, nil)
+		cfg := srv.parseElectionConfig(req)
+		if cfg.Tactical != tc.want {
+			t.Errorf("query %q: Tactical = %v, want %v", tc.query, cfg.Tactical, tc.want)
+		}
+	}
+}

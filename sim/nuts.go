@@ -20,6 +20,7 @@ type PrecinctUnit struct {
 	Name       string  `json:"name"`
 	UrbanType  int     `json:"urban_type,omitempty"` // 1 = urban, 2 = intermediate, 3 = rural
 	Population int     `json:"population,omitempty"` // resident population
+	Turnout    float64 `json:"turnout,omitempty"`    // optional unit-level baseline turnout rate in (0, 1]
 	Weight     float64 `json:"weight"`               // normalized share of region population
 	WealthZ    float64 `json:"wealth_z,omitempty"`   // region-relative wealth z-score in [-1.5, 1.5]
 	AgeZ       float64 `json:"age_z,omitempty"`      // region-relative age 65+ share z-score in [-1.5, 1.5]

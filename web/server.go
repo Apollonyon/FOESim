@@ -498,6 +498,7 @@ func (s *Server) handleForecast(w http.ResponseWriter, r *http.Request) {
 		Runs:          runs,
 		Temperature:   streamCfg.Temperature,
 		Swing:         streamCfg.Swing,
+		Tactical:      streamCfg.Tactical,
 		NationalShift: streamCfg.NationalShift,
 		BaseSeed:      streamCfg.Seed,
 	})
@@ -686,6 +687,9 @@ func (s *Server) parseElectionConfig(r *http.Request) sim.ElectionConfig {
 	}
 	if v, err := strconv.ParseFloat(rawUnc, 64); err == nil && v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) {
 		cfg.Swing = min(v, maxSwing)
+	}
+	if v, err := strconv.ParseFloat(q.Get("tactical"), 64); err == nil && v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) {
+		cfg.Tactical = min(v, 1.0)
 	}
 	if rawShift := strings.TrimSpace(q.Get("shift")); rawShift != "" {
 		cfg.NationalShift = parseNationalShift(rawShift)
